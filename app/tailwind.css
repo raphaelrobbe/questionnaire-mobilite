@@ -1,0 +1,40 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/nunito';
+
+@theme {
+  --font-sans: 'Nunito Variable', ui-sans-serif, system-ui, sans-serif;
+  --color-pine: #143d36;
+  --color-pine-deep: #0e2c27;
+  --color-leaf: #1f7a62;
+  --color-mist: #e7f3ef;
+  --color-paper: #f3efe6;
+  --color-card: #fffcf7;
+  --color-ink: #1c1915;
+  --color-muted: #5c564e;
+  --color-line: #e4dcd0;
+  --color-clay: #8a4b08;
+  --color-clay-bg: #f8ecd9;
+  --color-danger: #8f2d2d;
+  --color-danger-bg: #f8e4e0;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f3efe6;
+  color: #1c1915;
+  font-family: var(--font-sans);
+}
+
+button:hover:not(:disabled),
+a:hover {
+  cursor: pointer;
+}
+
+::selection {
+  background: #cfe5dc;
+}

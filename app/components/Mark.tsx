@@ -1,0 +1,13 @@
+export function Mark({ className = 'size-9' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <rect width="64" height="64" rx="18" fill="#143d36" />
+      <circle cx="32" cy="32" r="20" fill="#f3efe6" />
+      <path
+        d="M32 18.5c-5.2 6.4-8.2 10.2-8.2 15.2a8.2 8.2 0 0 0 16.4 0c0-5-3-8.8-8.2-15.2z"
+        fill="#1f7a62"
+      />
+      <circle cx="32" cy="33.2" r="2.6" fill="#f3efe6" />
+    </svg>
+  )
+}
