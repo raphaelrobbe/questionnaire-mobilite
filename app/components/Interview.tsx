@@ -1,7 +1,8 @@
 import { Link } from '@remix-run/react'
 import { useEffect, useRef, useState } from 'react'
+import { startRefusal } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
-import { buildSteps, issueFor, patchAnswers, summary, type Answers } from '~/common/survey'
+import { buildSteps, patchAnswers, stepIssue, summary, type Answers } from '~/common/survey'
 import type { ResponseRecord } from '~/common/response'
 import { clearDraft, emptyDraft, loadDraft, saveDraft, type Draft } from '~/lib/draft.client'
 import { capturePosition } from '~/lib/geo.client'
@@ -9,11 +10,16 @@ import { flushOne, keepResponse, type LocalResponse } from '~/lib/outbox.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { useOnline } from '~/hooks/useOnline'
 import { useSettings } from '~/hooks/useSettings'
+import { useSheetLists } from '~/hooks/useSheetLists'
 import { Button, buttonClass } from './Button'
-import { ChoiceList } from './ChoiceList'
+import { CommuneStep } from './CommuneStep'
+import { ContactStep } from './ContactStep'
+import { HouseholdStep } from './HouseholdStep'
+import { VehiclesStep } from './VehiclesStep'
 
 export function Interview() {
   const settings = useSettings()
+  const lists = useSheetLists()
   const online = useOnline()
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -23,10 +29,20 @@ export function Interview() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
   const [geoBusy, setGeoBusy] = useState(false)
+  const [deviceId, setDeviceId] = useState('')
+
+  const refusal =
+    settings && deviceId && lists.status === 'ready' ? startRefusal(lists.interviewers, settings.interviewer, deviceId) : null
+  const allowed = Boolean(settings && deviceId && lists.status === 'ready' && !refusal)
 
   useEffect(() => {
-    setDraft(loadDraft() ?? emptyDraft())
+    setDeviceId(getDeviceId())
   }, [])
+
+  useEffect(() => {
+    if (!allowed) return
+    setDraft((current) => current ?? loadDraft() ?? emptyDraft())
+  }, [allowed])
 
   useEffect(() => {
     if (!draft || saved) return
@@ -44,14 +60,34 @@ export function Interview() {
     setBlocked(false)
     const stepsNow = buildSteps(current.answers)
     const stepNow = stepsNow[Math.min(current.step, stepsNow.length - 1)]
-    if (stepNow?.kind === 'question' && stepNow.question.kind === 'text') {
-      document.getElementById('reponse')?.focus()
+    if (stepNow?.kind === 'commune') {
+      document.getElementById('commune-filtre')?.focus()
       return
     }
     headingRef.current?.focus()
   }, [stepIndex, opened])
 
-  if (!draft || !settings) {
+  if (!settings || !deviceId || lists.status === 'loading') {
+    return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’entretien…</p>
+  }
+
+  if (lists.status === 'error' || refusal) {
+    const message = lists.status === 'error' ? lists.message || 'Listes indisponibles.' : refusal
+    return (
+      <div className="grid gap-4">
+        <h1 className="text-3xl font-extrabold tracking-tight">Enquête impossible</h1>
+        <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">{message}</p>
+        <Link to="/reglages" className={buttonClass('secondary')}>
+          Ouvrir les réglages
+        </Link>
+        <Link to="/" className={buttonClass('ghost')}>
+          Retour à l’accueil
+        </Link>
+      </div>
+    )
+  }
+
+  if (!draft) {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’entretien…</p>
   }
 
@@ -88,12 +124,9 @@ export function Interview() {
       setBlocked(true)
       return
     }
-    if (step.kind === 'question') {
-      const issue = issueFor(step.question, draft.answers)
-      if (issue) {
-        setBlocked(true)
-        return
-      }
+    if (step.kind !== 'consent' && step.kind !== 'review' && stepIssue(step, draft.answers, lists.communes)) {
+      setBlocked(true)
+      return
     }
     setBlocked(false)
     update({ step: stepIndex + 1 })
@@ -104,11 +137,10 @@ export function Interview() {
     setSaving(true)
     setSaveError(null)
     const record: ResponseRecord = {
-      id: crypto.randomUUID(),
+      id: draft.code,
       createdAt: new Date().toISOString(),
       deviceId: getDeviceId(),
       interviewer: settings?.interviewer ?? '',
-      place: settings?.place ?? '',
       latitude: draft.latitude,
       longitude: draft.longitude,
       answers: draft.answers,
@@ -137,9 +169,7 @@ export function Interview() {
       ? draft.consent
         ? null
         : 'Cochez l’accord avant de continuer.'
-      : step.kind === 'question'
-        ? issueFor(step.question, draft.answers)
-        : null
+      : stepIssue(step, draft.answers, lists.communes)
 
   return (
     <div className="pb-28">
@@ -147,7 +177,7 @@ export function Interview() {
         <p className="text-sm font-bold text-muted">
           {stepIndex + 1} / {steps.length}
         </p>
-        <p className="truncate text-sm font-semibold text-muted">{settings.place.trim() || 'Lieu non précisé'}</p>
+        <p className="truncate text-sm font-semibold text-muted">{settings.interviewer.trim() || 'Enquêteur non choisi'}</p>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
         <div className="h-full bg-leaf" style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }} />
@@ -161,11 +191,12 @@ export function Interview() {
           <div className="mt-4 rounded-[28px] bg-mist px-5 py-5">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-leaf">À lire</p>
             <p className="mt-2 text-lg leading-snug">
-              Bonjour. Cette enquête porte sur vos déplacements du quotidien. Elle dure environ trois minutes.
+              Bonjour. Cette enquête porte sur les déplacements du quotidien de votre foyer.
+            </p>
+            <p className="mt-3 text-lg leading-snug">
               {endpoint.ok
-                ? ' Vos réponses vont dans le tableur de l’organisateur.'
-                : ' Pour l’instant les réponses restent sur ce téléphone : le tableur n’est pas encore branché.'}{' '}
-              Un téléphone ou un e-mail n’est noté que si vous le souhaitez.
+                ? 'Vos réponses seront stockées de manière anonymisée dans un tableau sur internet, susceptible d’être mis à disposition du public. Vous recevrez un code en fin de questionnaire, permettant de vérifier que vos réponses ont bien été prises en compte. Si vous donnez votre adresse mail en fin de questionnaire, elle ne sera pas accessible publiquement.'
+                : 'Pour l’instant les réponses restent sur ce téléphone : le tableur n’est pas encore branché.'}
             </p>
           </div>
           <label className="mt-4 flex min-h-14 items-start gap-3 rounded-2xl border border-line bg-card px-4 py-4">
@@ -180,18 +211,53 @@ export function Interview() {
         </section>
       ) : null}
 
-      {step.kind === 'question' ? (
+      {step.kind === 'commune' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            {step.question.title}
+            Dans quelle commune habitez-vous ?
           </h1>
-          {step.question.hint ? <p className="mt-2 text-base text-muted">{step.question.hint}</p> : null}
-          <ChoiceList
-            question={step.question}
-            answers={draft.answers}
-            onAnswers={updateAnswers}
-            onNext={goNext}
+          <p className="mt-2 text-base text-muted">Choisissez-la dans la liste.</p>
+          {lists.message ? <p className="mt-3 text-sm font-semibold text-clay">{lists.message}</p> : null}
+          <CommuneStep
+            communes={lists.communes}
+            commune={draft.answers.commune}
+            onSelect={(commune) => updateAnswers({ commune })}
           />
+        </section>
+      ) : null}
+
+      {step.kind === 'household' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Qui vit dans le foyer ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Pour chaque personne : la tranche d’âge, et si elle conduit.</p>
+          <HouseholdStep people={draft.answers.people} onChange={(people) => updateAnswers({ people })} />
+        </section>
+      ) : null}
+
+      {step.kind === 'vehicles' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Quels véhicules a le foyer ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Ajoutez chaque voiture et chaque 2/3 roues motorisé. Aucun, si le foyer n’en a pas.</p>
+          <VehiclesStep
+            cars={draft.answers.cars}
+            twoWheelers={draft.answers.twoWheelers}
+            onCars={(cars) => updateAnswers({ cars })}
+            onTwoWheelers={(twoWheelers) => updateAnswers({ twoWheelers })}
+          />
+        </section>
+      ) : null}
+
+      {step.kind === 'contact' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Rester en contact ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Le code de la fiche relie l’adresse mail, hors du tableau public.</p>
+          <ContactStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
 
@@ -200,9 +266,12 @@ export function Interview() {
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
             Relire avant d’enregistrer
           </h1>
+          <div className="mt-4 rounded-[28px] bg-pine px-5 py-5 text-center text-paper">
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-paper/70">Code à transmettre</p>
+            <p className="mt-2 font-mono text-4xl font-extrabold tracking-[0.18em]">{draft.code}</p>
+          </div>
           <dl className="mt-4 divide-y divide-line overflow-hidden rounded-[28px] border border-line bg-card">
             <Row label="Enquêteur" value={settings.interviewer.trim() || 'Non renseigné'} />
-            <Row label="Lieu" value={settings.place.trim() || 'Non renseigné'} />
             {summary(draft.answers).map((line) => (
               <Row key={line.label} label={line.label} value={line.value} />
             ))}
@@ -307,6 +376,7 @@ function Saved({ row, onNext }: { row: LocalResponse; onNext: () => void }) {
       <section className="rounded-[28px] bg-pine px-5 py-6 text-paper">
         <p className="text-sm font-bold uppercase tracking-[0.16em] text-paper/70">Fiche gardée</p>
         <h1 className="mt-2 text-3xl font-extrabold tracking-tight">{copy.title}</h1>
+        <p className="mt-4 font-mono text-4xl font-extrabold tracking-[0.18em]">{row.id}</p>
         <p className="mt-3 text-base leading-relaxed text-paper/85">{copy.detail}</p>
       </section>
       <button type="button" className={buttonClass('primary')} onClick={onNext}>

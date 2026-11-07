@@ -1,23 +1,29 @@
 import { Link } from '@remix-run/react'
 import { useEffect, useState } from 'react'
+import { isAdminSession, startRefusal } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
 import { formatWhen } from '~/common/format'
 import { answerPreview } from '~/common/survey'
 import { loadStartedDraft, clearDraft, type Draft } from '~/lib/draft.client'
 import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
+import { useSheetLists } from '~/hooks/useSheetLists'
+import { getDeviceId } from '~/lib/settings.client'
 import { buttonClass } from './Button'
 import { statusLabel } from '~/lib/outbox.client'
 
 export function HomeScreen() {
   const settings = useSettings()
+  const lists = useSheetLists()
   const { rows, error } = useOutbox()
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [deviceId, setDeviceId] = useState('')
   const [ready, setReady] = useState(false)
   const [confirmAbandon, setConfirmAbandon] = useState(false)
 
   useEffect(() => {
     setDraft(loadStartedDraft())
+    setDeviceId(getDeviceId())
     setReady(true)
   }, [])
 
@@ -26,6 +32,9 @@ export function HomeScreen() {
   }
 
   const endpoint = classifyEndpoint(settings.endpoint)
+  const refusal =
+    deviceId && lists.status === 'ready' ? startRefusal(lists.interviewers, settings.interviewer, deviceId) : null
+  const gate = lists.status === 'error' ? lists.message || 'Listes indisponibles.' : refusal
   const waiting = rows.filter((row) => row.status === 'pending' || row.status === 'error')
   const sent = rows.filter((row) => row.status === 'sent' || row.status === 'confirmed')
   const recent = rows.slice(0, 3)
@@ -43,11 +52,16 @@ export function HomeScreen() {
       <section className="rounded-[28px] border border-line bg-card px-5 py-5 shadow-[0_12px_40px_rgba(28,25,21,0.06)]">
         <p className="text-sm font-bold text-muted">Enquêteur</p>
         <p className="text-lg font-extrabold">{settings.interviewer.trim() || 'Non renseigné'}</p>
-        <p className="mt-3 text-sm font-bold text-muted">Lieu</p>
-        <p className="font-extrabold">{settings.place.trim() || 'Non renseigné'}</p>
-        <Link to="/reglages" className="mt-3 inline-flex min-h-11 items-center font-bold text-leaf">
-          Modifier
-        </Link>
+        <div className="mt-3 flex flex-wrap gap-x-4">
+          <Link to="/reglages" className="inline-flex min-h-11 items-center font-bold text-leaf">
+            Modifier
+          </Link>
+          {isAdminSession(lists.interviewers, settings.interviewer) ? (
+            <Link to="/admin" className="inline-flex min-h-11 items-center font-bold text-leaf">
+              Administration
+            </Link>
+          ) : null}
+        </div>
       </section>
 
       {!endpoint.ok ? (
@@ -62,7 +76,16 @@ export function HomeScreen() {
         </Link>
       ) : null}
 
-      {draft ? (
+      {gate ? (
+        <div className="grid gap-3">
+          <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">{gate}</p>
+          <Link to="/reglages" className={buttonClass('secondary')}>
+            Ouvrir les réglages
+          </Link>
+        </div>
+      ) : lists.status === 'loading' || !deviceId ? (
+        <p className="text-base font-semibold text-muted">Vérification de l’appareil…</p>
+      ) : draft ? (
         <div className="grid gap-2">
           <Link to="/entretien" className={buttonClass('primary')}>
             Reprendre l’entretien

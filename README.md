@@ -23,29 +23,30 @@ bun run build
 
 Le build statique est dans `build/client`. Pour GitHub Pages, le workflow `.github/workflows/pages.yml` suppose un dépôt nommé `questionnaire-mobilite`.
 
-## Brancher le tableur
+## Brancher les deux tableurs
 
-1. Créer un Google Sheet, par exemple « Enquête mobilité ».
-2. Extensions → Apps Script. Coller `scripts/google-apps-script/Code.gs`. Enregistrer.
-   Le script doit être ouvert **depuis le tableur**. Sinon, renseigner `SHEET_ID` en tête du fichier.
-3. Déployer → Nouveau déploiement → Application Web.
+Deux fichiers Drive, deux scripts. Aucun des deux n’ouvre l’autre.
+
+1. Tableur public, une feuille **Réponses**. Elle pourra être rendue publique. L’identité d’une fiche y est le code à 8 caractères. Extensions → Apps Script, ouvert depuis ce tableur. Coller `scripts/google-apps-script/reponses/Code.gs`.
+2. Tableur privé. Feuilles **Enquêteurs**, **Communes** et **Adresses mail**. Coller `scripts/google-apps-script/admin/Code.gs` dans le script de ce tableur-là.
+3. Pour chaque script : Déployer → Nouveau déploiement → Application Web.
    - Exécuter en tant que : Moi
    - Qui a accès : Tout le monde
-4. Copier l’URL qui se termine par `/exec`. Ce n’est pas le lien du tableur.
-5. En local, la mettre dans `.env` sous le nom `VITE_SHEETS_WEBAPP_URL`, puis relancer l’application. Pour GitHub Pages, le même nom en secret du dépôt : le workflow l’injecte au build. Dans Réglages : Tester la connexion.
-6. Faire un entretien. La ligne apparaît dans l’onglet **Réponses** (créé tout seul).
+4. Copier les deux URL qui se terminent par `/exec`. Ce ne sont pas les liens des tableurs.
+5. En local, `.env` : `VITE_SHEETS_WEBAPP_URL` pour le script public, `VITE_ADMIN_WEBAPP_URL` pour le script privé. Relancer l’application. Pour GitHub Pages, les deux noms en secrets du dépôt. Dans Réglages : Tester la connexion.
+6. Faire un entretien. La ligne apparaît dans **Réponses**. Si une adresse mail est donnée, elle est écrite dans **Adresses mail**, avec le même code, et pas dans Réponses.
 
-Toute personne qui a cette URL peut ajouter une ligne. Ne la publiez pas. Pour un garde-fou léger, mettez le même mot dans `TOKEN` du script et dans « Jeton du script ». Le jeton n’est pas écrit dans le tableur.
+Une enquête ne démarre que si le couple enquêteur + identifiant d’appareil est autorisé. La feuille Enquêteurs a trois colonnes : « Prénom Nom », « Identifiants appareils autorisés » et « Admin ». La cellule d’identifiants vaut `[]` (personne), un identifiant seul, ou `[id1, id2]`. L’enquêteur copie son identifiant dans Réglages et l’envoie à l’administrateur. Si Admin vaut `oui` et que cet appareil est déjà autorisé pour lui, l’écran Administration permet d’ajouter ou de retirer des identifiants. Le premier administrateur s’ajoute à la main dans le tableur.
 
 Google ne renvoie pas d’accusé de réception au navigateur. Après le premier entretien test, ouvrez l’onglet Réponses. Les envois suivants portent la mention « Envoyée ».
 
-Sans URL, l’app reste utilisable : les fiches restent dans la file, sur le téléphone.
+Sans l’URL du script privé, les fiches déjà gardées restent dans la file, mais une nouvelle enquête ne peut pas démarrer : la liste des appareils autorisés est illisible.
 
 ## Déroulé d’un entretien
 
 Accueil → Nouvelle personne. Un texte à lire, puis une question par écran, puis la relecture. On peut noter la position du lieu d’enquête. « Pause » garde le brouillon. « Personne suivante » en ouvre un autre.
 
-Les questions couvrent l’habitation, l’âge, le mode principal, le nombre de déplacements, le motif, la durée, les gênes, la priorité d’aménagement, une note, un commentaire, et un recontact facultatif.
+L’enquêteur est choisi dans la feuille Enquêteurs du tableur admin, colonne « Prénom Nom ». Son appareil doit être listé sur la même ligne. Les questions commencent par la commune de résidence (Pontarlier, puis la feuille Communes, colonne « Nom commune »), les personnes du foyer, les véhicules, puis le recontact et les informations du Collectif Mobilités du Haut-Doubs. La suite du questionnaire viendra ensuite.
 
 ## Fichiers
 
@@ -54,12 +55,13 @@ app/common/     questionnaire, validation, colonnes du tableur
 app/lib/        file IndexedDB, brouillon, envoi navigateur
 app/service/    le même envoi, côté Node, pour un futur serveur
 app/server/     emplacement des futures actions Remix
-app/routes/     accueil, entretien, file, réglages
-scripts/google-apps-script/Code.gs
+app/routes/     accueil, entretien, file, réglages, administration
+scripts/google-apps-script/reponses/Code.gs
+scripts/google-apps-script/admin/Code.gs
 ```
 
-Le client et `submitResponse` construisent le même JSON (`kind`, `token`, `headers`, `row`). Les en-têtes du tableur suivent les noms de colonnes : si l’app en ajoute, le script les ajoute en bout de ligne sans décaler l’existant.
+Le client et `submitResponse` envoient deux JSON distincts. `kind: response` va au script public : `headers` et `row`, sans adresse. `kind: mail` va au script privé : le code, l’adresse, le recontact et le collectif. Le script privé refuse l’adresse si l’appareil n’est pas autorisé pour l’enquêteur. Le script public ne connaît pas cette liste. Un second envoi du même code ne crée pas une seconde ligne. Tant que le questionnaire n’est pas en service, un changement de colonnes remplace la feuille Réponses. La feuille Adresses mail n’est pas vidée.
 
 ## Le jour où il y a un serveur
 
-Dans `vite.config.ts`, repasser `ssr` à `true`. Ajouter une action Remix, par exemple `app/routes/api.reponses.ts`, qui appelle `submitResponse` dans `app/service/responses.server.ts`. L’URL du script et le jeton vivent alors dans l’environnement du serveur, plus dans le téléphone. Une valeur `/api/reponses` dans `VITE_SHEETS_WEBAPP_URL` est déjà acceptée. Ce chemin lit le JSON de retour et peut marquer la fiche « Confirmée ». Aujourd’hui le téléphone ne le peut pas : le script Google répond, mais le navigateur n’a pas le droit de lire la réponse, et un second essai écrirait la ligne deux fois.
+Dans `vite.config.ts`, repasser `ssr` à `true`. Ajouter une action Remix, par exemple `app/routes/api.reponses.ts`, qui appelle `submitResponse` dans `app/service/responses.server.ts`. L’URL du script vit alors dans l’environnement du serveur, plus dans le téléphone. Une valeur `/api/reponses` dans `VITE_SHEETS_WEBAPP_URL` est déjà acceptée. Ce chemin lit le JSON de retour et peut marquer la fiche « Confirmée ». Aujourd’hui le téléphone ne le peut pas : le script Google répond, mais le navigateur n’a pas le droit de lire la réponse. Un second essai du même code ne réécrit pas la ligne.

@@ -1,7 +1,10 @@
 import { Link, useLocation } from '@remix-run/react'
 import type { ReactNode } from 'react'
+import { isAdminSession } from '~/common/config'
 import { useOnline } from '~/hooks/useOnline'
 import { useOutbox } from '~/hooks/useOutbox'
+import { useSettings } from '~/hooks/useSettings'
+import { useSheetLists } from '~/hooks/useSheetLists'
 import { Mark } from './Mark'
 
 const links = [
@@ -13,7 +16,10 @@ const links = [
 export function Shell({ children }: { children: ReactNode }) {
   const location = useLocation()
   const online = useOnline()
+  const settings = useSettings()
+  const lists = useSheetLists()
   const { rows } = useOutbox()
+  const nav = settings && isAdminSession(lists.interviewers, settings.interviewer) ? [...links, { to: '/admin', label: 'Admin' }] : links
   const interviewing = location.pathname === '/entretien'
   const waiting = rows?.filter((row) => row.status === 'pending' || row.status === 'error').length ?? 0
 
@@ -44,7 +50,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         ) : (
           <nav className="mx-auto flex w-full max-w-lg gap-1 px-3 pb-3" aria-label="Sections">
-            {links.map((link) => {
+            {nav.map((link) => {
               const active = location.pathname === link.to
               return (
                 <Link

@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
-import { endpointHint } from '~/common/endpoint'
+import { classifyEndpoint, endpointMessage, type EndpointIssue } from '~/common/endpoint'
 import { useSettings } from '~/hooks/useSettings'
-import { flushOutbox } from '~/lib/outbox.client'
+import { useSheetLists } from '~/hooks/useSheetLists'
 import { getDeviceId, updateSettings } from '~/lib/settings.client'
 import { probeEndpoint } from '~/lib/sheets.client'
 import { Button } from './Button'
 
 export function SettingsScreen() {
   const settings = useSettings()
+  const lists = useSheetLists()
   const [deviceId, setDeviceId] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState(false)
   const [probe, setProbe] = useState<'idle' | 'loading' | 'confirmed' | 'sent' | 'error'>('idle')
   const [probeMessage, setProbeMessage] = useState<string | null>(null)
 
@@ -16,22 +19,31 @@ export function SettingsScreen() {
     setDeviceId(getDeviceId())
   }, [])
 
+  useEffect(() => {
+    if (!settings || lists.status !== 'ready') return
+    if (settings.interviewer && !lists.interviewers.some((person) => person.name === settings.interviewer)) {
+      updateSettings({ interviewer: '' })
+    }
+  }, [lists.interviewers, lists.status, settings])
+
   if (!settings) {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture des réglages…</p>
   }
 
-  const hint = endpointHint(settings.endpoint)
+  const hint = connectionHint(settings.endpoint, settings.adminEndpoint)
 
   async function testConnection() {
     setProbe('loading')
     setProbeMessage(null)
     try {
-      const result = await probeEndpoint(settings?.endpoint ?? '', settings?.token.trim() ?? '')
+      const admin = await probeEndpoint(settings?.adminEndpoint ?? '')
+      const responses = await probeEndpoint(settings?.endpoint ?? '')
+      const result = admin === 'confirmed' && responses === 'confirmed' ? 'confirmed' : 'sent'
       setProbe(result)
       setProbeMessage(
         result === 'confirmed'
-          ? 'Le script répond. Le tableur est prêt à recevoir une ligne.'
-          : 'La requête est partie, mais le navigateur ne peut pas lire la réponse de Google. Faites un entretien test et ouvrez l’onglet Réponses.',
+          ? 'Les deux scripts répondent.'
+          : 'Les requêtes sont parties, mais le navigateur ne peut pas lire la réponse de Google. Faites un entretien test, puis ouvrez Réponses et Adresses mail.',
       )
     } catch (error) {
       setProbe('error')
@@ -39,60 +51,60 @@ export function SettingsScreen() {
     }
   }
 
+  const names = lists.interviewers.map((person) => person.name)
+
+  async function copyDeviceId() {
+    if (!deviceId) return
+    setCopyError(false)
+    try {
+      await navigator.clipboard.writeText(deviceId)
+      setCopied(true)
+      return
+    } catch {
+      /* Le navigateur a refusé l’accès au presse-papiers. */
+    }
+    try {
+      const area = document.createElement('textarea')
+      area.value = deviceId
+      area.setAttribute('readonly', '')
+      area.style.position = 'fixed'
+      area.style.left = '-9999px'
+      document.body.appendChild(area)
+      area.select()
+      const ok = document.execCommand('copy')
+      area.remove()
+      setCopied(ok)
+      setCopyError(!ok)
+    } catch {
+      setCopied(false)
+      setCopyError(true)
+    }
+  }
+
   return (
     <div className="grid gap-4">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Réglages</h1>
-        <p className="mt-2 text-base leading-relaxed text-muted">
-          Le prénom et le lieu sont recopiés sur chaque fiche. Ils restent sur cet appareil.
-        </p>
-      </div>
+      <h1 className="text-3xl font-extrabold tracking-tight">Réglages</h1>
 
       <label className="grid gap-2">
         <span className="font-bold">Enquêteur</span>
-        <input
-          value={settings.interviewer}
-          maxLength={80}
-          autoComplete="off"
-          placeholder="Prénom"
+        <select
+          value={names.includes(settings.interviewer) ? settings.interviewer : ''}
           onChange={(event) => updateSettings({ interviewer: event.target.value })}
           className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
-        />
-      </label>
-
-      <label className="grid gap-2">
-        <span className="font-bold">Lieu d’enquête</span>
-        <input
-          value={settings.place}
-          maxLength={120}
-          autoComplete="off"
-          placeholder="Ex. marché du samedi, place de la Halle"
-          onChange={(event) => updateSettings({ place: event.target.value })}
-          className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
-        />
+        >
+          <option value="">{lists.status === 'loading' ? 'Chargement de la liste…' : 'Choisir'}</option>
+          {names.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        {lists.message && lists.message !== hint.text ? (
+          <span className="text-sm font-semibold text-clay">{lists.message}</span>
+        ) : null}
       </label>
 
       <p className={`text-sm font-semibold ${hint.tone === 'warn' ? 'text-clay' : hint.tone === 'ok' ? 'text-leaf' : 'text-muted'}`}>{hint.text}</p>
-
-      <label className="grid gap-2">
-        <span className="font-bold">Jeton du script</span>
-        <input
-          value={settings.token}
-          maxLength={200}
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="Vide si TOKEN n’est pas rempli dans le script"
-          onChange={(event) => updateSettings({ token: event.target.value })}
-          onBlur={() => {
-            void flushOutbox()
-          }}
-          className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
-        />
-        <span className="text-sm font-semibold text-muted">
-          Facultatif. Le même mot que la constante TOKEN du script, si vous en avez mis un. Il n’est pas écrit dans le tableur.
-        </span>
-      </label>
 
       <Button variant="secondary" disabled={hint.tone !== 'ok' || probe === 'loading'} onClick={() => void testConnection()}>
         {probe === 'loading' ? 'Test…' : 'Tester la connexion'}
@@ -106,10 +118,38 @@ export function SettingsScreen() {
       <section className="rounded-[28px] border border-line bg-card px-4 py-4">
         <h2 className="font-extrabold">Cet appareil</h2>
         <p className="mt-1 text-sm leading-relaxed text-muted">
-          Identifiant recopié dans la colonne appareil, pour distinguer les téléphones. Il ne nomme pas la personne interrogée.
+          Copiez cet identifiant et envoyez-le à l’administrateur. Il l’autorise pour votre nom.
         </p>
         <p className="mt-3 break-all font-mono text-sm">{deviceId || '…'}</p>
+        <Button variant="secondary" className="mt-3" disabled={!deviceId} onClick={() => void copyDeviceId()}>
+          {copied ? 'Identifiant copié' : 'Copier l’identifiant'}
+        </Button>
+        {copyError ? (
+          <p className="mt-2 text-sm font-semibold text-clay">La copie a échoué. Sélectionnez l’identifiant ci-dessus et copiez-le.</p>
+        ) : null}
       </section>
     </div>
   )
+}
+
+function connectionIssue(reason: EndpointIssue, which: 'public' | 'privé'): string {
+  if (reason === 'empty') return which === 'privé' ? 'Le tableur privé n’est pas branché.' : 'Le tableur public n’est pas branché.'
+  return endpointMessage(reason)
+}
+
+function connectionHint(responses: string, admin: string): { tone: 'muted' | 'ok' | 'warn'; text: string } {
+  const publicEndpoint = classifyEndpoint(responses)
+  const privateEndpoint = classifyEndpoint(admin)
+  if (publicEndpoint.ok && privateEndpoint.ok) {
+    return {
+      tone: 'ok',
+      text: 'Les deux tableurs sont branchés. Les réponses partent vers le tableau public, les adresses vers le tableau privé.',
+    }
+  }
+  if (!publicEndpoint.ok && !privateEndpoint.ok && publicEndpoint.reason === 'empty' && privateEndpoint.reason === 'empty') {
+    return { tone: 'muted', text: 'Sans les deux scripts, les réponses restent sur l’appareil.' }
+  }
+  if (!privateEndpoint.ok) return { tone: 'warn', text: connectionIssue(privateEndpoint.reason, 'privé') }
+  if (!publicEndpoint.ok) return { tone: 'warn', text: connectionIssue(publicEndpoint.reason, 'public') }
+  return { tone: 'muted', text: 'Sans les deux scripts, les réponses restent sur l’appareil.' }
 }

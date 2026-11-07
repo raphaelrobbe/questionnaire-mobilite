@@ -1,12 +1,11 @@
 export type Settings = {
   interviewer: string
-  place: string
   endpoint: string
-  token: string
+  adminEndpoint: string
 }
 
 export function emptySettings(): Settings {
-  return { interviewer: '', place: '', endpoint: '', token: '' }
+  return { interviewer: '', endpoint: '', adminEndpoint: '' }
 }
 
 function clip(value: unknown, max: number): string {
@@ -17,8 +16,7 @@ export function sanitizeSettings(input: unknown): Settings {
   const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   return {
     interviewer: clip(source.interviewer, 80),
-    place: clip(source.place, 120),
     endpoint: clip(source.endpoint, 400),
-    token: clip(source.token, 200),
+    adminEndpoint: clip(source.adminEndpoint, 400),
   }
 }

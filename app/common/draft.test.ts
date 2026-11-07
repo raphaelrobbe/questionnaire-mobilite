@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { isResponseCode } from './response'
 import { draftIsStarted, emptyDraft, sanitizeDraft } from './draft'
 
 describe('brouillon', () => {
@@ -9,13 +10,17 @@ describe('brouillon', () => {
       consent: 'oui',
       latitude: 400,
       longitude: 2.5,
-      answers: { habitation: 'Centre', age: 'nope' },
+      answers: { commune: 'Centre', people: [{ age: 'nope', drive: 'oui' }] },
     })
+    expect(draft?.code && isResponseCode(draft.code)).toBe(true)
+    expect(sanitizeDraft({ ...draft, code: 'ab12-cd34' })?.code).toBe('AB12-CD34')
     expect(draft?.consent).toBe(false)
+    expect(isResponseCode(emptyDraft().code)).toBe(true)
     expect(draft?.latitude).toBeNull()
     expect(draft?.longitude).toBe(2.5)
-    expect(draft?.answers.habitation).toBe('Centre')
-    expect(draft?.answers.age).toBe('')
+    expect(draft?.answers.commune).toBe('Centre')
+    expect(draft?.answers.people[0]?.age).toBe('')
+    expect(draft?.answers.people[0]?.drive).toBe('oui')
     expect(draft && draft.step).toBeLessThan(20)
     expect(draftIsStarted(emptyDraft())).toBe(false)
     expect(draft && draftIsStarted(draft)).toBe(true)

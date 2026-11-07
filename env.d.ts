@@ -3,6 +3,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_SHEETS_WEBAPP_URL?: string
+  readonly VITE_ADMIN_WEBAPP_URL?: string
 }
 
 interface ImportMeta {

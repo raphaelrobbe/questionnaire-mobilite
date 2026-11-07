@@ -14,8 +14,8 @@ export function subscribeSettings(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-function configuredEndpoint(): string {
-  const preset = import.meta.env.VITE_SHEETS_WEBAPP_URL
+function configured(name: 'VITE_SHEETS_WEBAPP_URL' | 'VITE_ADMIN_WEBAPP_URL'): string {
+  const preset = import.meta.env[name]
   return typeof preset === 'string' ? preset.slice(0, 400) : ''
 }
 
@@ -30,7 +30,11 @@ function readStored(): Settings {
 }
 
 export function loadSettings(): Settings {
-  return { ...readStored(), endpoint: configuredEndpoint() }
+  return {
+    ...readStored(),
+    endpoint: configured('VITE_SHEETS_WEBAPP_URL'),
+    adminEndpoint: configured('VITE_ADMIN_WEBAPP_URL'),
+  }
 }
 
 export function updateSettings(patch: Partial<Settings>): Settings {

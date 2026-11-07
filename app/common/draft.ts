@@ -1,6 +1,8 @@
+import { isResponseCode, responseCode } from './response'
 import { buildSteps, emptyAnswers, hasAnyAnswer, sanitizeAnswers, type Answers } from './survey'
 
 export type Draft = {
+  code: string
   step: number
   consent: boolean
   answers: Answers
@@ -10,6 +12,7 @@ export type Draft = {
 
 export function emptyDraft(): Draft {
   return {
+    code: responseCode(),
     step: 0,
     consent: false,
     answers: emptyAnswers(),
@@ -30,7 +33,9 @@ export function sanitizeDraft(input: unknown): Draft | null {
   const answers = sanitizeAnswers(source.answers)
   const steps = buildSteps(answers)
   const step = typeof source.step === 'number' && Number.isFinite(source.step) ? Math.max(0, Math.floor(source.step)) : 0
+  const code = typeof source.code === 'string' ? source.code.trim().toUpperCase() : ''
   return {
+    code: isResponseCode(code) ? code : responseCode(),
     step: Math.min(step, Math.max(steps.length - 1, 0)),
     consent: source.consent === true,
     answers,

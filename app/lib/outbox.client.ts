@@ -95,7 +95,12 @@ async function write(row: LocalResponse): Promise<void> {
 export async function keepResponse(record: ResponseRecord): Promise<LocalResponse> {
   const row: LocalResponse = {
     ...record,
-    answers: { ...record.answers, frictions: [...record.answers.frictions] },
+    answers: {
+      ...record.answers,
+      people: record.answers.people.map((person) => ({ ...person })),
+      cars: record.answers.cars.map((vehicle) => ({ ...vehicle })),
+      twoWheelers: record.answers.twoWheelers.map((vehicle) => ({ ...vehicle })),
+    },
     status: 'pending',
     lastError: null,
     attempts: 0,
@@ -116,7 +121,6 @@ function toRecord(row: LocalResponse): ResponseRecord {
     createdAt: row.createdAt,
     deviceId: row.deviceId,
     interviewer: row.interviewer,
-    place: row.place,
     latitude: row.latitude,
     longitude: row.longitude,
     answers: row.answers,
@@ -128,7 +132,7 @@ async function attempt(row: LocalResponse): Promise<LocalResponse> {
   const classified = classifyEndpoint(settings.endpoint)
   if (!classified.ok || !navigator.onLine) return row
   try {
-    const status = await submitRecord(toRecord(row), classified.url, settings.token.trim())
+    const status = await submitRecord(toRecord(row), classified.url, settings.adminEndpoint)
     const next: LocalResponse = {
       ...row,
       status,
