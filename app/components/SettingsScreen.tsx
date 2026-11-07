@@ -72,30 +72,7 @@ export function SettingsScreen() {
         />
       </label>
 
-      <label className="grid gap-2">
-        <span className="font-bold">URL du script Google</span>
-        <input
-          value={settings.endpoint}
-          maxLength={400}
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          inputMode="url"
-          placeholder="https://script.google.com/macros/s/…/exec"
-          onChange={(event) => {
-            setProbe('idle')
-            setProbeMessage(null)
-            updateSettings({ endpoint: event.target.value })
-          }}
-          onBlur={() => {
-            void flushOutbox()
-          }}
-          className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
-        />
-        <span className={`text-sm font-semibold ${hint.tone === 'warn' ? 'text-clay' : hint.tone === 'ok' ? 'text-leaf' : 'text-muted'}`}>
-          {hint.text}
-        </span>
-      </label>
+      <p className={`text-sm font-semibold ${hint.tone === 'warn' ? 'text-clay' : hint.tone === 'ok' ? 'text-leaf' : 'text-muted'}`}>{hint.text}</p>
 
       <label className="grid gap-2">
         <span className="font-bold">Jeton du script</span>

@@ -52,7 +52,7 @@ export function HomeScreen() {
 
       {!endpoint.ok ? (
         <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">
-          Mode local. Les réponses restent sur cet appareil tant que le script Google n’est pas collé dans Réglages.
+          Mode local. Le tableur n’est pas branché : les réponses restent sur cet appareil.
         </p>
       ) : null}
 

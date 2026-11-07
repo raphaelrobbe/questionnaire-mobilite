@@ -32,7 +32,7 @@ Le build statique est dans `build/client`. Pour GitHub Pages, le workflow `.gith
    - Exécuter en tant que : Moi
    - Qui a accès : Tout le monde
 4. Copier l’URL qui se termine par `/exec`. Ce n’est pas le lien du tableur.
-5. Dans l’app : Réglages → coller l’URL → Tester la connexion.
+5. En local, la mettre dans `.env` sous le nom `VITE_SHEETS_WEBAPP_URL`, puis relancer l’application. Pour GitHub Pages, le même nom en secret du dépôt : le workflow l’injecte au build. Dans Réglages : Tester la connexion.
 6. Faire un entretien. La ligne apparaît dans l’onglet **Réponses** (créé tout seul).
 
 Toute personne qui a cette URL peut ajouter une ligne. Ne la publiez pas. Pour un garde-fou léger, mettez le même mot dans `TOKEN` du script et dans « Jeton du script ». Le jeton n’est pas écrit dans le tableur.
@@ -62,4 +62,4 @@ Le client et `submitResponse` construisent le même JSON (`kind`, `token`, `head
 
 ## Le jour où il y a un serveur
 
-Dans `vite.config.ts`, repasser `ssr` à `true`. Ajouter une action Remix, par exemple `app/routes/api.reponses.ts`, qui appelle `submitResponse` dans `app/service/responses.server.ts`. L’URL du script et le jeton vivent alors dans l’environnement du serveur, plus dans le téléphone. Dans Réglages, l’adresse `/api/reponses` est déjà acceptée. Ce chemin lit le JSON de retour et peut marquer la fiche « Confirmée ». Aujourd’hui le téléphone ne le peut pas : le script Google répond, mais le navigateur n’a pas le droit de lire la réponse, et un second essai écrirait la ligne deux fois.
+Dans `vite.config.ts`, repasser `ssr` à `true`. Ajouter une action Remix, par exemple `app/routes/api.reponses.ts`, qui appelle `submitResponse` dans `app/service/responses.server.ts`. L’URL du script et le jeton vivent alors dans l’environnement du serveur, plus dans le téléphone. Une valeur `/api/reponses` dans `VITE_SHEETS_WEBAPP_URL` est déjà acceptée. Ce chemin lit le JSON de retour et peut marquer la fiche « Confirmée ». Aujourd’hui le téléphone ne le peut pas : le script Google répond, mais le navigateur n’a pas le droit de lire la réponse, et un second essai écrirait la ligne deux fois.

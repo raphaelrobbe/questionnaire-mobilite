@@ -53,7 +53,7 @@ export function endpointHint(raw: string): { tone: 'muted' | 'ok' | 'warn'; text
   const result = classifyEndpoint(raw)
   if (result.ok) {
     if (result.kind === 'google-script') {
-      return { tone: 'ok', text: 'Adresse acceptée. Les envois iront vers le script Google.' }
+      return { tone: 'ok', text: 'Le tableur est branché. Les envois iront vers le script Google.' }
     }
     return { tone: 'ok', text: 'Route locale acceptée, pour le jour où un serveur répondra sur /api/.' }
   }

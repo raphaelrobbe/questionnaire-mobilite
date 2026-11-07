@@ -14,22 +14,23 @@ export function subscribeSettings(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-function defaultSettings(): Settings {
-  const settings = emptySettings()
+function configuredEndpoint(): string {
   const preset = import.meta.env.VITE_SHEETS_WEBAPP_URL
-  if (typeof preset === 'string') settings.endpoint = preset.slice(0, 400)
-  return settings
+  return typeof preset === 'string' ? preset.slice(0, 400) : ''
+}
+
+function readStored(): Settings {
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return emptySettings()
+    return sanitizeSettings(JSON.parse(raw))
+  } catch {
+    return emptySettings()
+  }
 }
 
 export function loadSettings(): Settings {
-  const defaults = defaultSettings()
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return defaults
-    return sanitizeSettings(JSON.parse(raw))
-  } catch {
-    return defaults
-  }
+  return { ...readStored(), endpoint: configuredEndpoint() }
 }
 
 export function updateSettings(patch: Partial<Settings>): Settings {
