@@ -5,7 +5,8 @@
  * L'URL /exec va dans VITE_SHEETS_WEBAPP_URL.
  *
  * Ce script n'ouvre aucun autre fichier. Il n'a pas la liste des enquêteurs
- * ni les adresses mail. Une adresse reçue par erreur est ignorée, pas écrite.
+ * ni de quoi identifier une personne. Un nom, une adresse, un téléphone
+ * ou des coordonnées reçus par erreur sont ignorés, pas écrits.
  * Le même code n'ajoute pas une seconde ligne.
  * action=code répond seulement si ce code est déjà dans la feuille, sans renvoyer la ligne.
  * Après une modification : Déployer → Gérer les déploiements → crayon → Nouvelle version.
@@ -53,9 +54,9 @@ function doPost(e) {
         body.headers.map(function (header) {
           return String(header)
         }).filter(function (header) {
-          return !isAddressHeader(header)
+          return !isPrivateHeader(header)
         }),
-        withoutAddress(body.row),
+        withoutPrivate(body.row),
       )
     } finally {
       lock.releaseLock()
@@ -72,15 +73,33 @@ function spreadsheet() {
   return book
 }
 
-function isAddressHeader(header) {
-  const name = String(header || '').trim().toLowerCase()
-  return name === 'adresse' || name === 'email' || name === 'mail' || name === 'adresse_mail'
+function isPrivateHeader(header) {
+  var name = String(header || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  return (
+    name === 'adresse' ||
+    name === 'email' ||
+    name === 'mail' ||
+    name === 'adresse mail' ||
+    name === 'adresse_mail' ||
+    name === 'nom' ||
+    name === 'prenom' ||
+    name === 'complement' ||
+    name === "complement d'adresse" ||
+    name === 'latitude' ||
+    name === 'longitude' ||
+    name === 'telephone' ||
+    name === 'numero de telephone'
+  )
 }
 
-function withoutAddress(row) {
+function withoutPrivate(row) {
   const clean = {}
   Object.keys(row || {}).forEach(function (key) {
-    if (!isAddressHeader(key)) clean[key] = row[key]
+    if (!isPrivateHeader(key)) clean[key] = row[key]
   })
   return clean
 }

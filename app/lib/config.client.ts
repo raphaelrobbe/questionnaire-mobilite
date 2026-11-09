@@ -9,9 +9,10 @@ let inflight: Promise<SheetLists> | null = null
 export type ConfigQuery = {
   device?: string
   who?: string
-  action?: 'add' | 'remove'
+  action?: 'add' | 'remove' | 'create'
   interviewer?: string
   target?: string
+  phone?: string
 }
 
 export function subscribeCachedLists(listener: () => void): () => void {
@@ -67,6 +68,7 @@ function requestSheetLists(endpoint: string, query: ConfigQuery): Promise<SheetL
   if (query.action) url.searchParams.set('action', query.action)
   if (query.interviewer) url.searchParams.set('interviewer', query.interviewer)
   if (query.target) url.searchParams.set('target', query.target)
+  if (query.phone) url.searchParams.set('phone', query.phone)
 
   return new Promise((resolve, reject) => {
     const script = document.createElement('script')

@@ -44,6 +44,30 @@ export function updateSettings(patch: Partial<Settings>): Settings {
   return next
 }
 
+export async function copyText(value: string): Promise<boolean> {
+  if (!value) return false
+  try {
+    await navigator.clipboard.writeText(value)
+    return true
+  } catch {
+    /* Le navigateur a refusé l’accès au presse-papiers. */
+  }
+  try {
+    const area = document.createElement('textarea')
+    area.value = value
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.left = '-9999px'
+    document.body.appendChild(area)
+    area.select()
+    const ok = document.execCommand('copy')
+    area.remove()
+    return ok
+  } catch {
+    return false
+  }
+}
+
 export function getDeviceId(): string {
   try {
     const existing = localStorage.getItem(DEVICE_KEY)

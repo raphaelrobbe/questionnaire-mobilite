@@ -1,20 +1,39 @@
 /**
- * Script du tableur PRIVÉ. Feuilles : Enquêteurs, Communes, Adresses mail.
+ * Script du tableur PRIVÉ. Feuilles : Enquêteurs, Communes, Enquêtés.
  * Collez ce fichier dans Extensions → Apps Script, ouvert depuis CE tableur.
  * Déployer → Application Web → Exécuter en tant que : Moi → Qui a accès : Tout le monde.
  * L'URL /exec va dans VITE_ADMIN_WEBAPP_URL.
  *
  * Ce script n'ouvre aucun autre fichier. Il ne reçoit pas les réponses du questionnaire.
- * La feuille Adresses mail relie l'adresse au code à 8 caractères.
+ * Une lecture sans identifiant reconnu ne renvoie aucun enquêteur.
+ * Un identifiant reconnu renvoie le nom de sa ligne et les communes.
+ * Un identifiant porté par un administrateur renvoie toute la liste, avec les identifiants et les numéros.
+ * La feuille Enquêtés relie l'identité au code à 8 caractères.
  * Le même code n'ajoute pas une seconde adresse.
  * Après une modification : Déployer → Gérer les déploiements → crayon → Nouvelle version.
  */
-const MAIL_TAB = 'Adresses mail'
+const MAIL_TAB = 'Enquêtés'
+const ENQUETE_HEADERS = [
+  'code',
+  'horodatage_utc',
+  'Nom',
+  'Prénom',
+  'Commune',
+  'Adresse',
+  "Complément d'adresse",
+  'Latitude',
+  'Longitude',
+  'Numéro de téléphone',
+  'Adresse mail',
+  'recontact',
+  'collectif',
+]
 const INTERVIEWERS_TAB = 'Enquêteurs'
 const COMMUNES_TAB = 'Communes'
 const INTERVIEWER_HEADER = 'Prénom Nom'
 const DEVICE_HEADER = 'Identifiants appareils autorisés'
 const ADMIN_HEADER = 'Admin'
+const PHONE_HEADER = 'Numéro de téléphone'
 const COMMUNE_HEADER = 'Nom commune'
 
 function doGet(e) {
@@ -24,6 +43,7 @@ function doGet(e) {
   try {
     var action = String(params.action || '')
     if (action === 'add' || action === 'remove') payload = changeDevices(params, action)
+    else if (action === 'create') payload = addInterviewer(params)
     else payload = readConfig(params.device, params.who)
   } catch (error) {
     payload = { ok: false, error: String(error && error.message ? error.message : error).slice(0, 180) }
@@ -62,14 +82,46 @@ function spreadsheet() {
 }
 
 function readConfig(device, who) {
+  const loaded = loadInterviewers()
+  const interviewers = presentInterviewers(loaded.people, normalizeDevice(device), String(who || '').trim())
+  if (!interviewers.length) {
+    return { ok: true, service: 'questionnaire-mobilite', interviewers: [], communes: [] }
+  }
   const communesSheet = spreadsheet().getSheetByName(COMMUNES_TAB)
   if (!communesSheet) return { ok: false, error: 'Feuille Communes introuvable.' }
-  const loaded = loadInterviewers()
   return {
     ok: true,
     service: 'questionnaire-mobilite',
-    interviewers: presentInterviewers(loaded.people, normalizeDevice(device), String(who || '').trim()),
+    interviewers: interviewers,
     communes: columnByHeader(communesSheet, COMMUNE_HEADER),
+  }
+}
+
+function addInterviewer(params) {
+  const device = normalizeDevice(params.device)
+  const who = String(params.who || '').trim()
+  const name = String(params.interviewer || '').trim().slice(0, 120)
+  const phone = normalizePhone(params.phone)
+  if (!device || !who) throw new Error('Administration refusée.')
+  if (!name) throw new Error('Indiquez le prénom et le nom.')
+  const lock = LockService.getScriptLock()
+  lock.waitLock(15000)
+  try {
+    const loaded = ensurePhoneColumn(loadInterviewers())
+    if (!isAdmin(loaded.people, who, device)) throw new Error('Administration refusée.')
+    const folded = foldName(name)
+    for (let i = 0; i < loaded.people.length; i++) {
+      if (foldName(loaded.people[i].name) === folded) throw new Error('Cet enquêteur est déjà dans la liste.')
+    }
+    const row = loaded.sheet.getLastRow() + 1
+    loaded.sheet.getRange(row, loaded.nameCol).setValue(name)
+    loaded.sheet.getRange(row, loaded.deviceCol).setValue('[]')
+    loaded.sheet.getRange(row, loaded.adminCol).setValue('')
+    loaded.sheet.getRange(row, loaded.phoneCol).setValue(phone)
+    SpreadsheetApp.flush()
+    return readConfig(device, who)
+  } finally {
+    lock.releaseLock()
   }
 }
 
@@ -112,6 +164,7 @@ function loadInterviewers() {
   const nameIndex = headerIndex(headers, INTERVIEWER_HEADER)
   const deviceIndex = headerIndex(headers, DEVICE_HEADER)
   const adminIndex = headerIndex(headers, ADMIN_HEADER)
+  const phoneIndex = headerIndex(headers, PHONE_HEADER)
   if (nameIndex === -1) throw new Error('Colonne « Prénom Nom » introuvable.')
   if (deviceIndex === -1) throw new Error('Colonne « Identifiants appareils autorisés » introuvable.')
   if (adminIndex === -1) throw new Error('Colonne « Admin » introuvable.')
@@ -127,24 +180,68 @@ function loadInterviewers() {
         name: name,
         admin: String(values[row][adminIndex] || '').trim().toLowerCase() === 'oui',
         devices: parseDevices(values[row][deviceIndex]),
+        phone: phoneIndex === -1 ? '' : String(values[row][phoneIndex] || '').trim().slice(0, 40),
         sheetRow: row + 2,
       })
       if (people.length >= 400) break
     }
   }
-  return { sheet: sheet, deviceCol: deviceIndex + 1, people: people }
+  return {
+    sheet: sheet,
+    nameCol: nameIndex + 1,
+    deviceCol: deviceIndex + 1,
+    adminCol: adminIndex + 1,
+    phoneCol: phoneIndex === -1 ? 0 : phoneIndex + 1,
+    people: people,
+  }
+}
+
+function ensurePhoneColumn(loaded) {
+  if (loaded.phoneCol) return loaded
+  const col = loaded.sheet.getLastColumn() + 1
+  loaded.sheet.getRange(1, col).setValue(PHONE_HEADER)
+  loaded.phoneCol = col
+  return loaded
+}
+
+function foldName(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+function normalizePhone(value) {
+  const text = String(value || '').trim().slice(0, 40)
+  if (!text) return ''
+  if (!/^[0-9+().\s-]+$/.test(text)) throw new Error('Numéro illisible.')
+  const digits = text.replace(/\D/g, '')
+  if (digits.length < 6 || digits.length > 15) throw new Error('Numéro illisible.')
+  return text
 }
 
 function presentInterviewers(people, device, who) {
-  const reveal = isAdmin(people, who, device)
+  if (!device) return []
+  var match = null
+  var adminDevice = false
+  for (var i = 0; i < people.length; i++) {
+    if (people[i].devices.indexOf(device) === -1) continue
+    if (!match) match = people[i]
+    if (people[i].admin) adminDevice = true
+  }
+  if (!match) return []
+  if (!(adminDevice || isAdmin(people, who, device))) {
+    return [{ name: match.name, admin: false, authorized: true }]
+  }
   return people.map(function (person) {
-    const item = {
+    return {
       name: person.name,
       admin: person.admin,
-      authorized: Boolean(device) && person.devices.indexOf(device) !== -1,
+      authorized: person.devices.indexOf(device) !== -1,
+      devices: person.devices,
+      phone: person.phone || '',
     }
-    if (reveal) item.devices = person.devices
-    return item
   })
 }
 
@@ -228,23 +325,24 @@ function columnByHeader(sheet, header) {
 }
 
 function writeMail(body) {
-  const adresse = String(body && body.adresse ? body.adresse : '').trim().toLowerCase().slice(0, 120)
-  const code = String(body && body.code ? body.code : '').trim()
+  const code = clipText(body && body.code, 80)
   if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw new Error('Code illisible.')
-  if (!adresse || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adresse)) throw new Error('Adresse mail illisible.')
   const sheet = mailSheet()
-  let headers = readHeaders(sheet)
-  if (!headers.length) {
-    headers = ['code', 'horodatage_utc', 'adresse', 'recontact', 'collectif']
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers])
-    sheet.setFrozenRows(1)
-  }
+  const headers = ensureEnqueteHeaders(sheet)
   if (headers.indexOf('code') === -1) throw new Error('Colonne « code » introuvable.')
   if (hasCode(sheet, headers, code)) return
   const record = {
     code: code,
     horodatage_utc: new Date().toISOString(),
-    adresse: adresse,
+    Nom: clipText(body.nom, 80),
+    Prénom: clipText(body.prenom, 80),
+    Commune: clipText(body.commune, 120),
+    Adresse: clipText(body.adresse, 160),
+    "Complément d'adresse": clipText(body.complement, 160),
+    Latitude: clipText(body.latitude, 40),
+    Longitude: clipText(body.longitude, 40),
+    'Numéro de téléphone': clipText(body.telephone, 40),
+    'Adresse mail': clipText(body.email, 120).toLowerCase(),
     recontact: body.recontact === 'oui' ? 'oui' : 'non',
     collectif: body.collectif === 'oui' ? 'oui' : 'non',
   }
@@ -252,6 +350,28 @@ function writeMail(body) {
     return record[header] || ''
   })
   sheet.appendRow(values)
+}
+
+function clipText(value, max) {
+  return String(value || '').trim().slice(0, max)
+}
+
+function ensureEnqueteHeaders(sheet) {
+  var headers = readHeaders(sheet)
+  if (!headers.length) {
+    sheet.getRange(1, 1, 1, ENQUETE_HEADERS.length).setValues([ENQUETE_HEADERS])
+    sheet.setFrozenRows(1)
+    return ENQUETE_HEADERS.slice()
+  }
+  var missing = false
+  for (var i = 0; i < ENQUETE_HEADERS.length; i++) {
+    if (headers.indexOf(ENQUETE_HEADERS[i]) === -1) {
+      headers.push(ENQUETE_HEADERS[i])
+      missing = true
+    }
+  }
+  if (missing) sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+  return headers
 }
 
 function mailSheet() {

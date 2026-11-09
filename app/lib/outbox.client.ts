@@ -1,8 +1,9 @@
+import { DeviceUnknown } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
 import { ARRIVAL_TRIES, ArrivalStopped, pollArrival } from '~/common/receipt'
 import type { ResponseRecord } from '~/common/response'
-import { loadSettings } from './settings.client'
-import { codeIsStored, submitRecord, type SendStatus } from './sheets.client'
+import { loadSettings, updateSettings } from './settings.client'
+import { codeIsStored, confirmInterviewer, submitRecord, type SendStatus } from './sheets.client'
 
 const DB_NAME = 'questionnaire-mobilite'
 const STORE = 'responses'
@@ -139,9 +140,11 @@ async function attempt(row: LocalResponse): Promise<LocalResponse> {
   const classified = classifyEndpoint(settings.endpoint)
   if (!classified.ok || !navigator.onLine) return row
   try {
-    const status = await submitRecord(toRecord(row), classified.url, settings.adminEndpoint)
+    const interviewer = await confirmInterviewer(settings.adminEndpoint, row.deviceId)
+    const status = await submitRecord({ ...toRecord(row), interviewer }, classified.url, settings.adminEndpoint)
     const next: LocalResponse = {
       ...row,
+      interviewer,
       status,
       lastError: null,
       attempts: row.attempts + 1,
@@ -151,6 +154,7 @@ async function attempt(row: LocalResponse): Promise<LocalResponse> {
     await write(next)
     return next
   } catch (error) {
+    if (error instanceof DeviceUnknown) updateSettings({ interviewer: '' })
     const message = error instanceof Error ? error.message : 'Envoi impossible.'
     const next: LocalResponse = {
       ...row,

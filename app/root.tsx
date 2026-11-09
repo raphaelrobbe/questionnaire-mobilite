@@ -38,10 +38,16 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <Meta />
         <Links />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__qmInstall=e;});",
+          }}
+        />
         {import.meta.env.PROD ? (
           <script
             dangerouslySetInnerHTML={{
-              __html: `(function(){if(!('serviceWorker' in navigator))return;var b=${JSON.stringify(import.meta.env.BASE_URL)};navigator.serviceWorker.register(b+'sw.js',{scope:b}).catch(function(){})})();`,
+              __html: `(function(){if(!('serviceWorker' in navigator))return;var b=${JSON.stringify(import.meta.env.BASE_URL)};navigator.serviceWorker.register(b+'sw.js',{scope:b,updateViaCache:'none'}).catch(function(){})})();`,
             }}
           />
         ) : null}

@@ -37,8 +37,6 @@ export const SHEET_HEADERS = [
   'horodatage_utc',
   'appareil',
   'enqueteur',
-  'latitude',
-  'longitude',
   'commune',
   'personnes',
   'detail_personnes',
@@ -55,7 +53,15 @@ export type MailBody = {
   code: string
   appareil: string
   enqueteur: string
+  nom: string
+  prenom: string
+  commune: string
   adresse: string
+  complement: string
+  latitude: string
+  longitude: string
+  telephone: string
+  email: string
   recontact: 'oui' | 'non'
   collectif: 'oui' | 'non'
 }
@@ -86,8 +92,6 @@ export function toSheetRow(record: ResponseRecord): SheetRow {
     horodatage_utc: clip(record.createdAt, 40),
     appareil: clip(record.deviceId, 80),
     enqueteur: clip(record.interviewer, 80),
-    latitude: coord(record.latitude),
-    longitude: coord(record.longitude),
     commune: clip(answers.commune, 120),
     personnes: String(people.filter(Boolean).length),
     detail_personnes: joined(people),
@@ -100,15 +104,22 @@ export function toSheetRow(record: ResponseRecord): SheetRow {
   }
 }
 
-export function mailBody(record: ResponseRecord): MailBody | null {
+export function mailBody(record: ResponseRecord): MailBody {
   const answers = sanitizeAnswers(record.answers)
-  if (!isEmail(answers.email)) return null
   return {
     kind: 'mail',
     code: clip(record.id, 80),
     appareil: clip(record.deviceId, 80),
     enqueteur: clip(record.interviewer, 80),
-    adresse: answers.email,
+    nom: clip(answers.nom, 80),
+    prenom: clip(answers.prenom, 80),
+    commune: clip(answers.commune, 120),
+    adresse: clip(answers.adresse, 160),
+    complement: clip(answers.complement, 160),
+    latitude: coord(record.latitude),
+    longitude: coord(record.longitude),
+    telephone: clip(answers.phone, 40),
+    email: isEmail(answers.email) ? answers.email : '',
     recontact: answers.recontact === 'oui' ? 'oui' : 'non',
     collectif: answers.collectif ? 'oui' : 'non',
   }

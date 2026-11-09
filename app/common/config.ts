@@ -5,6 +5,8 @@ export type Interviewer = {
   authorized: boolean
   /** Null tant que l’appelant n’est pas un administrateur : les identifiants ne sont pas révélés. */
   devices: string[] | null
+  /** Vide tant que l’appelant n’est pas un administrateur, ou si aucun numéro n’a été noté. */
+  phone: string
 }
 
 export type SheetLists = {
@@ -74,6 +76,16 @@ export function normalizeDeviceId(input: string): string | null {
   return ids.length === 1 ? ids[0] : null
 }
 
+/** Chaîne vide si le champ est laissé vide. Null si le texte n’est pas un numéro. */
+export function normalizePhone(input: string): string | null {
+  const text = input.trim().slice(0, 40)
+  if (!text) return ''
+  if (!/^[0-9+().\s-]+$/.test(text)) return null
+  const digits = text.replace(/\D/g, '')
+  if (digits.length < 6 || digits.length > 15) return null
+  return text
+}
+
 export function deviceAllowed(interviewers: Interviewer[], interviewer: string, deviceId: string): boolean {
   const name = interviewer.trim()
   const device = deviceId.trim().toLowerCase()
@@ -89,10 +101,25 @@ export function isAdminSession(interviewers: Interviewer[], interviewer: string)
   return Boolean(person?.admin && person.authorized)
 }
 
-export function startRefusal(interviewers: Interviewer[], interviewer: string, deviceId: string): string | null {
-  if (!interviewer.trim()) return 'Choisissez l’enquêteur dans les réglages.'
-  if (!deviceAllowed(interviewers, interviewer, deviceId)) {
-    return 'Cet appareil n’est pas autorisé pour cet enquêteur. Copiez l’identifiant dans les réglages et envoyez-le à l’administrateur.'
+export const DEVICE_REFUSED = 'Cet appareil n’est plus autorisé. La fiche reste sur ce téléphone.'
+
+export class DeviceUnknown extends Error {
+  constructor() {
+    super(DEVICE_REFUSED)
+    this.name = 'DeviceUnknown'
+  }
+}
+
+/** Ligne dont l’appareil demandeur est autorisé. Les identifiants ne sont révélés qu’à un administrateur. */
+export function interviewerForDevice(interviewers: Interviewer[], deviceId: string): Interviewer | null {
+  const device = deviceId.trim().toLowerCase()
+  if (!device) return null
+  for (const person of interviewers) {
+    if (person.devices) {
+      if (person.devices.includes(device)) return person
+    } else if (person.authorized) {
+      return person
+    }
   }
   return null
 }
@@ -126,7 +153,8 @@ function cleanInterviewers(values: unknown[]): Interviewer[] {
     if (!name || seen.has(key)) continue
     seen.add(key)
     const devices = !('devices' in source) || source.devices === null ? null : cleanDevices(source.devices)
-    list.push({ name, admin: source.admin, authorized: source.authorized, devices })
+    const phone = typeof source.phone === 'string' ? source.phone.trim().slice(0, 40) : ''
+    list.push({ name, admin: source.admin, authorized: source.authorized, devices, phone })
     if (list.length >= LIST_MAX) break
   }
   return list

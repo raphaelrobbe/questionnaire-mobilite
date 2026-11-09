@@ -9,6 +9,7 @@ import {
   issueForCommune,
   issueForContact,
   questionSide,
+  respondentPhone,
   issueForHousehold,
   issueForVehicles,
   patchAnswers,
@@ -18,10 +19,12 @@ import {
 } from './survey'
 
 describe('questionnaire', () => {
-  test('commence par la commune, le foyer, puis les véhicules', () => {
+  test('commence par le nom, la commune et l’adresse, puis l’accord', () => {
     expect(buildSteps(emptyAnswers()).map((step) => step.kind)).toEqual([
-      'consent',
+      'name',
       'commune',
+      'address',
+      'consent',
       'household',
       'vehicles',
       'contact',
@@ -90,6 +93,10 @@ describe('questionnaire', () => {
     expect(ready.email).toBe('ada@exemple.fr')
     const dropped = patchAnswers(ready, { collectif: false })
     expect(dropped.email).toBe('')
+    expect(issueForContact(patchAnswers(refused, { phone: 'bureau' }))).toMatch(/chiffre/)
+    expect(respondentPhone('  +33 6 12 34 56 78  ')).toBe('+33 6 12 34 56 78')
+    expect(respondentPhone('')).toBe('')
+    expect(issueForContact(patchAnswers(refused, { phone: '+33 6 12 34 56 78' }))).toBeNull()
   })
 
   test('une fiche de l’ancien questionnaire ne fait pas planter l’accueil', () => {

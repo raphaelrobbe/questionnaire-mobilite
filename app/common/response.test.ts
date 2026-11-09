@@ -49,7 +49,8 @@ describe('ligne du tableur', () => {
     expect(row.detail_voitures).toBe('Hybride')
     expect(row.deux_trois_roues).toBe('1')
     expect(row.detail_deux_trois_roues).toBe('100 % électrique, sans permis')
-    expect(row.latitude).toBe('48.856600')
+    expect('latitude' in row).toBe(false)
+    expect('longitude' in row).toBe(false)
   })
 
   test('garde l’adresse mail hors de la ligne publique, liée au code dans l’autre envoi', () => {
@@ -59,21 +60,18 @@ describe('ligne du tableur', () => {
     expect(body.row.collectif).toBe('oui')
     expect(JSON.stringify(body)).not.toContain('ada@exemple.fr')
     expect('mail' in body).toBe(false)
-    expect(mailBody(source)).toEqual({
-      kind: 'mail',
-      code: 'id-1',
-      appareil: 'device-1',
-      enqueteur: 'Camille',
-      adresse: 'ada@exemple.fr',
-      recontact: 'oui',
-      collectif: 'oui',
-    })
-    expect(mailBody(record())).toBeNull()
-  })
-
-  test('laisse la position vide quand elle n’a pas été notée', () => {
-    const row = toSheetRow({ ...record(), latitude: null, longitude: Number.NaN })
-    expect(row.latitude).toBe('')
-    expect(row.longitude).toBe('')
+    const mailed = mailBody(source)
+    expect(mailed.email).toBe('ada@exemple.fr')
+    expect(mailed.commune).toBe('Lyon')
+    expect(mailed.latitude).toBe('48.856600')
+    expect(mailed.recontact).toBe('oui')
+    expect(JSON.stringify(responseBody(source))).not.toContain('48.856600')
+    const plain = mailBody(record({ nom: 'Martin', prenom: 'Ada', adresse: '12 rue de la Gare', phone: '+33 6 12 34 56 78' }))
+    expect(plain.email).toBe('')
+    expect(plain.nom).toBe('Martin')
+    expect(plain.prenom).toBe('Ada')
+    expect(plain.adresse).toBe('12 rue de la Gare')
+    expect(plain.telephone).toBe('+33 6 12 34 56 78')
+    expect(JSON.stringify(responseBody(record({ nom: 'Martin', adresse: '12 rue de la Gare' })))).not.toContain('Martin')
   })
 })

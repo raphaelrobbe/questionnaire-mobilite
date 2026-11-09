@@ -1,29 +1,10 @@
-/* Coque de l'application : après une visite en ligne, la page se rouvre sans réseau. */
-const CACHE = 'questionnaire-mobilite-shell-v1'
-
-const PRECACHE = [
-  '',
-  'index.html',
-  'site.webmanifest',
-  'favicon.svg',
-  'logo.svg',
-  'app-icon-192.png',
-  'app-icon-512.png',
-  'app-icon-maskable-192.png',
-  'app-icon-maskable-512.png',
-  'apple-touch-icon.png',
-]
+/* Après une visite en ligne, toute l'application se rouvre sans réseau.
+ * Le build remplace __CACHE_VERSION__ pour forcer une nouvelle mise en cache. */
+const CACHE = 'questionnaire-mobilite-__CACHE_VERSION__'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) =>
-        Promise.all(
-          PRECACHE.map((path) => cache.add(new URL(path, self.location).href).catch(() => undefined)),
-        ),
-      )
-      .then(() => self.skipWaiting()),
+    precache().then(() => self.skipWaiting()),
   )
 })
 
@@ -41,6 +22,32 @@ self.addEventListener('message', (event) => {
   event.waitUntil(cacheUrls(event.data.urls))
 })
 
+async function precache() {
+  const cache = await caches.open(CACHE)
+  const listed = await readList()
+  const paths = listed.length ? listed : ['', 'index.html', 'site.webmanifest']
+  await Promise.all(paths.map((path) => addOne(cache, path)))
+}
+
+async function readList() {
+  try {
+    const response = await fetch(new URL('precache.json', self.location).href, { cache: 'no-store' })
+    if (!response.ok) return []
+    const body = await response.json()
+    return Array.isArray(body) ? body.filter((item) => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+async function addOne(cache, path) {
+  try {
+    await cache.add(new URL(path, self.location).href)
+  } catch {
+    /* Un fichier manquant ne doit pas empêcher d'ouvrir l'enquête. */
+  }
+}
+
 async function cacheUrls(urls) {
   const cache = await caches.open(CACHE)
   await Promise.all(
@@ -51,7 +58,7 @@ async function cacheUrls(urls) {
       } catch {
         return
       }
-      if (url.origin !== self.location.origin || url.pathname.endsWith('.map')) return
+      if (url.origin !== self.location.origin || url.pathname.endsWith('.map') || url.pathname.endsWith('/sw.js')) return
       try {
         const response = await fetch(url.href)
         if (response.ok) await cache.put(url.href, response)
@@ -63,7 +70,7 @@ async function cacheUrls(urls) {
 }
 
 function isAsset(url) {
-  if (url.pathname.endsWith('/sw.js')) return false
+  if (url.pathname.endsWith('/sw.js') || url.pathname.endsWith('/precache.json')) return false
   return url.pathname.includes('/assets/') || /\.(?:js|css|woff2?|png|svg|ico|webmanifest)$/i.test(url.pathname)
 }
 
@@ -90,15 +97,14 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
+        .then(async (response) => {
           if (response.ok) {
             const copy = response.clone()
-            void caches.open(CACHE).then((cache) => {
-              void cache.put(request, copy.clone())
-              void cache.put(new URL('./', self.location).href, copy)
-            })
+            const cache = await caches.open(CACHE)
+            await cache.put(new URL('./', self.location).href, copy)
+            return response
           }
-          return response
+          return (await shellResponse()) || response
         })
         .catch(async () => (await shellResponse()) || new Response('Hors ligne', { status: 503 })),
     )
@@ -110,13 +116,14 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(request)
-      const network = fetch(request)
-        .then((response) => {
-          if (response.ok) void cache.put(request, response.clone())
-          return response
-        })
-        .catch(() => cached)
-      return cached || network
+      if (cached) return cached
+      try {
+        const response = await fetch(request)
+        if (response.ok) await cache.put(request, response.clone())
+        return response
+      } catch {
+        return cached || new Response('', { status: 504 })
+      }
     }),
   )
 })

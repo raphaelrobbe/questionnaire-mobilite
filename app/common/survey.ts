@@ -13,13 +13,18 @@ export type Vehicle = { motor: Motor | ''; sansPermis: boolean }
 export type Recontact = 'oui' | 'non'
 
 export type Answers = {
+  nom: string
+  prenom: string
   commune: string
+  adresse: string
+  complement: string
   people: Person[]
   cars: Vehicle[]
   twoWheelers: Vehicle[]
   recontact: Recontact | ''
   collectif: boolean
   email: string
+  phone: string
 }
 
 type Labeled<T extends string> = { value: T; label: string }
@@ -46,8 +51,10 @@ export const MOTOR_OPTIONS: Labeled<Motor>[] = [
 ]
 
 export type Step =
-  | { kind: 'consent' }
+  | { kind: 'name' }
   | { kind: 'commune' }
+  | { kind: 'address' }
+  | { kind: 'consent' }
   | { kind: 'household' }
   | { kind: 'vehicles' }
   | { kind: 'contact' }
@@ -62,11 +69,41 @@ export function emptyVehicle(): Vehicle {
 }
 
 export function emptyAnswers(): Answers {
-  return { commune: '', people: [emptyPerson()], cars: [], twoWheelers: [], recontact: '', collectif: false, email: '' }
+  return {
+    nom: '',
+    prenom: '',
+    commune: '',
+    adresse: '',
+    complement: '',
+    people: [emptyPerson()],
+    cars: [],
+    twoWheelers: [],
+    recontact: '',
+    collectif: false,
+    email: '',
+    phone: '',
+  }
 }
 
 export function buildSteps(_answers: Answers): Step[] {
-  return [{ kind: 'consent' }, { kind: 'commune' }, { kind: 'household' }, { kind: 'vehicles' }, { kind: 'contact' }, { kind: 'review' }]
+  return [
+    { kind: 'name' },
+    { kind: 'commune' },
+    { kind: 'address' },
+    { kind: 'consent' },
+    { kind: 'household' },
+    { kind: 'vehicles' },
+    { kind: 'contact' },
+    { kind: 'review' },
+  ]
+}
+
+/** Vide si le champ est vide. Null seulement quand le texte ne contient aucun chiffre. */
+export function respondentPhone(value: string): string | null {
+  const text = value.trim().slice(0, 40)
+  if (!text) return ''
+  if (!/\d/.test(text)) return null
+  return text
 }
 
 export function normalizeEmail(value: string): string {
@@ -101,14 +138,23 @@ export function sanitizeAnswers(input: unknown): Answers {
   const collectif = source.collectif === true
   const email = typeof source.email === 'string' ? normalizeEmail(source.email) : ''
   return {
-    commune: typeof source.commune === 'string' ? clip(source.commune.trim(), 120) : '',
+    nom: text(source.nom, 80),
+    prenom: text(source.prenom, 80),
+    commune: text(source.commune, 120),
+    adresse: text(source.adresse, 160),
+    complement: text(source.complement, 160),
     people: people.length ? people : [emptyPerson()],
     cars: sanitizeVehicles(source.cars),
     twoWheelers: sanitizeVehicles(source.twoWheelers),
     recontact,
     collectif,
     email: recontact === 'oui' || collectif ? email : '',
+    phone: text(source.phone, 40),
   }
+}
+
+function text(value: unknown, max: number): string {
+  return typeof value === 'string' ? clip(value.trim(), max) : ''
 }
 
 function sanitizePeople(input: unknown): Person[] {
@@ -197,6 +243,7 @@ export function issueForContact(answers: Answers): string | null {
     return 'Indiquez si la personne accepte d’être recontactée.'
   }
   if (wantsEmail(answers) && !isEmail(answers.email)) return 'Indiquez une adresse mail.'
+  if (respondentPhone(answers.phone) === null) return 'Ce numéro ne contient aucun chiffre.'
   return null
 }
 
@@ -227,14 +274,24 @@ export function summary(input: Answers): { label: string; value: string }[] {
   const cars = answers.cars.map(vehicleLine).filter(Boolean)
   const twoWheelers = answers.twoWheelers.map(vehicleLine).filter(Boolean)
   return [
+    { label: 'Nom', value: [answers.prenom, answers.nom].filter(Boolean).join(' ') },
     { label: 'Commune', value: answers.commune },
+    { label: 'Adresse', value: [answers.adresse, answers.complement].filter(Boolean).join(', ') },
     { label: 'Foyer', value: people.join(' · ') },
     { label: 'Voitures', value: cars.length ? cars.join(' · ') : 'Aucune' },
     { label: '2/3 roues', value: twoWheelers.length ? twoWheelers.join(' · ') : 'Aucun' },
     { label: 'Recontact', value: answers.recontact === 'oui' ? 'Oui' : answers.recontact === 'non' ? 'Non' : '' },
     { label: 'Collectif Mobilités du Haut-Doubs', value: answers.collectif ? 'Oui' : 'Non' },
     { label: 'Adresse mail', value: answers.email },
+    { label: 'Téléphone', value: answers.phone },
   ].filter((line) => line.value !== '')
+}
+
+export function draftTitle(input: Answers): string {
+  const answers = sanitizeAnswers(input)
+  const name = [answers.prenom, answers.nom].filter(Boolean).join(' ')
+  if (name && answers.commune) return `${name} · ${answers.commune}`
+  return name || answers.commune || 'Sans nom'
 }
 
 export function answerPreview(input: unknown): string {
@@ -253,12 +310,17 @@ function legacyPlace(input: unknown): string {
 export function hasAnyAnswer(input: Answers): boolean {
   const answers = sanitizeAnswers(input)
   return Boolean(
-    answers.commune ||
+    answers.nom ||
+      answers.prenom ||
+      answers.commune ||
+      answers.adresse ||
+      answers.complement ||
       answers.people.some((person) => person.age || person.drive) ||
       answers.cars.length ||
       answers.twoWheelers.length ||
       answers.recontact !== '' ||
       answers.collectif ||
-      answers.email !== '',
+      answers.email !== '' ||
+      answers.phone !== '',
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { communesOnOffer, deviceAllowed, filterCommunes, formatDeviceCell, isAdminSession, normalizeDeviceId, parseDeviceCell, readListsPayload, startRefusal } from './config'
+import { communesOnOffer, deviceAllowed, filterCommunes, formatDeviceCell, interviewerForDevice, isAdminSession, normalizeDeviceId, normalizePhone, parseDeviceCell, readListsPayload } from './config'
 
 describe('listes du tableur', () => {
   test('filtre sur le début du nom, sans tenir compte des accents', () => {
@@ -30,8 +30,8 @@ describe('listes du tableur', () => {
       }),
     ).toEqual({
       interviewers: [
-        { name: 'Ada', admin: true, authorized: true, devices: null },
-        { name: 'Camille', admin: false, authorized: false, devices: ['abc'] },
+        { name: 'Ada', admin: true, authorized: true, devices: null, phone: '' },
+        { name: 'Camille', admin: false, authorized: false, devices: ['abc'], phone: '' },
       ],
       communes: ['Lyon'],
     })
@@ -56,9 +56,9 @@ describe('listes du tableur', () => {
 
   test('n’autorise un appareil que s’il est listé pour l’enquêteur, et jamais si la cellule est vide', () => {
     const interviewers = [
-      { name: 'Ada', admin: true, authorized: true, devices: ['abc'] },
-      { name: 'Camille', admin: false, authorized: false, devices: [] as string[] },
-      { name: 'Noé', admin: false, authorized: true, devices: null },
+      { name: 'Ada', admin: true, authorized: true, devices: ['abc'], phone: '' },
+      { name: 'Camille', admin: false, authorized: false, devices: [] as string[], phone: '' },
+      { name: 'Noé', admin: false, authorized: true, devices: null, phone: '' },
     ]
     expect(deviceAllowed(interviewers, 'Ada', 'ABC')).toBe(true)
     expect(deviceAllowed(interviewers, 'Ada', 'autre')).toBe(false)
@@ -68,8 +68,37 @@ describe('listes du tableur', () => {
     expect(isAdminSession(interviewers, 'Ada')).toBe(true)
     expect(isAdminSession(interviewers, 'Camille')).toBe(false)
     expect(isAdminSession(interviewers, 'Noé')).toBe(false)
-    expect(startRefusal(interviewers, '', 'abc')).toMatch(/enquêteur/)
-    expect(startRefusal(interviewers, 'Camille', 'abc')).toMatch(/pas autorisé/)
-    expect(startRefusal(interviewers, 'Ada', 'abc')).toBeNull()
+  })
+
+  test('retrouve le nom à partir de l’identifiant, sans liste à choisir', () => {
+    const hidden = [
+      { name: 'Ada', admin: true, authorized: false, devices: null, phone: '' },
+      { name: 'Camille', admin: false, authorized: true, devices: null, phone: '' },
+    ]
+    expect(interviewerForDevice(hidden, 'abc')?.name).toBe('Camille')
+    const revealed = [
+      { name: 'Ada', admin: true, authorized: false, devices: ['zzz'], phone: '' },
+      { name: 'Camille', admin: false, authorized: true, devices: ['abc'], phone: '' },
+    ]
+    expect(interviewerForDevice(revealed, 'ABC')?.name).toBe('Camille')
+    expect(interviewerForDevice(revealed, 'absent')).toBeNull()
+    expect(interviewerForDevice([{ name: 'Ada', admin: false, authorized: true, devices: [], phone: '' }], 'abc')).toBeNull()
+    expect(interviewerForDevice(hidden, '')).toBeNull()
+    expect(interviewerForDevice([], 'abc')).toBeNull()
+  })
+
+  test('accepte un numéro facultatif, et refuse un texte qui n’en est pas un', () => {
+    expect(normalizePhone('')).toBe('')
+    expect(normalizePhone('  06 12 34 56 78  ')).toBe('06 12 34 56 78')
+    expect(normalizePhone('+33 6 12 34 56 78')).toBe('+33 6 12 34 56 78')
+    expect(normalizePhone('bureau')).toBeNull()
+    expect(normalizePhone('123')).toBeNull()
+    expect(
+      readListsPayload({
+        ok: true,
+        interviewers: [{ name: 'Ada', admin: false, authorized: false, phone: ' 06 12 34 56 78 ' }],
+        communes: ['Lyon'],
+      }).interviewers[0]?.phone,
+    ).toBe('06 12 34 56 78')
   })
 })

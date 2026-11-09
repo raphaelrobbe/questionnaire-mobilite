@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Enquête mobilité",
   "short_name": "Mobilité",
-  "description": "Enquête de terrain sur les déplacements. Les réponses partent dans un Google Sheet.",
+  "description": "Enquête de terrain. Elle s’ouvre et se remplit sans réseau après une première visite en ligne.",
   "lang": "fr",
   "dir": "ltr",
   "start_url": "./",

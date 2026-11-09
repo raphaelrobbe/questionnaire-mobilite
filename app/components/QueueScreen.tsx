@@ -1,6 +1,7 @@
 import { Link } from '@remix-run/react'
 import { useState } from 'react'
 import { classifyEndpoint, endpointHint } from '~/common/endpoint'
+import { arrivalInProgress } from '~/common/receipt'
 import { formatWhen } from '~/common/format'
 import { answerPreview } from '~/common/survey'
 import { useOutbox } from '~/hooks/useOutbox'
@@ -156,14 +157,25 @@ export function QueueScreen() {
                 </span>
               </div>
               <p className="mt-1 text-sm font-semibold text-muted">{formatWhen(row.createdAt)}</p>
+              {arrivalInProgress(row.status, row.lookups) ? (
+                <p role="status" className="mt-2 flex items-center gap-2 text-sm font-semibold text-clay">
+                  <span
+                    className="inline-block size-3.5 shrink-0 animate-spin rounded-full border-2 border-clay/30 border-t-clay"
+                    aria-hidden="true"
+                  />
+                  L’enregistrement est en cours de vérification.
+                </p>
+              ) : null}
               {row.lastError ? <p className="mt-2 text-sm font-semibold text-danger">{row.lastError}</p> : null}
               {confirm?.id === row.id ? (
                 <div className="mt-3 rounded-2xl bg-paper p-3">
                   <p className="text-sm font-bold">
                     {confirm.kind === 'delete'
-                      ? row.status === 'sent' || row.status === 'confirmed'
-                        ? 'Supprimer la copie sur ce téléphone ? La ligne déjà partie dans le tableur, s’il y en a une, reste en place.'
-                        : 'Supprimer cette fiche de ce téléphone ? Elle ne sera pas envoyée.'
+                      ? row.status === 'confirmed'
+                        ? 'Supprimer la copie sur ce téléphone ? La ligne reste dans le tableur.'
+                        : row.status === 'sent'
+                          ? 'Supprimer la copie sur ce téléphone ? La ligne déjà partie dans le tableur, s’il y en a une, reste en place.'
+                          : 'Supprimer cette fiche de ce téléphone ? Elle ne sera pas envoyée.'
                       : 'Renvoyer réessaie l’envoi. Le même code ne crée pas une seconde ligne.'}
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
@@ -176,16 +188,21 @@ export function QueueScreen() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className={`mt-3 grid gap-2 ${row.status === 'confirmed' ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   {row.status === 'pending' || row.status === 'error' ? (
                     <Button variant="secondary" disabled={busy} onClick={() => void sendOne(row.id)}>
                       Envoyer
                     </Button>
-                  ) : (
-                    <Button variant="secondary" disabled={busy} onClick={() => setConfirm({ id: row.id, kind: 'resend' })}>
+                  ) : row.status === 'sent' ? (
+                    <Button
+                      variant="secondary"
+                      className="disabled:bg-line disabled:text-muted disabled:opacity-100 disabled:hover:bg-line"
+                      disabled={busy || arrivalInProgress(row.status, row.lookups)}
+                      onClick={() => setConfirm({ id: row.id, kind: 'resend' })}
+                    >
                       Renvoyer
                     </Button>
-                  )}
+                  ) : null}
                   <Button variant="ghost" disabled={busy} onClick={() => setConfirm({ id: row.id, kind: 'delete' })}>
                     Supprimer
                   </Button>

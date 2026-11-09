@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "remix vite:dev",
-    "build": "remix vite:build",
+    "build": "remix vite:build && bun scripts/precache.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -14,7 +14,8 @@
     "@remix-run/node": "^2.15.0",
     "@remix-run/react": "^2.15.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "uqr": "^0.1.3"
   },
   "devDependencies": {
     "@remix-run/dev": "^2.15.0",

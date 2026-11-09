@@ -1,7 +1,14 @@
 import { describe, expect, test } from 'vitest'
-import { ArrivalStopped, pollArrival, readStoredFlag } from './receipt'
+import { ArrivalStopped, arrivalInProgress, pollArrival, readStoredFlag } from './receipt'
 
 describe('accusé de la fiche', () => {
+  test('la vérification dure tant que les cinq lectures ne sont pas faites', () => {
+    expect(arrivalInProgress('sent', 0)).toBe(true)
+    expect(arrivalInProgress('sent', 4)).toBe(true)
+    expect(arrivalInProgress('sent', 5)).toBe(false)
+    expect(arrivalInProgress('confirmed', 1)).toBe(false)
+  })
+
   test('ne retient qu’un oui ou un non', () => {
     expect(readStoredFlag({ ok: true, stored: true })).toBe(true)
     expect(readStoredFlag({ ok: true, stored: false })).toBe(false)

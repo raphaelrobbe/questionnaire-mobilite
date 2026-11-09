@@ -3,6 +3,10 @@ export const ARRIVAL_GAP_MS = 2000
 
 export class ArrivalStopped extends Error {}
 
+export function arrivalInProgress(status: string, lookups: number): boolean {
+  return status === 'sent' && lookups < ARRIVAL_TRIES
+}
+
 export function readStoredFlag(payload: unknown): boolean {
   if (!payload || typeof payload !== 'object') throw new Error('Réponse illisible.')
   const source = payload as Record<string, unknown>

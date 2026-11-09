@@ -1,10 +1,9 @@
-import { Link } from '@remix-run/react'
+import { Link, useNavigate, useSearchParams } from '@remix-run/react'
 import { useEffect, useRef, useState } from 'react'
-import { startRefusal } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
 import { buildSteps, patchAnswers, stepIssue, summary, type Answers } from '~/common/survey'
 import type { ResponseRecord } from '~/common/response'
-import { clearDraft, emptyDraft, loadDraft, saveDraft, type Draft } from '~/lib/draft.client'
+import { createDraft, loadDraft, removeDraft, saveDraft, type Draft } from '~/lib/draft.client'
 import { capturePosition } from '~/lib/geo.client'
 import { flushOne, keepResponse, type LocalResponse } from '~/lib/outbox.client'
 import { getDeviceId } from '~/lib/settings.client'
@@ -22,28 +21,31 @@ export function Interview() {
   const settings = useSettings()
   const lists = useSheetLists()
   const online = useOnline()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const fiche = params.get('fiche') ?? ''
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saved, setSaved] = useState<LocalResponse | null>(null)
-  const [blocked, setBlocked] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
   const [geoBusy, setGeoBusy] = useState(false)
   const [deviceId, setDeviceId] = useState('')
+  const [missing, setMissing] = useState(false)
 
-  const refusal =
-    settings && deviceId && lists.status === 'ready' ? startRefusal(lists.interviewers, settings.interviewer, deviceId) : null
-  const allowed = Boolean(settings && deviceId && lists.status === 'ready' && !refusal)
+  const named = Boolean(settings?.interviewer.trim())
 
   useEffect(() => {
     setDeviceId(getDeviceId())
   }, [])
 
   useEffect(() => {
-    if (!allowed) return
-    setDraft((current) => current ?? loadDraft() ?? emptyDraft())
-  }, [allowed])
+    if (!named || !fiche) return
+    const found = loadDraft(fiche)
+    setDraft(found)
+    setMissing(!found)
+  }, [named, fiche])
 
   useEffect(() => {
     if (!draft || saved) return
@@ -58,7 +60,6 @@ export function Interview() {
   useEffect(() => {
     const current = draftRef.current
     if (!current) return
-    setBlocked(false)
     const stepsNow = buildSteps(current.answers)
     const stepNow = stepsNow[Math.min(current.step, stepsNow.length - 1)]
     if (stepNow?.kind === 'commune') {
@@ -68,20 +69,49 @@ export function Interview() {
     headingRef.current?.focus()
   }, [stepIndex, opened])
 
-  if (!settings || !deviceId || lists.status === 'loading') {
+  if (saved) {
+    return (
+      <Saved
+        row={saved}
+        onNext={() => {
+          setSaved(null)
+          setSaveError(null)
+          setSaving(false)
+          if (!settings?.interviewer.trim()) {
+            setDraft(null)
+            return
+          }
+          const next = createDraft()
+          setDraft(next)
+          navigate(`/entretien?fiche=${next.code}`)
+        }}
+      />
+    )
+  }
+
+  if (!settings || !deviceId || (named && lists.status === 'loading')) {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’entretien…</p>
   }
 
-  if (lists.status === 'error' || refusal) {
-    const message = lists.status === 'error' ? lists.message || 'Listes indisponibles.' : refusal
+  if (!named) {
     return (
       <div className="grid gap-4">
         <h1 className="text-3xl font-extrabold tracking-tight">Enquête impossible</h1>
-        <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">{message}</p>
-        <Link to="/reglages" className={buttonClass('secondary')}>
-          Ouvrir les réglages
+        <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">
+          Connectez cet appareil depuis l’accueil.
+        </p>
+        <Link to="/" className={buttonClass('secondary')}>
+          Retour à l’accueil
         </Link>
-        <Link to="/" className={buttonClass('ghost')}>
+      </div>
+    )
+  }
+
+  if (!fiche || missing) {
+    return (
+      <div className="grid gap-4">
+        <h1 className="text-3xl font-extrabold tracking-tight">Cette fiche n’est pas sur ce téléphone.</h1>
+        <Link to="/" className={buttonClass('secondary')}>
           Retour à l’accueil
         </Link>
       </div>
@@ -90,21 +120,6 @@ export function Interview() {
 
   if (!draft) {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’entretien…</p>
-  }
-
-  if (saved) {
-    return (
-      <Saved
-        row={saved}
-        onNext={() => {
-          clearDraft()
-          setDraft(emptyDraft())
-          setSaved(null)
-          setSaveError(null)
-          setSaving(false)
-        }}
-      />
-    )
   }
 
   const steps = buildSteps(draft.answers)
@@ -120,16 +135,7 @@ export function Interview() {
   }
 
   function goNext() {
-    if (!draft || !step) return
-    if (step.kind === 'consent' && !draft.consent) {
-      setBlocked(true)
-      return
-    }
-    if (step.kind !== 'consent' && step.kind !== 'review' && stepIssue(step, draft.answers, lists.communes)) {
-      setBlocked(true)
-      return
-    }
-    setBlocked(false)
+    if (!draft || !step || issue) return
     update({ step: stepIndex + 1 })
   }
 
@@ -148,7 +154,7 @@ export function Interview() {
     }
     try {
       await keepResponse(record)
-      clearDraft()
+      removeDraft(record.id)
       const row = await flushOne(record.id)
       setSaved(
         row ?? {
@@ -173,8 +179,21 @@ export function Interview() {
         : 'Cochez l’accord avant de continuer.'
       : stepIssue(step, draft.answers, lists.communes)
 
+  async function notePosition() {
+    setGeoBusy(true)
+    setGeoError(null)
+    try {
+      const position = await capturePosition()
+      update(position)
+    } catch (error) {
+      setGeoError(error instanceof Error ? error.message : 'Position indisponible.')
+    } finally {
+      setGeoBusy(false)
+    }
+  }
+
   return (
-    <div className="pb-28">
+    <div className={issue ? 'pb-40' : 'pb-28'}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-bold text-muted">
           {stepIndex + 1} / {steps.length}
@@ -184,6 +203,19 @@ export function Interview() {
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
         <div className="h-full bg-leaf" style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }} />
       </div>
+
+      {step.kind === 'name' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Qui est la personne ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Facultatif. La fiche peut être préparée avant la rencontre.</p>
+          <div className="mt-4 grid gap-3">
+            <Field label="Prénom" value={draft.answers.prenom} autoComplete="given-name" onChange={(prenom) => updateAnswers({ prenom })} />
+            <Field label="Nom" value={draft.answers.nom} autoComplete="family-name" onChange={(nom) => updateAnswers({ nom })} />
+          </div>
+        </section>
+      ) : null}
 
       {step.kind === 'consent' ? (
         <section className="mt-6">
@@ -228,6 +260,30 @@ export function Interview() {
         </section>
       ) : null}
 
+      {step.kind === 'address' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Quelle est son adresse ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Facultatif. La seconde ligne précise l’appartement ou le bâtiment.</p>
+          <div className="mt-4 grid gap-3">
+            <Field
+              label="Adresse"
+              value={draft.answers.adresse}
+              autoComplete="street-address"
+              placeholder="12 rue de la Gare"
+              onChange={(adresse) => updateAnswers({ adresse })}
+            />
+            <Field
+              label="Complément"
+              value={draft.answers.complement}
+              placeholder="Appartement 12"
+              onChange={(complement) => updateAnswers({ complement })}
+            />
+          </div>
+        </section>
+      ) : null}
+
       {step.kind === 'household' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
@@ -258,7 +314,7 @@ export function Interview() {
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
             Rester en contact ?
           </h1>
-          <p className="mt-2 text-base text-muted">Le code de la fiche relie l’adresse mail, hors du tableau public.</p>
+          <p className="mt-2 text-base text-muted">Le nom, l’adresse, le téléphone et l’adresse mail restent hors du tableau public.</p>
           <ContactStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
@@ -311,49 +367,41 @@ export function Interview() {
         </section>
       ) : null}
 
-      {blocked && issue ? (
-        <p role="alert" className="mt-4 text-sm font-bold text-danger">
-          {issue}
-        </p>
-      ) : null}
-
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-paper/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-lg gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {stepIndex === 0 ? (
-            <Link to="/" className={buttonClass('secondary', 'w-auto flex-1')}>
-              Pause
-            </Link>
-          ) : (
-            <Button variant="secondary" className="w-auto flex-1" onClick={() => update({ step: stepIndex - 1 })}>
-              Retour
-            </Button>
-          )}
-          {step.kind === 'review' ? (
-            <Button className="w-auto flex-[2]" disabled={saving} onClick={() => void onSave()}>
-              {saving ? 'Enregistrement…' : 'Enregistrer la réponse'}
-            </Button>
-          ) : (
-            <Button className="w-auto flex-[2]" onClick={goNext}>
-              Suivant
-            </Button>
-          )}
+        <div className="mx-auto w-full max-w-lg px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {issue ? (
+            <p role="status" className="mb-2 text-sm font-bold leading-snug text-danger">
+              {issue}
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            {stepIndex === 0 ? (
+              <Link to="/" className={buttonClass('secondary', 'w-auto flex-1')}>
+                Pause
+              </Link>
+            ) : (
+              <Button variant="secondary" className="w-auto flex-1" onClick={() => update({ step: stepIndex - 1 })}>
+                Retour
+              </Button>
+            )}
+            {step.kind === 'review' ? (
+              <Button className="w-auto flex-[2]" disabled={saving} onClick={() => void onSave()}>
+                {saving ? 'Enregistrement…' : 'Enregistrer la réponse'}
+              </Button>
+            ) : (
+              <Button
+                className="w-auto flex-[2] disabled:bg-line disabled:text-muted disabled:opacity-100 disabled:hover:bg-line"
+                disabled={Boolean(issue)}
+                onClick={goNext}
+              >
+                Suivant
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
-
-  async function notePosition() {
-    setGeoBusy(true)
-    setGeoError(null)
-    try {
-      const position = await capturePosition()
-      update(position)
-    } catch (error) {
-      setGeoError(error instanceof Error ? error.message : 'Position indisponible.')
-    } finally {
-      setGeoBusy(false)
-    }
-  }
 }
 
 function sendHint(online: boolean, endpointReady: boolean): string {
@@ -368,6 +416,34 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-sm font-semibold text-muted">{label}</dt>
       <dd className="font-bold">{value}</dd>
     </div>
+  )
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  autoComplete?: string
+}) {
+  return (
+    <label className="grid gap-2">
+      <span className="font-bold">{label}</span>
+      <input
+        value={value}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        maxLength={160}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
+      />
+    </label>
   )
 }
 

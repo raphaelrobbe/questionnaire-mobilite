@@ -51,7 +51,7 @@ export function useSheetLists(): SheetListsState {
         saveCachedLists(next)
         setLists(next)
         setStatus('ready')
-        setMessage(next.interviewers.length && next.communes.length ? null : 'La colonne « Prénom Nom » ou « Nom commune » est vide.')
+        setMessage(next.interviewers.length && !next.communes.length ? 'La colonne « Nom commune » est vide.' : null)
       })
       .catch((error: unknown) => {
         if (cancelled || cached) return

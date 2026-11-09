@@ -34,6 +34,15 @@ export default defineConfig({
     strictPort: true,
     host: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/app/lib/qr/') || id.includes('/uqr/')) return 'qr'
+        },
+      },
+    },
+  },
   test: {
     environment: 'node',
     include: ['app/**/*.test.ts'],

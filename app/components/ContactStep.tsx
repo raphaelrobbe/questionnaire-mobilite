@@ -25,6 +25,23 @@ export function ContactStep({
         />
         <span className="font-bold">J’accepte de recevoir les informations du Collectif Mobilités du Haut-Doubs.</span>
       </label>
+      <label className="grid gap-2">
+        <span className="font-bold">Numéro de téléphone</span>
+        <input
+          value={answers.phone}
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={40}
+          placeholder="+33 6 12 34 56 78"
+          onChange={(event) => onChange({ phone: event.target.value })}
+          className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
+        />
+        <span className="text-sm font-semibold text-muted">Facultatif. Les espaces et le + sont gardés.</span>
+      </label>
       {wantsEmail(answers) ? (
         <label className="grid gap-2">
           <span className="font-bold">Adresse mail</span>

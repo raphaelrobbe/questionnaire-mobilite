@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
 import { classifyEndpoint, endpointMessage, type EndpointIssue } from '~/common/endpoint'
 import { useSettings } from '~/hooks/useSettings'
-import { useSheetLists } from '~/hooks/useSheetLists'
-import { getDeviceId, updateSettings } from '~/lib/settings.client'
+import { copyText, getDeviceId } from '~/lib/settings.client'
 import { probeEndpoint } from '~/lib/sheets.client'
 import { Button } from './Button'
 
 export function SettingsScreen() {
   const settings = useSettings()
-  const lists = useSheetLists()
   const [deviceId, setDeviceId] = useState('')
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState(false)
@@ -18,13 +16,6 @@ export function SettingsScreen() {
   useEffect(() => {
     setDeviceId(getDeviceId())
   }, [])
-
-  useEffect(() => {
-    if (!settings || lists.status !== 'ready') return
-    if (settings.interviewer && !lists.interviewers.some((person) => person.name === settings.interviewer)) {
-      updateSettings({ interviewer: '' })
-    }
-  }, [lists.interviewers, lists.status, settings])
 
   if (!settings) {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture des réglages…</p>
@@ -43,7 +34,7 @@ export function SettingsScreen() {
       setProbeMessage(
         result === 'confirmed'
           ? 'Les deux scripts répondent.'
-          : 'Les requêtes sont parties, mais le navigateur ne peut pas lire la réponse de Google. Faites un entretien test, puis ouvrez Réponses et Adresses mail.',
+          : 'Les requêtes sont parties, mais le navigateur ne peut pas lire la réponse de Google. Faites un entretien test, puis ouvrez Réponses et Enquêtés.',
       )
     } catch (error) {
       setProbe('error')
@@ -51,58 +42,16 @@ export function SettingsScreen() {
     }
   }
 
-  const names = lists.interviewers.map((person) => person.name)
-
   async function copyDeviceId() {
-    if (!deviceId) return
     setCopyError(false)
-    try {
-      await navigator.clipboard.writeText(deviceId)
-      setCopied(true)
-      return
-    } catch {
-      /* Le navigateur a refusé l’accès au presse-papiers. */
-    }
-    try {
-      const area = document.createElement('textarea')
-      area.value = deviceId
-      area.setAttribute('readonly', '')
-      area.style.position = 'fixed'
-      area.style.left = '-9999px'
-      document.body.appendChild(area)
-      area.select()
-      const ok = document.execCommand('copy')
-      area.remove()
-      setCopied(ok)
-      setCopyError(!ok)
-    } catch {
-      setCopied(false)
-      setCopyError(true)
-    }
+    const ok = await copyText(deviceId)
+    setCopied(ok)
+    setCopyError(!ok)
   }
 
   return (
     <div className="grid gap-4">
       <h1 className="text-3xl font-extrabold tracking-tight">Réglages</h1>
-
-      <label className="grid gap-2">
-        <span className="font-bold">Enquêteur</span>
-        <select
-          value={names.includes(settings.interviewer) ? settings.interviewer : ''}
-          onChange={(event) => updateSettings({ interviewer: event.target.value })}
-          className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
-        >
-          <option value="">{lists.status === 'loading' ? 'Chargement de la liste…' : 'Choisir'}</option>
-          {names.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-        {lists.message && lists.message !== hint.text ? (
-          <span className="text-sm font-semibold text-clay">{lists.message}</span>
-        ) : null}
-      </label>
 
       <p className={`text-sm font-semibold ${hint.tone === 'warn' ? 'text-clay' : hint.tone === 'ok' ? 'text-leaf' : 'text-muted'}`}>{hint.text}</p>
 

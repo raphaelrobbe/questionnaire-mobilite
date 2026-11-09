@@ -1,7 +1,10 @@
+import { DeviceUnknown, interviewerForDevice } from '~/common/config'
 import { assertEndpoint, classifyEndpoint } from '~/common/endpoint'
 import { readSheetResult } from '~/common/http'
 import { readStoredFlag } from '~/common/receipt'
 import { mailBody, pingBody, responseBody, type ResponseRecord } from '~/common/response'
+import { fetchSheetLists, publishLists } from '~/lib/config.client'
+import { loadSettings, updateSettings } from '~/lib/settings.client'
 
 export type SendStatus = 'confirmed' | 'sent'
 
@@ -10,9 +13,23 @@ export type SendStatus = 'confirmed' | 'sent'
  * le script exécute la requête même quand le navigateur n'a pas le droit de lire la réponse.
  * L'adresse part d'abord vers le script privé, la fiche ensuite vers le script public.
  */
+/**
+ * Relit Enquêteurs avec l’identifiant. Sans correspondance, rien ne doit être envoyé.
+ * Une panne de réseau ou de script reste une erreur ordinaire : le nom gardé n’est pas retiré ici.
+ */
+export async function confirmInterviewer(adminEndpoint: string, deviceId: string): Promise<string> {
+  const admin = classifyEndpoint(adminEndpoint)
+  if (!admin.ok || admin.kind !== 'google-script') throw new Error('Le tableur privé n’est pas branché.')
+  const lists = await fetchSheetLists(admin.url, { device: deviceId, who: loadSettings().interviewer })
+  publishLists(lists)
+  const person = interviewerForDevice(lists.interviewers, deviceId)
+  if (!person) throw new DeviceUnknown()
+  updateSettings({ interviewer: person.name })
+  return person.name
+}
+
 export async function submitRecord(record: ResponseRecord, endpoint: string, adminEndpoint: string): Promise<SendStatus> {
-  const mail = mailBody(record)
-  const mailed = mail ? await post(adminEndpoint, JSON.stringify(mail)) : null
+  const mailed = await post(adminEndpoint, JSON.stringify(mailBody(record)))
   const responses = await post(endpoint, JSON.stringify(responseBody(record)))
   return mailed === 'confirmed' && responses === 'confirmed' ? 'confirmed' : responses
 }
