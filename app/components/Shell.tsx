@@ -10,7 +10,6 @@ import { Mark } from './Mark'
 const links = [
   { to: '/', label: 'Accueil' },
   { to: '/file', label: 'File' },
-  { to: '/reglages', label: 'Réglages' },
 ]
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -31,24 +30,31 @@ export function Shell({ children }: { children: ReactNode }) {
       >
         Aller au contenu
       </a>
-      <header className="border-b border-line bg-card/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 py-3">
-          <Mark />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-extrabold leading-none tracking-tight">Mobilité</p>
-            <p className="mt-1 text-sm font-semibold text-muted">Enquête de terrain</p>
-          </div>
-          {!online ? (
-            <p className="rounded-full bg-clay-bg px-3 py-1 text-sm font-bold text-clay">Hors réseau</p>
-          ) : null}
-        </div>
-        {interviewing ? (
-          <div className="mx-auto flex w-full max-w-lg px-4 pb-3">
-            <Link to="/" className="text-sm font-bold text-leaf">
-              Accueil
+      {interviewing ? null : (
+        <header className="border-b border-line bg-card/90 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 py-3">
+            <Mark />
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-extrabold leading-tight tracking-tight">
+                Transports en commun <em>de</em> et <em>vers</em> Pontarlier
+              </p>
+              <p className="mt-1 text-sm font-semibold text-muted">Enquête de terrain</p>
+            </div>
+            {!online ? (
+              <p className="rounded-full bg-clay-bg px-3 py-1 text-sm font-bold text-clay">Hors réseau</p>
+            ) : null}
+            <Link
+              to="/reglages"
+              prefetch="intent"
+              aria-label="Réglages"
+              aria-current={location.pathname === '/reglages' ? 'page' : undefined}
+              className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full ${
+                location.pathname === '/reglages' ? 'bg-pine text-paper' : 'text-pine hover:bg-mist'
+              }`}
+            >
+              <Gear />
             </Link>
           </div>
-        ) : (
           <nav className="mx-auto flex w-full max-w-lg gap-1 px-3 pb-3" aria-label="Sections">
             {nav.map((link) => {
               const active = location.pathname === link.to
@@ -72,11 +78,19 @@ export function Shell({ children }: { children: ReactNode }) {
               )
             })}
           </nav>
-        )}
-      </header>
+        </header>
+      )}
       <main id="contenu" className="mx-auto w-full max-w-lg px-4 pb-16 pt-4">
         {children}
       </main>
     </div>
+  )
+}
+
+function Gear() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-6" aria-hidden="true" fill="currentColor">
+      <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.48.41l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.49.49 0 0 0-.59.22L2.69 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.3.61.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.48 0 .61-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z" />
+    </svg>
   )
 }

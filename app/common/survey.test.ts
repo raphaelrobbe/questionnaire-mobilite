@@ -14,6 +14,7 @@ import {
   issueForVehicles,
   patchAnswers,
   personLine,
+  mapsDestination,
   sanitizeAnswers,
   summary,
 } from './survey'
@@ -93,6 +94,14 @@ describe('questionnaire', () => {
     expect(ready.email).toBe('ada@exemple.fr')
     const dropped = patchAnswers(ready, { collectif: false })
     expect(dropped.email).toBe('')
+    expect(patchAnswers(emptyAnswers(), { adresse: '11 ' }).adresse).toBe('11 ')
+    expect(patchAnswers(emptyAnswers(), { adresse: '11 rue de la gare' }).adresse).toBe('11 rue de la gare')
+    expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' })).toBe(
+      'https://www.google.com/maps/dir/?api=1&destination=11%20rue%20de%20la%20gare%2C%20Chaux-Neuve',
+    )
+    expect(mapsDestination({ adresse: '  ', commune: 'Chaux-Neuve' })).toBeNull()
+    expect(mapsDestination({ adresse: '11 rue de la gare', commune: '' })).toBeNull()
+    expect(patchAnswers(emptyAnswers(), { phone: '+33 ' }).phone).toBe('+33 ')
     expect(issueForContact(patchAnswers(refused, { phone: 'bureau' }))).toMatch(/chiffre/)
     expect(respondentPhone('  +33 6 12 34 56 78  ')).toBe('+33 6 12 34 56 78')
     expect(respondentPhone('')).toBe('')

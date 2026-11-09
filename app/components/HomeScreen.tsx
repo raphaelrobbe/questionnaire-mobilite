@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { DeviceUnknown, isAdminSession } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
 import { formatWhen } from '~/common/format'
-import { answerPreview, draftTitle } from '~/common/survey'
+import { answerPreview, draftTitle, mapsDestination } from '~/common/survey'
 import { createDraft, listDrafts, removeDraft, type Draft } from '~/lib/draft.client'
 import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
@@ -12,6 +12,7 @@ import { useInstall } from '~/lib/install.client'
 import { copyText, getDeviceId } from '~/lib/settings.client'
 import { confirmInterviewer } from '~/lib/sheets.client'
 import { Button, buttonClass } from './Button'
+import { MapsLink } from './MapsLink'
 import { statusLabel } from '~/lib/outbox.client'
 
 export function HomeScreen() {
@@ -134,11 +135,6 @@ export function HomeScreen() {
 
   return (
     <div className="grid gap-4">
-      <section className="rounded-[28px] bg-pine px-5 py-6 text-paper">
-        <p className="text-sm font-bold text-paper/70">Enquête de terrain</p>
-        <h1 className="mt-2 text-3xl font-extrabold leading-tight tracking-tight">Transports en commun de et vers Pontarlier</h1>
-      </section>
-
       <InstallOffer offer={installOffer} />
 
       <section className="rounded-[28px] border border-line bg-card px-5 py-5 shadow-[0_12px_40px_rgba(28,25,21,0.06)]">
@@ -169,10 +165,14 @@ export function HomeScreen() {
       {drafts.length > 0 ? (
         <ul className="grid gap-2">
           {drafts.map((item) => (
-            <li key={item.code} className="rounded-2xl border border-line bg-card px-4 py-3">
-              <p className="font-bold">{draftTitle(item.answers)}</p>
+            <li key={item.code} className="relative rounded-2xl border border-line bg-card px-4 py-3">
+              <p className={`font-bold ${mapsDestination(item.answers) ? 'pr-28' : ''}`}>{draftTitle(item.answers)}</p>
+              <MapsLink answers={item.answers} compact className="absolute right-4 top-3" />
+              <p className="absolute bottom-3 right-3 rounded-full bg-pine px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
+                {item.code}
+              </p>
               {abandonCode === item.code ? (
-                <div className="mt-3">
+                <div className="mt-3 pr-28">
                   <p className="font-bold">Effacer cette fiche commencée ?</p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <button type="button" className={buttonClass('secondary')} onClick={() => setAbandonCode(null)}>
@@ -192,7 +192,7 @@ export function HomeScreen() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-2 flex gap-4">
+                <div className="mt-2 flex gap-4 pr-28">
                   <Link to={`/entretien?fiche=${item.code}`} className="inline-flex min-h-11 items-center font-bold text-leaf">
                     Continuer
                   </Link>

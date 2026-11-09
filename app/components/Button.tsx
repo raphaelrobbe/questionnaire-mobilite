@@ -10,8 +10,12 @@ const variants: Record<Variant, string> = {
 }
 
 export function buttonClass(variant: Variant = 'primary', extra = ''): string {
+  const width = /\bw-/.test(extra) ? '' : 'w-full'
+  const padding = /\bpx-/.test(extra) ? '' : 'px-4'
   return [
-    'inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl px-4 text-center text-base font-bold transition',
+    'inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl text-center text-base font-bold transition',
+    width,
+    padding,
     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf',
     'disabled:cursor-not-allowed disabled:opacity-45',
     variants[variant],

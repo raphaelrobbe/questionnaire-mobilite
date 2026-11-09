@@ -173,14 +173,28 @@ function sanitizeVehicles(input: unknown): Vehicle[] {
   })
 }
 
+const editableText = {
+  nom: 80,
+  prenom: 80,
+  adresse: 160,
+  complement: 160,
+  phone: 40,
+} as const
+
 export function patchAnswers(answers: Answers, patch: Partial<Answers>): Answers {
-  return sanitizeAnswers({
+  const next = sanitizeAnswers({
     ...answers,
     ...patch,
     people: patch.people ?? answers.people,
     cars: patch.cars ?? answers.cars,
     twoWheelers: patch.twoWheelers ?? answers.twoWheelers,
   })
+  // L’espace en fin de saisie doit rester, sinon « 11 rue » ne peut pas s’écrire.
+  for (const key of Object.keys(editableText) as (keyof typeof editableText)[]) {
+    const value = patch[key]
+    if (typeof value === 'string') next[key] = clip(value, editableText[key])
+  }
+  return next
 }
 
 export function addPerson(people: Person[]): Person[] {
@@ -285,6 +299,14 @@ export function summary(input: Answers): { label: string; value: string }[] {
     { label: 'Adresse mail', value: answers.email },
     { label: 'Téléphone', value: answers.phone },
   ].filter((line) => line.value !== '')
+}
+
+/** Itinéraire vers la rue et la commune. Vide tant que l’une des deux manque. */
+export function mapsDestination(answers: Pick<Answers, 'adresse' | 'commune'>): string | null {
+  const street = answers.adresse.trim()
+  const commune = answers.commune.trim()
+  if (!street || !commune) return null
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${street}, ${commune}`)}`
 }
 
 export function draftTitle(input: Answers): string {

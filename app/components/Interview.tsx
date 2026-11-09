@@ -12,6 +12,7 @@ import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { Button, buttonClass } from './Button'
+import { MapsLink } from './MapsLink'
 import { CommuneStep } from './CommuneStep'
 import { ContactStep } from './ContactStep'
 import { HouseholdStep } from './HouseholdStep'
@@ -125,6 +126,7 @@ export function Interview() {
   const steps = buildSteps(draft.answers)
   const step = steps[stepIndex]
   const endpoint = classifyEndpoint(settings.endpoint)
+  const hint = sendHint(online, endpoint.ok)
 
   function update(patch: Partial<Draft>) {
     setDraft((current) => (current ? { ...current, ...patch } : current))
@@ -194,11 +196,12 @@ export function Interview() {
 
   return (
     <div className={issue ? 'pb-40' : 'pb-28'}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <p className="text-sm font-bold text-muted">
           {stepIndex + 1} / {steps.length}
         </p>
-        <p className="truncate text-sm font-semibold text-muted">{settings.interviewer.trim() || 'Enquêteur non choisi'}</p>
+        <p className="font-mono text-sm font-bold tracking-[0.14em] text-pine">{draft.code}</p>
+        <p className="truncate text-right text-sm font-semibold text-muted">{settings.interviewer.trim() || 'Enquêteur non choisi'}</p>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
         <div className="h-full bg-leaf" style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }} />
@@ -229,7 +232,7 @@ export function Interview() {
             </p>
             <p className="mt-3 text-lg leading-snug">
               {endpoint.ok
-                ? 'Vos réponses seront stockées de manière anonymisée dans un tableau sur internet, susceptible d’être mis à disposition du public. Vous recevrez un code en fin de questionnaire, permettant de vérifier que vos réponses ont bien été prises en compte. Si vous donnez votre adresse mail en fin de questionnaire, elle ne sera pas accessible publiquement.'
+                ? 'Vos réponses sont stockées informatiquement. À l’exception de vos coordonnées personnelles qui restent privées, vos réponses, anonymisées, pourront être rendues publiques et faire l’objet de traitements statistiques informatisés. Un code vous sera remis, permettant aux responsables de l’enquête de relier vos réponses à vos coordonnées pour vous recontacter si besoin.'
                 : 'Pour l’instant les réponses restent sur ce téléphone : le tableur n’est pas encore branché.'}
             </p>
           </div>
@@ -281,6 +284,7 @@ export function Interview() {
               onChange={(complement) => updateAnswers({ complement })}
             />
           </div>
+          <MapsLink answers={draft.answers} className="mt-2" />
         </section>
       ) : null}
 
@@ -342,6 +346,7 @@ export function Interview() {
               }
             />
           </dl>
+          <MapsLink answers={draft.answers} className="mt-3" />
           <div className="mt-4 grid gap-2">
             {draft.latitude === null ? (
               <Button variant="secondary" disabled={geoBusy} onClick={() => void notePosition()}>
@@ -357,7 +362,7 @@ export function Interview() {
                 {geoError}
               </p>
             ) : null}
-            <p className="text-sm leading-relaxed text-muted">{sendHint(online, endpoint.ok)}</p>
+            {hint ? <p className="text-sm leading-relaxed text-muted">{hint}</p> : null}
             {saveError ? (
               <p role="alert" className="text-sm font-semibold text-danger">
                 {saveError}
@@ -375,22 +380,21 @@ export function Interview() {
             </p>
           ) : null}
           <div className="flex gap-2">
-            {stepIndex === 0 ? (
-              <Link to="/" className={buttonClass('secondary', 'w-auto flex-1')}>
-                Pause
-              </Link>
-            ) : (
-              <Button variant="secondary" className="w-auto flex-1" onClick={() => update({ step: stepIndex - 1 })}>
+            <Link to="/" className={buttonClass('secondary', 'w-auto shrink-0 px-2')}>
+              Pause
+            </Link>
+            {stepIndex > 0 ? (
+              <Button variant="secondary" className="w-auto shrink-0 px-2" onClick={() => update({ step: stepIndex - 1 })}>
                 Retour
               </Button>
-            )}
+            ) : null}
             {step.kind === 'review' ? (
-              <Button className="w-auto flex-[2]" disabled={saving} onClick={() => void onSave()}>
+              <Button className="w-auto min-w-0 flex-1" disabled={saving} onClick={() => void onSave()}>
                 {saving ? 'Enregistrement…' : 'Enregistrer la réponse'}
               </Button>
             ) : (
               <Button
-                className="w-auto flex-[2] disabled:bg-line disabled:text-muted disabled:opacity-100 disabled:hover:bg-line"
+                className="w-auto min-w-0 flex-1 disabled:bg-line disabled:text-muted disabled:opacity-100 disabled:hover:bg-line"
                 disabled={Boolean(issue)}
                 onClick={goNext}
               >
@@ -404,10 +408,10 @@ export function Interview() {
   )
 }
 
-function sendHint(online: boolean, endpointReady: boolean): string {
+function sendHint(online: boolean, endpointReady: boolean): string | null {
   if (!online) return 'Pas de réseau. La réponse restera sur ce téléphone.'
   if (!endpointReady) return 'Le tableur n’est pas branché. La réponse restera sur ce téléphone.'
-  return 'La ligne part vers le tableur juste après l’enregistrement.'
+  return null
 }
 
 function Row({ label, value }: { label: string; value: string }) {
