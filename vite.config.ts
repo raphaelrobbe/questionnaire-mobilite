@@ -7,7 +7,15 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 
 installGlobals()
 
-const base = process.env.GITHUB_PAGES === 'true' ? '/questionnaire-mobilite/' : '/'
+const base = pagesBase(process.env.PAGES_BASE_PATH)
+
+/** Chemin public du site. `/` sur le domaine, ou `/dépôt/` sur une adresse github.io. */
+function pagesBase(value: string | undefined): string {
+  const text = value?.trim()
+  if (!text || text === '/') return '/'
+  const withSlash = text.startsWith('/') ? text : `/${text}`
+  return withSlash.endsWith('/') ? withSlash : `${withSlash}/`
+}
 
 export default defineConfig({
   base,

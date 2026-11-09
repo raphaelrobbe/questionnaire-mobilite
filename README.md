@@ -23,7 +23,7 @@ bun run typecheck
 bun run build
 ```
 
-Le build statique est dans `build/client`. Pour GitHub Pages, le workflow `.github/workflows/pages.yml` suppose un dépôt nommé `questionnaire-mobilite`.
+Le build statique est dans `build/client`. Sur le domaine, GitHub Pages le sert à la racine. Sans domaine, l’adresse `github.io` le sert dans le dossier du dépôt : le workflow reprend le chemin indiqué par GitHub.
 
 ## Brancher les deux tableurs
 
