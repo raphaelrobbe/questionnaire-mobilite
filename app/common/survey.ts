@@ -1,4 +1,5 @@
 import { communesOnOffer, fold, PONTARLIER } from './config'
+import { type MapApp } from './settings'
 import { emptyMotives, motivesStarted, sanitizeMotives, type Motives } from './motives'
 import { actualJourneyIssue, defaultJourneys, journeysStarted, offerJourneyIssue, sanitizeJourneys, type Journey } from './journeys'
 
@@ -189,7 +190,7 @@ function sanitizePeople(input: unknown): Person[] {
   return input.slice(0, MAX_PEOPLE).map((item) => {
     const source = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
     const age = known(AGE_BANDS, source.age)
-    const drive = known(DRIVE_OPTIONS, source.drive)
+    const drive = age === '0-14' ? '' : known(DRIVE_OPTIONS, source.drive)
     return { age, drive, manqueAutonomie: asksAutonomie({ age, drive }) && source.manqueAutonomie === true }
   })
 }
@@ -271,7 +272,7 @@ export function issueForCommune(answers: Answers, communes: string[]): string | 
 
 export function issueForHousehold(answers: Answers): string | null {
   if (!answers.people.length) return 'Ajoutez au moins une personne.'
-  if (answers.people.some((person) => !person.age || !person.drive)) {
+  if (answers.people.some((person) => !person.age || (person.age !== '0-14' && !person.drive))) {
     return 'Indiquez l’âge et la conduite de chaque personne.'
   }
   return null
@@ -304,6 +305,7 @@ export function stepIssue(step: Step, answers: Answers, communes: string[]): str
 
 export function personLine(person: Person): string {
   const age = labelOf(AGE_BANDS, person.age)
+  if (person.age === '0-14') return age
   const drive = labelOf(DRIVE_OPTIONS, person.drive)
   if (!age || !drive) return ''
   const driving = `${drive.charAt(0).toLocaleLowerCase('fr')}${drive.slice(1)}`
@@ -336,12 +338,18 @@ export function summary(input: Answers): { label: string; value: string }[] {
   ].filter((line) => line.value !== '')
 }
 
-/** Itinéraire vers la rue et la commune. Vide tant que l’une des deux manque. */
-export function mapsDestination(answers: Pick<Answers, 'adresse' | 'commune'>): string | null {
+/** Lieu à la rue et à la commune. Vide tant que l’une des deux manque. */
+export function mapsDestination(answers: Pick<Answers, 'adresse' | 'commune'>, app: MapApp = 'google'): string | null {
   const street = answers.adresse.trim()
   const commune = answers.commune.trim()
   if (!street || !commune) return null
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${street}, ${commune}`)}`
+  const query = encodeURIComponent(`${street}, ${commune}`)
+  if (app === 'apple') return `https://maps.apple.com/?q=${query}`
+  if (app === 'osm') return `https://www.openstreetmap.org/search?query=${query}`
+  if (app === 'mappy') return `https://fr.mappy.com/plan#/search/${query}`
+  if (app === 'mapy') return `https://mapy.com/fnc/v1/search?query=${query}`
+  if (app === 'waze') return `https://www.waze.com/ul?q=${query}`
+  return `https://www.google.com/maps/search/?api=1&query=${query}`
 }
 
 export function draftTitle(input: Answers): string {
@@ -354,7 +362,7 @@ export function draftTitle(input: Answers): string {
 export function answerPreview(input: unknown): string {
   const answers = sanitizeAnswers(input)
   const commune = answers.commune.trim() || legacyPlace(input) || 'Commune non précisée'
-  const count = answers.people.filter((person) => person.age && person.drive).length
+  const count = answers.people.filter((person) => person.age && (person.age === '0-14' || person.drive)).length
   return count ? `${commune} · ${count} pers.` : commune
 }
 

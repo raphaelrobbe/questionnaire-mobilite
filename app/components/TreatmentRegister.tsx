@@ -37,11 +37,11 @@ export function TreatmentRegister() {
           .
         </p>
         <p>
-          <span className="font-extrabold">Date de mise à jour</span> : 9 novembre 2026
+          <span className="font-extrabold">Date de mise à jour</span> : 10 novembre 2026
         </p>
         <p>
           Ce registre recense les traitements de données personnelles récoltées lors de l’enquête sur les besoins de
-          mobilité <em>de</em> et <em>vers</em> Pontarlier.
+          mobilité des habitants du Haut-Doubs.
         </p>
         <h3 className="font-extrabold">Traitements recensés</h3>
         <ol className="list-decimal space-y-1 pl-5">
@@ -141,7 +141,7 @@ function MobilitySurveyFiche() {
       <Controller />
       <h3 className="font-extrabold">Finalité</h3>
       <p>
-        Recueillir et analyser les besoins de déplacements vers Pontarlier afin de produire des résultats statistiques
+        Recueillir et analyser les besoins de déplacements des habitants du Haut-Doubs afin de produire des résultats statistiques
         et de les présenter aux collectivités et autorités compétentes.
       </p>
       <h3 className="font-extrabold">Personnes concernées</h3>

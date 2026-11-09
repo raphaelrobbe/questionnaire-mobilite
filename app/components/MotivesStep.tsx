@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { DOMICILE, RARE_COUNTS, RARE_UNITS, addJourney, journeyHeading, journeyTouched, tripReplacedRiders, tripRiders, updateJourney, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
+import { DOMICILE, RARE_COUNTS, RARE_UNITS, addJourney, journeyHeading, journeyTouched, removeJourney, tripReplacedRiders, tripRiders, updateJourney, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
 import { SLOTS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId } from '~/common/motives'
 import { AGE_BANDS, type Answers, type Person } from '~/common/survey'
 import { communesOnOffer, filterCommunes, fold } from '~/common/config'
@@ -41,6 +41,11 @@ export function MotivesStep({
     onChange(updateJourney(answers.journeys, index, patch))
   }
 
+  function remove(index: number) {
+    setOpen(-1)
+    onChange(removeJourney(answers.journeys, index))
+  }
+
   function add() {
     const hiddenBlank = listed.findIndex((item, position) => !journeyTouched(item.journey) && open !== position)
     if (hiddenBlank >= 0) {
@@ -71,6 +76,7 @@ export function MotivesStep({
               communes={communes}
               onOpen={() => setOpen(open === item.listedIndex ? -1 : item.listedIndex)}
               onChange={(patch) => change(item.index, patch)}
+              onRemove={() => remove(item.index)}
             />
           ))}
         </div>
@@ -92,6 +98,7 @@ function TripCard({
   communes,
   onOpen,
   onChange,
+  onRemove,
 }: {
   journey: Journey
   position: number
@@ -102,8 +109,10 @@ function TripCard({
   communes: string[]
   onOpen: () => void
   onChange: (patch: Partial<Journey>) => void
+  onRemove: () => void
 }) {
   const cardRef = useRef<HTMLElement>(null)
+  const [confirming, setConfirming] = useState(false)
 
   useEffect(() => {
     if (!open || pin.current !== listedIndex) return
@@ -122,9 +131,12 @@ function TripCard({
 
   if (!open) {
     return (
-      <button type="button" className="min-h-12 w-full rounded-2xl border border-line bg-paper px-4 py-2 text-left" onClick={onOpen}>
-        <TripHeading journey={journey} position={position} />
-      </button>
+      <div className="relative rounded-2xl border border-line bg-paper">
+        <button type="button" className="min-h-12 w-full rounded-2xl py-2 pl-4 pr-12 text-left" onClick={onOpen}>
+          <TripHeading journey={journey} position={position} />
+        </button>
+        <DeleteTrip confirming={confirming} onAsk={() => setConfirming(true)} onCancel={() => setConfirming(false)} onConfirm={onRemove} />
+      </div>
     )
   }
 
@@ -132,10 +144,11 @@ function TripCard({
   const wouldRide = journey.kind === 'nouveau' || journey.replaced === 'toujours' || journey.replaced === 'souvent' || journey.replaced === 'parfois'
 
   return (
-    <article ref={cardRef} className="rounded-2xl border border-line bg-white p-3">
-      <button type="button" className="min-h-10 w-full py-1 text-left" onClick={onOpen}>
+    <article ref={cardRef} className="relative rounded-2xl border border-line bg-white p-3">
+      <button type="button" className="min-h-10 w-full py-1 pr-10 text-left" onClick={onOpen}>
         <TripHeading journey={journey} position={position} />
       </button>
+      <DeleteTrip confirming={confirming} onAsk={() => setConfirming(true)} onCancel={() => setConfirming(false)} onConfirm={onRemove} />
 
       <fieldset className="mt-3">
         <legend className="text-base font-extrabold">Pour quel motif ?</legend>
@@ -255,6 +268,42 @@ function TripCard({
 }
 
 const PLACE_PRESETS = [{ commune: 'Pontarlier', places: ['Lycée Xavier Marmier', 'Gare SNCF', 'Hôpital', 'Zone industrielle', 'Zone commerciale Hyper U', 'Centre-ville'] }]
+
+function DeleteTrip({
+  confirming,
+  onAsk,
+  onCancel,
+  onConfirm,
+}: {
+  confirming: boolean
+  onAsk: () => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Supprimer ce trajet"
+        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md text-xl font-bold leading-none text-ink"
+        onClick={onAsk}
+      >
+        ×
+      </button>
+      {confirming ? (
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+          <p className="text-sm font-bold">Supprimer ce trajet ?</p>
+          <button type="button" className="h-8 rounded-md bg-danger px-2 text-sm font-extrabold text-white" onClick={onConfirm}>
+            Supprimer
+          </button>
+          <button type="button" className="h-8 rounded-md border border-line bg-paper px-2 text-sm font-extrabold" onClick={onCancel}>
+            Annuler
+          </button>
+        </div>
+      ) : null}
+    </>
+  )
+}
 
 function TripHeading({ journey, position }: { journey: Journey; position: number }) {
   const { title, route } = journeyHeading(journey, position)

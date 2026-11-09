@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { addJourney, emptyJourney, journeyComplete, journeyIssue, journeyTouched, sanitizeJourneys, updateJourney, DOMICILE, type Journey } from './journeys'
+import { addJourney, emptyJourney, journeyComplete, journeyIssue, journeyTouched, removeJourney, sanitizeJourneys, updateJourney, DOMICILE, type Journey } from './journeys'
 
 function filled(patch: Partial<Journey> = {}): Journey {
   return {
@@ -90,6 +90,7 @@ describe('trajets du foyer', () => {
     expect(journeyIssue([filled(), { ...fresh, replacedRiders: [1] }])).toBeNull()
     const added = addJourney([filled(), emptyJourney('nouveau')], 'actuel')
     expect(added.filter((journey) => journey.kind === 'actuel')).toHaveLength(2)
+    expect(removeJourney(added, 0).filter((journey) => journey.kind === 'actuel')).toHaveLength(1)
     const cleared = updateJourney(added, 0, { replaced: 'jamais', replacedRiders: [0] })
     expect(cleared[0]?.replacedRiders).toEqual([])
     const followed = updateJourney([filled({ replacedRiders: [] })], 0, { riders: [0, 1] })

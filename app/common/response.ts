@@ -36,7 +36,50 @@ export type ResponseRecord = {
 
 /** Une réponse sans appareil autorisé n’est gardée que si la fiche est en mode test. */
 export function responseIsKept(record: Pick<ResponseRecord, 'test' | 'interviewer'>): boolean {
-  return record.test || Boolean(record.interviewer.trim())
+  return record.test || Boolean(record.interviewer?.trim())
+}
+
+type PersonalCarrier = {
+  latitude: number | null
+  longitude: number | null
+  answers: Answers
+}
+
+function filled(value: unknown): boolean {
+  return typeof value === 'string' && value.trim() !== ''
+}
+
+/** Nom, adresse, contact ou position encore présents. Les fiches anciennes peuvent omettre un champ. */
+export function holdsPersonal(record: PersonalCarrier): boolean {
+  const answers = record.answers ?? ({} as Answers)
+  return (
+    record.latitude != null ||
+    record.longitude != null ||
+    filled(answers.nom) ||
+    filled(answers.prenom) ||
+    filled(answers.adresse) ||
+    filled(answers.complement) ||
+    filled(answers.email) ||
+    filled(answers.phone)
+  )
+}
+
+/** Retire nom, adresse, contact et position. Le code, la commune et le reste restent. */
+export function forgetPersonal<T extends PersonalCarrier>(record: T): T {
+  return {
+    ...record,
+    latitude: null,
+    longitude: null,
+    answers: {
+      ...record.answers,
+      nom: '',
+      prenom: '',
+      adresse: '',
+      complement: '',
+      email: '',
+      phone: '',
+    },
+  }
 }
 
 export const SHEET_HEADERS = [

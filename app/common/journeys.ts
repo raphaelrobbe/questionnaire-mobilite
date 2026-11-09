@@ -167,6 +167,11 @@ export function journeyIssue(journeys: Journey[]): string | null {
   return actualJourneyIssue(journeys) ?? offerJourneyIssue(journeys)
 }
 
+export function removeJourney(journeys: Journey[], index: number): Journey[] {
+  if (index < 0 || index >= journeys.length) return journeys
+  return journeys.filter((_, item) => item !== index)
+}
+
 export function addJourney(journeys: Journey[], kind: JourneyKind): Journey[] {
   const count = journeys.filter((journey) => journey.kind === kind).length
   if (count >= MAX_JOURNEYS) return journeys

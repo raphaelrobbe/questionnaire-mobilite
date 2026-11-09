@@ -1,7 +1,8 @@
 import { DeviceUnknown } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
 import { ARRIVAL_TRIES, ArrivalStopped, pollArrival } from '~/common/receipt'
-import { responseIsKept, type ResponseRecord } from '~/common/response'
+import { forgetPersonal, holdsPersonal, responseIsKept, type ResponseRecord } from '~/common/response'
+import { forgetDraftPersonal } from './draft.client'
 import { loadSettings, updateSettings } from './settings.client'
 import { codeIsStored, confirmInterviewer, submitRecord, type SendStatus } from './sheets.client'
 
@@ -91,20 +92,41 @@ function counted(row: LocalResponse): LocalResponse {
 export async function listResponses(): Promise<LocalResponse[]> {
   const rows = await withStore<LocalResponse[]>('readonly', (store) => store.getAll() as IDBRequest<LocalResponse[]>)
   const countedRows = rows.map(counted)
+  const kept: LocalResponse[] = []
   for (const row of countedRows) {
-    if (!responseIsKept(row)) await removeResponse(row.id)
+    if (!responseIsKept(row)) {
+      await removeResponse(row.id)
+      continue
+    }
+    const next = remembered(row)
+    if (next !== row) await put(next)
+    kept.push(next)
   }
-  return countedRows.filter((row) => responseIsKept(row)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  return kept.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
 }
 
 async function read(id: string): Promise<LocalResponse | null> {
   const row = await withStore<LocalResponse | undefined>('readonly', (store) => store.get(id))
-  return row ? counted(row) : null
+  if (!row) return null
+  const countedRow = counted(row)
+  const next = remembered(countedRow)
+  if (next !== countedRow) await put(next)
+  return next
+}
+
+async function put(row: LocalResponse): Promise<void> {
+  await withStore('readwrite', (store) => store.put(row))
 }
 
 async function write(row: LocalResponse): Promise<void> {
-  await withStore('readwrite', (store) => store.put(row))
+  await put(row)
   emit()
+}
+
+function remembered(row: LocalResponse): LocalResponse {
+  if (row.status !== 'confirmed') return row
+  forgetDraftPersonal(row.id)
+  return holdsPersonal(row) ? forgetPersonal(row) : row
 }
 
 export async function keepResponse(record: ResponseRecord): Promise<LocalResponse> {
@@ -156,7 +178,7 @@ async function attempt(row: LocalResponse): Promise<LocalResponse | null> {
   try {
     const interviewer = row.test ? row.interviewer.trim() || 'Test' : await confirmInterviewer(settings.adminEndpoint, row.deviceId)
     const status = await submitRecord({ ...toRecord(row), interviewer, test: row.test }, classified.url, settings.adminEndpoint)
-    const next: LocalResponse = {
+    const sent: LocalResponse = {
       ...row,
       interviewer,
       status,
@@ -165,6 +187,7 @@ async function attempt(row: LocalResponse): Promise<LocalResponse | null> {
       lookups: status === 'sent' ? 0 : row.lookups,
       updatedAt: new Date().toISOString(),
     }
+    const next = remembered(sent)
     await write(next)
     return next
   } catch (error) {
@@ -272,13 +295,15 @@ async function watchArrival(id: string): Promise<void> {
   await lock(async () => {
     const row = await read(id)
     if (!row || row.status !== 'sent') return
-    await write({
-      ...row,
-      status: 'confirmed',
-      lookups: row.lookups + 1,
-      lastError: null,
-      updatedAt: new Date().toISOString(),
-    })
+    await write(
+      remembered({
+        ...row,
+        status: 'confirmed',
+        lookups: row.lookups + 1,
+        lastError: null,
+        updatedAt: new Date().toISOString(),
+      }),
+    )
   })
 }
 

@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { DeviceUnknown, isAdminSession } from '~/common/config'
 import { canUseSurvey } from '~/common/settings'
 import { classifyEndpoint } from '~/common/endpoint'
-import { formatWhen } from '~/common/format'
 import { answerPreview, draftTitle, mapsDestination } from '~/common/survey'
 import { draftMatchesMode } from '~/common/draft'
 import { createDraft, listDrafts, removeDraft, type Draft } from '~/lib/draft.client'
@@ -17,7 +16,7 @@ import { Button, buttonClass } from './Button'
 import { DeviceIdPanel } from './DeviceId'
 import { TestChip } from './TestMark'
 import { MapsLink } from './MapsLink'
-import { statusLabel } from '~/lib/outbox.client'
+import { statusLabel, type LocalResponse } from '~/lib/outbox.client'
 
 export function HomeScreen() {
   const settings = useSettings()
@@ -84,10 +83,7 @@ export function HomeScreen() {
   }
 
   const endpoint = classifyEndpoint(settings.endpoint)
-  const waiting = rows.filter((row) => row.status === 'pending' || row.status === 'error')
-  const sent = rows.filter((row) => row.status === 'sent')
-  const recorded = rows.filter((row) => row.status === 'confirmed')
-  const recent = rows.slice(0, 3)
+  const listed = [...rows].sort(homeOrder)
 
   return (
     <div className="grid gap-4">
@@ -109,12 +105,6 @@ export function HomeScreen() {
         </p>
       ) : null}
 
-      {waiting.length > 0 ? (
-        <Link to="/file" className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-bold text-clay">
-          {waiting.length === 1 ? '1 réponse attend le réseau ou le tableur.' : `${waiting.length} réponses attendent le réseau ou le tableur.`}
-        </Link>
-      ) : null}
-
       <button type="button" className={buttonClass('primary')} onClick={() => navigate(`/entretien?fiche=${createDraft().code}`)}>
         Nouvelle personne
       </button>
@@ -126,7 +116,7 @@ export function HomeScreen() {
             const locked = !draftMatchesMode(item, settings.testMode)
             return (
             <li key={item.code} className={`relative rounded-2xl border border-line bg-card px-4 py-3 ${locked ? 'opacity-50' : ''}`}>
-              <div className={`flex flex-wrap items-center gap-2 ${!locked && mapsDestination(item.answers) ? 'pr-28' : ''}`}>
+              <div className={`flex flex-wrap items-center gap-2 ${!locked && mapsDestination(item.answers) ? 'pr-16' : ''}`}>
                 <p className={`font-bold ${locked ? 'text-muted' : ''}`}>{draftTitle(item.answers)}</p>
                 {item.test ? <TestChip /> : null}
               </div>
@@ -179,47 +169,43 @@ export function HomeScreen() {
       ) : null}
 
       <section>
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-lg font-extrabold">Sur cet appareil</h2>
-          {sent.length > 0 || recorded.length > 0 ? (
-            <p className="text-sm font-semibold text-muted">
-              {[
-                sent.length > 0 ? `${sent.length} envoyée${sent.length > 1 ? 's' : ''}` : '',
-                recorded.length > 0 ? `${recorded.length} enregistrée${recorded.length > 1 ? 's' : ''}` : '',
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          ) : null}
-        </div>
+        <h2 className="text-lg font-extrabold">Sur cet appareil</h2>
         {error ? <p className="mt-3 text-danger">{error}</p> : null}
-        {recent.length === 0 ? (
+        {listed.length === 0 ? (
           <p className="mt-3 text-base leading-relaxed text-muted">
             Aucune fiche pour l’instant. Elles apparaissent ici dès le premier entretien, même sans réseau.
           </p>
         ) : (
           <ul className="mt-3 grid gap-2">
-            {recent.map((row) => (
-              <li key={row.id} className="rounded-2xl border border-line bg-card px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-bold">{answerPreview(row.answers)}</p>
-                  {row.test ? <TestChip /> : null}
-                </div>
-                <p className="mt-1 text-sm font-semibold text-muted">
-                  {formatWhen(row.createdAt)} · {statusLabel(row.status)}
-                </p>
+            {listed.map((row) => (
+              <li
+                key={row.id}
+                className={`flex min-h-11 items-center gap-2 rounded-2xl border border-line px-3 py-2 ${
+                  row.status === 'confirmed' ? 'bg-mist' : 'bg-clay-bg'
+                }`}
+              >
+                <p className="min-w-0 flex-1 truncate font-bold">{answerPreview(row.answers)}</p>
+                {row.test ? <TestChip /> : null}
+                {row.status === 'confirmed' ? null : (
+                  <span className="shrink-0 text-xs font-bold text-clay">{statusLabel(row.status)}</span>
+                )}
+                <span className="shrink-0 rounded-full bg-pine px-2 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
+                  {row.id}
+                </span>
               </li>
             ))}
           </ul>
         )}
-        {rows.length > 3 ? (
-          <Link to="/file" className="mt-3 inline-flex min-h-11 items-center font-bold text-leaf">
-            Toute la file
-          </Link>
-        ) : null}
       </section>
     </div>
   )
+}
+
+/** Les envois non confirmés restent en haut. Les fiches enregistrées descendent, les plus anciennes en bas. */
+function homeOrder(left: LocalResponse, right: LocalResponse): number {
+  const group = Number(left.status === 'confirmed') - Number(right.status === 'confirmed')
+  if (group !== 0) return group
+  return left.createdAt < right.createdAt ? 1 : -1
 }
 
 function InstallOffer({ offer }: { offer: ReturnType<typeof useInstall> }) {

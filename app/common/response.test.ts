@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { COLLECTIF_CONSENT, PHONE_CONSENT } from './consent'
 import { emptyAnswers, patchAnswers } from './survey'
-import { SHEET_HEADERS, isResponseCode, mailBody, responseBody, responseCode, responseIsKept, toSheetRow, type ResponseRecord } from './response'
+import { SHEET_HEADERS, forgetPersonal, holdsPersonal, isResponseCode, mailBody, responseBody, responseCode, responseIsKept, toSheetRow, type ResponseRecord } from './response'
 
 function record(patch: Parameters<typeof patchAnswers>[1] = {}): ResponseRecord {
   return {
@@ -25,6 +25,41 @@ function record(patch: Parameters<typeof patchAnswers>[1] = {}): ResponseRecord 
   }
 }
 
+describe('fiche enregistrée', () => {
+  test('retire nom, adresse, contact et position, et garde le reste', () => {
+    const source = record({
+      nom: 'Martin',
+      prenom: 'Ada',
+      adresse: '1 grande rue',
+      complement: 'étage 2',
+      recontact: 'oui',
+      phone: '06 12 34 56 78',
+      collectif: true,
+      email: 'ada@exemple.fr',
+    })
+    expect(holdsPersonal(source)).toBe(true)
+    const kept = forgetPersonal(source)
+    expect(holdsPersonal(kept)).toBe(false)
+    expect(kept.id).toBe(source.id)
+    expect(kept.answers.commune).toBe('Lyon')
+    expect(kept.answers.people).toHaveLength(2)
+    expect(kept.answers.cars).toHaveLength(1)
+    expect(kept.answers.recontact).toBe('oui')
+    expect(kept.answers.collectif).toBe(true)
+    expect(kept.answers.nom).toBe('')
+    expect(kept.answers.prenom).toBe('')
+    expect(kept.answers.adresse).toBe('')
+    expect(kept.answers.complement).toBe('')
+    expect(kept.answers.email).toBe('')
+    expect(kept.answers.phone).toBe('')
+    expect(kept.latitude).toBeNull()
+    expect(kept.longitude).toBeNull()
+    const legacy = { latitude: null, longitude: null, answers: {} } as ResponseRecord
+    expect(holdsPersonal(legacy)).toBe(false)
+    expect(forgetPersonal(legacy).answers.nom).toBe('')
+  })
+})
+
 describe('code de la fiche', () => {
   test('fait huit caractères en deux groupes de quatre', () => {
     const bytes = [0, 1, 2, 3, 10, 11, 35, 36, 252, 255]
@@ -46,7 +81,7 @@ describe('ligne du tableur', () => {
     expect(row.commune).toBe('Lyon')
     expect('version' in row).toBe(false)
     expect(row.personnes).toBe('2')
-    expect(row.detail_personnes).toBe('40–64 ans, conduit · 0–14 ans, ne conduit pas')
+    expect(row.detail_personnes).toBe('40–64 ans, conduit · 0–14 ans')
     expect(row.voitures).toBe('1')
     expect(row.detail_voitures).toBe('Hybride')
     expect(row.deux_trois_roues).toBe('1')

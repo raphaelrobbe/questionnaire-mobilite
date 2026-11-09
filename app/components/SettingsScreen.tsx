@@ -2,6 +2,7 @@ import { useNavigate } from '@remix-run/react'
 import { useEffect, useState } from 'react'
 import { isAdminSession } from '~/common/config'
 import { classifyEndpoint, endpointMessage, type EndpointIssue } from '~/common/endpoint'
+import { MAP_APPS } from '~/common/settings'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { getDeviceId, updateSettings } from '~/lib/settings.client'
@@ -69,6 +70,24 @@ export function SettingsScreen() {
       </section>
 
       <h2 className="text-3xl font-extrabold tracking-tight">Réglages</h2>
+
+      <section className="rounded-[28px] border border-line bg-card px-4 py-4">
+        <h2 className="font-extrabold">Lieux</h2>
+        <p className="mt-1 text-sm leading-relaxed text-muted">Choisissez l’application qui ouvrira les plans.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {MAP_APPS.map((app) => (
+            <button
+              key={app.id}
+              type="button"
+              aria-pressed={settings.mapApp === app.id}
+              onClick={() => updateSettings({ mapApp: app.id })}
+              className={`min-h-11 rounded-2xl px-3 text-sm font-extrabold ${settings.mapApp === app.id ? 'bg-pine text-white' : 'border border-line bg-paper'}`}
+            >
+              {app.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {admin ? (
         <>

@@ -1,8 +1,8 @@
+import { Navigate } from '@remix-run/react'
 import type { MetaFunction } from '@remix-run/node'
-import { QueueScreen } from '~/components/QueueScreen'
 
-export const meta: MetaFunction = () => [{ title: 'File d’envoi · Enquête mobilité' }]
+export const meta: MetaFunction = () => [{ title: 'Accueil · Enquête mobilité' }]
 
 export default function FileRoute() {
-  return <QueueScreen />
+  return <Navigate to="/" replace />
 }

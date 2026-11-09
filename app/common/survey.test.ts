@@ -53,7 +53,10 @@ describe('questionnaire', () => {
     expect(blocked.people[0]?.manqueAutonomie).toBe(true)
     expect(personLine(blocked.people[0])).toBe('65 ans et plus, ne conduit pas, manque d’autonomie')
     const child = patchAnswers(answers, { people: [{ age: '0-14', drive: 'non', manqueAutonomie: true }] })
-    expect(child.people[0]?.manqueAutonomie).toBe(false)
+    expect(child.people[0]).toEqual({ age: '0-14', drive: '', manqueAutonomie: false })
+    expect(issueForHousehold(child)).toBeNull()
+    expect(personLine(child.people[0])).toBe('0–14 ans')
+    expect(issueForHousehold(patchAnswers(answers, { people: [{ age: '15-17', drive: '', manqueAutonomie: false }] }))).toMatch(/conduite/)
     const driver = patchAnswers(answers, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: true }] })
     expect(driver.people[0]?.manqueAutonomie).toBe(false)
   })
@@ -127,9 +130,21 @@ describe('questionnaire', () => {
     expect(patchAnswers(remembered, { collectif: false }).collectifText).toBe('')
     expect(patchAnswers(emptyAnswers(), { adresse: '11 ' }).adresse).toBe('11 ')
     expect(patchAnswers(emptyAnswers(), { adresse: '11 rue de la gare' }).adresse).toBe('11 rue de la gare')
+    const place = '11%20rue%20de%20la%20gare%2C%20Chaux-Neuve'
     expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' })).toBe(
-      'https://www.google.com/maps/dir/?api=1&destination=11%20rue%20de%20la%20gare%2C%20Chaux-Neuve',
+      `https://www.google.com/maps/search/?api=1&query=${place}`,
     )
+    expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' }, 'apple')).toBe(`https://maps.apple.com/?q=${place}`)
+    expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' }, 'osm')).toBe(
+      `https://www.openstreetmap.org/search?query=${place}`,
+    )
+    expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' }, 'mappy')).toBe(
+      `https://fr.mappy.com/plan#/search/${place}`,
+    )
+    expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' }, 'mapy')).toBe(
+      `https://mapy.com/fnc/v1/search?query=${place}`,
+    )
+    expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' }, 'waze')).toBe(`https://www.waze.com/ul?q=${place}`)
     expect(mapsDestination({ adresse: '  ', commune: 'Chaux-Neuve' })).toBeNull()
     expect(mapsDestination({ adresse: '11 rue de la gare', commune: '' })).toBeNull()
     expect(patchAnswers(emptyAnswers(), { recontact: 'oui', phone: '+33 ' }).phone).toBe('+33 ')

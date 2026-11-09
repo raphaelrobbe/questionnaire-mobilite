@@ -1,4 +1,5 @@
 import { draftHasContent, draftIsStarted, emptyDraft, sanitizeDraft, type Draft } from '~/common/draft'
+import { forgetPersonal, holdsPersonal } from '~/common/response'
 import { loadSettings } from '~/lib/settings.client'
 
 export type { Draft }
@@ -71,6 +72,16 @@ export function saveDraft(draft: Draft): void {
 
 export function removeDraft(code: string): void {
   writeAll(readAll().filter((draft) => draft.code !== code))
+}
+
+/** Efface les informations personnelles d’une fiche encore dans le navigateur. */
+export function forgetDraftPersonal(code: string): void {
+  const drafts = readAll()
+  const index = drafts.findIndex((draft) => draft.code === code)
+  const draft = drafts[index]
+  if (!draft || !holdsPersonal(draft)) return
+  drafts[index] = forgetPersonal(draft)
+  writeAll(drafts)
 }
 
 export function createDraft(): Draft {

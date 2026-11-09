@@ -22,19 +22,23 @@ export function HouseholdStep({ people, onChange }: { people: Person[]; onChange
               ))}
             </div>
           </div>
-          <div>
-            <p className="text-sm font-bold text-muted">Conduite</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {DRIVE_OPTIONS.map((option) => (
-                <Chip
-                  key={option.value}
-                  selected={person.drive === option.value}
-                  label={option.label}
-                  onClick={() => onChange(changePerson(people, index, { drive: option.value }))}
-                />
-              ))}
-            </div>
-          </div>
+          {person.age !== '' && person.age !== '0-14' ? (
+            <Reveal>
+              <div>
+                <p className="text-sm font-bold text-muted">Conduite</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {DRIVE_OPTIONS.map((option) => (
+                    <Chip
+                      key={option.value}
+                      selected={person.drive === option.value}
+                      label={option.label}
+                      onClick={() => onChange(changePerson(people, index, { drive: option.value }))}
+                    />
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+          ) : null}
           {asksAutonomie(person) ? (
             <Reveal>
             <label className="flex min-h-11 items-start gap-3">

@@ -12,7 +12,7 @@ export function LetterDraft() {
       </p>
       <p>
         Cette demande s’inscrit dans le cadre d’une enquête citoyenne menée par le Collectif Mobilité Haut-Doubs, portant
-        sur les besoins de déplacement des habitants du territoire <em>de</em> et <em>vers</em> Pontarlier et, plus
+        sur les besoins de déplacement des habitants des environs de Pontarlier et, plus
         particulièrement, sur l’intérêt et les conditions de mise en place éventuelle d’une desserte régulière en
         transports en commun depuis les communes environnantes.
       </p>

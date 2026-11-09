@@ -519,7 +519,7 @@ function Saved({ row, onNext }: { row: LocalResponse; onNext: () => void }) {
   const copy = savedCopy(live)
   return (
     <div className="grid gap-4">
-      <section className="rounded-[28px] bg-pine px-5 py-6 text-paper">
+      <section className={`rounded-[28px] px-5 py-6 text-paper ${live.status === 'confirmed' ? 'bg-pine' : 'bg-clay'}`}>
         {copy.kicker ? <p className="text-sm font-bold uppercase tracking-[0.16em] text-paper/70">{copy.kicker}</p> : null}
         <h1 className={`${copy.kicker ? 'mt-2' : ''} text-3xl font-extrabold tracking-tight`}>{copy.title}</h1>
         <p className="mt-4 font-mono text-4xl font-extrabold tracking-[0.18em]">{live.id}</p>
@@ -531,11 +531,6 @@ function Saved({ row, onNext }: { row: LocalResponse; onNext: () => void }) {
       <Link to="/" className={buttonClass('secondary')}>
         Retour à l’accueil
       </Link>
-      {live.status === 'pending' || live.status === 'error' ? (
-        <Link to="/file" className="text-center font-bold text-leaf">
-          Voir la file d’envoi
-        </Link>
-      ) : null}
     </div>
   )
 }
