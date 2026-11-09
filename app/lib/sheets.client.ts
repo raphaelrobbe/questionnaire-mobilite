@@ -100,7 +100,7 @@ export function codeIsStored(endpoint: string, code: string): Promise<boolean> {
       }
     }
     script.src = url.toString()
-    script.onerror = () => finish(new Error('Impossible de lire le tableur des réponses.'))
+    // Même redirection que la lecture des feuilles : error n'empêche pas le script de répondre.
     document.head.appendChild(script)
   })
 }

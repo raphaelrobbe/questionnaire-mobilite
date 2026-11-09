@@ -93,7 +93,8 @@ function requestSheetLists(endpoint: string, query: ConfigQuery): Promise<SheetL
       }
     }
     script.src = url.toString()
-    script.onerror = () => finish(new Error('Impossible de lire les feuilles Enquêteurs et Communes.'))
+    // La redirection vers script.googleusercontent.com déclenche error sur certains téléphones,
+    // puis le script s'exécute. On n'interrompt pas : sans réponse, le délai ci-dessus échoue.
     document.head.appendChild(script)
   })
 }
