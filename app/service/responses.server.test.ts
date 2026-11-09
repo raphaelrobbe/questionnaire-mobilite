@@ -12,11 +12,12 @@ function record(): ResponseRecord {
     createdAt: '2026-11-06T12:00:00.000Z',
     deviceId: 'device',
     interviewer: 'Camille',
+    test: false,
     latitude: null,
     longitude: null,
     answers: patchAnswers(emptyAnswers(), {
       commune: 'Lyon',
-      people: [{ age: '40-64', drive: 'oui' }],
+      people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false }],
     }),
   }
 }
@@ -51,12 +52,23 @@ describe('envoi serveur', () => {
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
     const withMail = record()
-    withMail.answers = patchAnswers(withMail.answers, { recontact: 'oui', email: 'Ada@Exemple.fr' })
+    withMail.answers = patchAnswers(withMail.answers, { collectif: true, email: 'Ada@Exemple.fr' })
     await submitResponse(withMail, endpoint, fetchImpl, adminEndpoint)
     expect(calls.map((call) => call.url)).toEqual([adminEndpoint, endpoint])
     expect(calls[0]?.body).toContain('ada@exemple.fr')
     expect(calls[0]?.body).toContain(withMail.id)
     expect(calls[1]?.body).not.toContain('ada@exemple.fr')
+  })
+
+  test('envoie une réponse de test seulement au script public', async () => {
+    const calls: { url: string; body: string }[] = []
+    const fetchImpl: FetchLike = async (url, init) => {
+      calls.push({ url, body: init.body })
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    }
+    await submitResponse({ ...record(), test: true }, endpoint, fetchImpl, adminEndpoint)
+    expect(calls.map((call) => call.url)).toEqual([endpoint])
+    expect(JSON.parse(calls[0]?.body ?? '{}').test).toBe(true)
   })
 
   test('propage le refus du script', async () => {

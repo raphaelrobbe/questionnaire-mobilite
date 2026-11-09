@@ -1,6 +1,9 @@
 import { Link, useNavigate, useSearchParams } from '@remix-run/react'
 import { useEffect, useRef, useState } from 'react'
+import { draftMatchesMode } from '~/common/draft'
 import { classifyEndpoint } from '~/common/endpoint'
+import { shiftMotive, themeLabel } from '~/common/motives'
+import { canUseSurvey } from '~/common/settings'
 import { buildSteps, patchAnswers, stepIssue, summary, type Answers } from '~/common/survey'
 import type { ResponseRecord } from '~/common/response'
 import { createDraft, loadDraft, removeDraft, saveDraft, type Draft } from '~/lib/draft.client'
@@ -12,10 +15,13 @@ import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { Button, buttonClass } from './Button'
+import { ConsentScript } from './ConsentScript'
+import { holdRevealScroll } from './Reveal'
 import { MapsLink } from './MapsLink'
 import { CommuneStep } from './CommuneStep'
 import { ContactStep } from './ContactStep'
 import { HouseholdStep } from './HouseholdStep'
+import { motivePersonLabel, MotivesStep } from './MotivesStep'
 import { VehiclesStep } from './VehiclesStep'
 
 export function Interview() {
@@ -35,7 +41,7 @@ export function Interview() {
   const [deviceId, setDeviceId] = useState('')
   const [missing, setMissing] = useState(false)
 
-  const named = Boolean(settings?.interviewer.trim())
+  const named = settings ? canUseSurvey(settings) : false
 
   useEffect(() => {
     setDeviceId(getDeviceId())
@@ -54,6 +60,7 @@ export function Interview() {
   }, [draft, saved])
 
   const stepIndex = draft ? Math.min(draft.step, buildSteps(draft.answers).length - 1) : 0
+  const motiveCursor = draft ? `${draft.answers.motives.cursor.theme}:${draft.answers.motives.cursor.person}` : ''
   const draftRef = useRef(draft)
   draftRef.current = draft
   const opened = draft !== null
@@ -68,7 +75,11 @@ export function Interview() {
       return
     }
     headingRef.current?.focus()
-  }, [stepIndex, opened])
+  }, [stepIndex, opened, motiveCursor])
+
+  useEffect(() => {
+    holdRevealScroll()
+  }, [stepIndex, motiveCursor])
 
   if (saved) {
     return (
@@ -99,7 +110,7 @@ export function Interview() {
       <div className="grid gap-4">
         <h1 className="text-3xl font-extrabold tracking-tight">Enquête impossible</h1>
         <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">
-          Connectez cet appareil depuis l’accueil.
+            Connectez cet appareil depuis l’accueil, ou activez le mode test dans les réglages.
         </p>
         <Link to="/" className={buttonClass('secondary')}>
           Retour à l’accueil
@@ -123,6 +134,22 @@ export function Interview() {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’entretien…</p>
   }
 
+  if (!draftMatchesMode(draft, settings.testMode)) {
+    return (
+      <div className="grid gap-4">
+        <h1 className="text-3xl font-extrabold tracking-tight">Cette fiche n’est pas dans le mode en cours.</h1>
+        <p className="rounded-2xl bg-mist px-4 py-3 text-sm font-semibold leading-relaxed text-muted">
+          {draft.test
+            ? 'Activez le mode test pour la reprendre. Elle ne part pas dans la feuille des vraies réponses.'
+            : 'Désactivez le mode test pour la reprendre. Elle ne part pas dans la feuille test.'}
+        </p>
+        <Link to="/" className={buttonClass('secondary')}>
+          Retour à l’accueil
+        </Link>
+      </div>
+    )
+  }
+
   const steps = buildSteps(draft.answers)
   const step = steps[stepIndex]
   const endpoint = classifyEndpoint(settings.endpoint)
@@ -138,18 +165,53 @@ export function Interview() {
 
   function goNext() {
     if (!draft || !step || issue) return
+    if (step.kind === 'motives') {
+      const next = shiftMotive(draft.answers.motives, draft.answers.people.length, 1)
+      if (next) {
+        updateAnswers({ motives: next })
+        window.scrollTo(0, 0)
+        return
+      }
+    }
     update({ step: stepIndex + 1 })
+    window.scrollTo(0, 0)
+  }
+
+  function goBack() {
+    if (!draft || !step) return
+    if (step.kind === 'motives') {
+      const previous = shiftMotive(draft.answers.motives, draft.answers.people.length, -1)
+      if (previous) {
+        updateAnswers({ motives: previous })
+        window.scrollTo(0, 0)
+        return
+      }
+    }
+    if (stepIndex > 0) update({ step: stepIndex - 1 })
+    window.scrollTo(0, 0)
   }
 
   async function onSave() {
     if (!draft || saving) return
     setSaving(true)
     setSaveError(null)
+    const interviewer = settings?.interviewer.trim() ?? ''
+    if (!draftMatchesMode(draft, settings?.testMode === true)) {
+      setSaveError('Cette fiche n’est pas dans le mode en cours.')
+      setSaving(false)
+      return
+    }
+    if (!draft.test && !interviewer) {
+      setSaveError('Cette réponse n’est pas enregistrée.')
+      setSaving(false)
+      return
+    }
     const record: ResponseRecord = {
       id: draft.code,
       createdAt: new Date().toISOString(),
       deviceId: getDeviceId(),
-      interviewer: settings?.interviewer ?? '',
+      interviewer: draft.test ? interviewer || 'Test' : interviewer,
+      test: draft.test,
       latitude: draft.latitude,
       longitude: draft.longitude,
       answers: draft.answers,
@@ -201,7 +263,9 @@ export function Interview() {
           {stepIndex + 1} / {steps.length}
         </p>
         <p className="font-mono text-sm font-bold tracking-[0.14em] text-pine">{draft.code}</p>
-        <p className="truncate text-right text-sm font-semibold text-muted">{settings.interviewer.trim() || 'Enquêteur non choisi'}</p>
+        <p className="truncate text-right text-sm font-semibold text-muted">
+          {settings.interviewer.trim() || (draft.test ? 'Test' : 'Enquêteur non choisi')}
+        </p>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
         <div className="h-full bg-leaf" style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }} />
@@ -227,14 +291,7 @@ export function Interview() {
           </h1>
           <div className="mt-4 rounded-[28px] bg-mist px-5 py-5">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-leaf">À lire</p>
-            <p className="mt-2 text-lg leading-snug">
-              Bonjour. Cette enquête porte sur les déplacements du quotidien de votre foyer.
-            </p>
-            <p className="mt-3 text-lg leading-snug">
-              {endpoint.ok
-                ? 'Vos réponses sont stockées informatiquement. À l’exception de vos coordonnées personnelles qui restent privées, vos réponses, anonymisées, pourront être rendues publiques et faire l’objet de traitements statistiques informatisés. Un code vous sera remis, permettant aux responsables de l’enquête de relier vos réponses à vos coordonnées pour vous recontacter si besoin.'
-                : 'Pour l’instant les réponses restent sur ce téléphone : le tableur n’est pas encore branché.'}
-            </p>
+            <ConsentScript />
           </div>
           <label className="mt-4 flex min-h-14 items-start gap-3 rounded-2xl border border-line bg-card px-4 py-4">
             <input
@@ -313,12 +370,24 @@ export function Interview() {
         </section>
       ) : null}
 
+      {step.kind === 'motives' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            {themeLabel(draft.answers.motives.cursor.theme, draft.answers.motives.autre)}
+          </h1>
+          <p className="mt-2 text-lg font-bold">
+            {motivePersonLabel(draft.answers.people[draft.answers.motives.cursor.person], draft.answers.motives.cursor.person)}
+          </p>
+          <MotivesStep answers={draft.answers} onChange={(motives) => updateAnswers({ motives })} />
+        </section>
+      ) : null}
+
       {step.kind === 'contact' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
             Rester en contact ?
           </h1>
-          <p className="mt-2 text-base text-muted">Le nom, l’adresse, le téléphone et l’adresse mail restent hors du tableau public.</p>
+          <p className="mt-2 text-base text-muted">Les informations personnelles ne seront jamais diffusées.</p>
           <ContactStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
@@ -372,7 +441,7 @@ export function Interview() {
         </section>
       ) : null}
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-paper/95 backdrop-blur">
+      <div data-dock className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto w-full max-w-lg px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {issue ? (
             <p role="status" className="mb-2 text-sm font-bold leading-snug text-danger">
@@ -384,7 +453,7 @@ export function Interview() {
               Pause
             </Link>
             {stepIndex > 0 ? (
-              <Button variant="secondary" className="w-auto shrink-0 px-2" onClick={() => update({ step: stepIndex - 1 })}>
+              <Button variant="secondary" className="w-auto shrink-0 px-2" onClick={goBack}>
                 Retour
               </Button>
             ) : null}

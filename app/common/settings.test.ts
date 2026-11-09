@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { sanitizeSettings } from './settings'
+import { canUseSurvey, sanitizeSettings } from './settings'
 
 describe('réglages', () => {
   test('ne garde que des chaînes bornées', () => {
@@ -10,7 +10,12 @@ describe('réglages', () => {
     })
     expect(settings.interviewer).toHaveLength(80)
     expect(settings.endpoint).toMatch(/\/exec$/)
-    expect(sanitizeSettings(null)).toEqual({ interviewer: '', endpoint: '', adminEndpoint: '' })
+    expect(sanitizeSettings(null)).toEqual({ interviewer: '', endpoint: '', adminEndpoint: '', testMode: false })
+    expect(sanitizeSettings({ testMode: true }).testMode).toBe(true)
+    expect(sanitizeSettings({ testMode: 'oui' }).testMode).toBe(false)
+    expect(canUseSurvey({ interviewer: '', testMode: false })).toBe(false)
+    expect(canUseSurvey({ interviewer: '', testMode: true })).toBe(true)
+    expect(canUseSurvey({ interviewer: 'Ada', testMode: false })).toBe(true)
     expect('token' in settings).toBe(false)
   })
 })

@@ -28,6 +28,7 @@ describe('questionnaire', () => {
       'consent',
       'household',
       'vehicles',
+      'motives',
       'contact',
       'review',
     ])
@@ -44,9 +45,16 @@ describe('questionnaire', () => {
     expect(questionSide('pontarlier')).toBe('de')
     expect(questionSide('Jougne')).toBe('vers')
     expect(issueForHousehold(answers)).toMatch(/chaque personne/)
-    const ready = patchAnswers(answers, { people: [{ age: '15-17', drive: 'accompagnee' }] })
+    const ready = patchAnswers(answers, { people: [{ age: '15-17', drive: 'accompagnee', manqueAutonomie: false }] })
     expect(issueForHousehold(ready)).toBeNull()
     expect(personLine(ready.people[0])).toBe('15–17 ans, conduite accompagnée')
+    const blocked = patchAnswers(answers, { people: [{ age: '65+', drive: 'non', manqueAutonomie: true }] })
+    expect(blocked.people[0]?.manqueAutonomie).toBe(true)
+    expect(personLine(blocked.people[0])).toBe('65 ans et plus, ne conduit pas, manque d’autonomie')
+    const child = patchAnswers(answers, { people: [{ age: '0-14', drive: 'non', manqueAutonomie: true }] })
+    expect(child.people[0]?.manqueAutonomie).toBe(false)
+    const driver = patchAnswers(answers, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: true }] })
+    expect(driver.people[0]?.manqueAutonomie).toBe(false)
   })
 
   test('une motorisation est obligatoire dès qu’un véhicule est ajouté', () => {
@@ -71,8 +79,8 @@ describe('questionnaire', () => {
       twoWheelers: [{ motor: 'fusee', sansPermis: true }],
     })
     expect(clean.commune).toBe('Lyon')
-    expect(clean.people[0]).toEqual({ age: '', drive: 'oui' })
-    expect(clean.people[1]).toEqual({ age: '65+', drive: 'non' })
+    expect(clean.people[0]).toEqual({ age: '', drive: 'oui', manqueAutonomie: false })
+    expect(clean.people[1]).toEqual({ age: '65+', drive: 'non', manqueAutonomie: false })
     expect(clean.cars).toHaveLength(8)
     expect(clean.cars[0]?.sansPermis).toBe(false)
     expect(clean.twoWheelers[0]?.motor).toBe('')
@@ -81,19 +89,41 @@ describe('questionnaire', () => {
     expect(changePerson(clean.people, 0, { age: '0-14' })[0]?.age).toBe('0-14')
   })
 
-  test('demande une adresse mail seulement pour un recontact ou le collectif', () => {
+  test('demande le téléphone pour un rappel, et l’adresse mail seulement pour le collectif', () => {
     const answers = emptyAnswers()
-    expect(issueForContact(answers)).toMatch(/recontactée/)
-    const refused = patchAnswers(answers, { recontact: 'non' })
+    expect(issueForContact(answers)).toBeNull()
+    const refused = patchAnswers(answers, { recontact: 'non', phone: '06 12 34 56 78', email: 'Ada@Exemple.fr' })
     expect(issueForContact(refused)).toBeNull()
+    expect(refused.phone).toBe('')
     expect(refused.email).toBe('')
-    const news = patchAnswers(answers, { recontact: 'non', collectif: true, email: 'PasUnMail' })
+    const called = patchAnswers(answers, { recontact: 'oui' })
+    expect(issueForContact(called)).toMatch(/téléphone/)
+    expect(issueForContact(patchAnswers(called, { phone: 'bureau' }))).toMatch(/chiffre/)
+    const reached = patchAnswers(called, { phone: '+33 6 12 34 56 78', email: 'Ada@Exemple.fr' })
+    expect(issueForContact(reached)).toBeNull()
+    expect(reached.email).toBe('')
+    const news = patchAnswers(reached, { collectif: true, email: 'PasUnMail' })
     expect(issueForContact(news)).toMatch(/adresse mail/)
     const ready = patchAnswers(news, { email: 'Ada@Exemple.fr' })
     expect(issueForContact(ready)).toBeNull()
     expect(ready.email).toBe('ada@exemple.fr')
     const dropped = patchAnswers(ready, { collectif: false })
     expect(dropped.email).toBe('')
+    expect(dropped.phone).toBe('+33 6 12 34 56 78')
+    const hungUp = patchAnswers(dropped, { recontact: 'non' })
+    expect(hungUp.phone).toBe('')
+    const remembered = patchAnswers(emptyAnswers(), {
+      recontact: 'oui',
+      recontactText: 'Phrase cochée pour le téléphone',
+      phone: '06 12 34 56 78',
+      collectif: true,
+      collectifText: 'Phrase cochée pour le collectif',
+      email: 'ada@exemple.fr',
+    })
+    expect(remembered.recontactText).toBe('Phrase cochée pour le téléphone')
+    expect(remembered.collectifText).toBe('Phrase cochée pour le collectif')
+    expect(patchAnswers(remembered, { recontact: 'non' }).recontactText).toBe('')
+    expect(patchAnswers(remembered, { collectif: false }).collectifText).toBe('')
     expect(patchAnswers(emptyAnswers(), { adresse: '11 ' }).adresse).toBe('11 ')
     expect(patchAnswers(emptyAnswers(), { adresse: '11 rue de la gare' }).adresse).toBe('11 rue de la gare')
     expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' })).toBe(
@@ -101,11 +131,9 @@ describe('questionnaire', () => {
     )
     expect(mapsDestination({ adresse: '  ', commune: 'Chaux-Neuve' })).toBeNull()
     expect(mapsDestination({ adresse: '11 rue de la gare', commune: '' })).toBeNull()
-    expect(patchAnswers(emptyAnswers(), { phone: '+33 ' }).phone).toBe('+33 ')
-    expect(issueForContact(patchAnswers(refused, { phone: 'bureau' }))).toMatch(/chiffre/)
+    expect(patchAnswers(emptyAnswers(), { recontact: 'oui', phone: '+33 ' }).phone).toBe('+33 ')
     expect(respondentPhone('  +33 6 12 34 56 78  ')).toBe('+33 6 12 34 56 78')
     expect(respondentPhone('')).toBe('')
-    expect(issueForContact(patchAnswers(refused, { phone: '+33 6 12 34 56 78' }))).toBeNull()
   })
 
   test('une fiche de l’ancien questionnaire ne fait pas planter l’accueil', () => {

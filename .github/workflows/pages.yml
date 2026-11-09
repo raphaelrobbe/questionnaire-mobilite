@@ -26,6 +26,10 @@ jobs:
           bun-version: 1.3.5
       - uses: actions/configure-pages@v5
       - run: bun install --frozen-lockfile
+      - run: bunx vitest run
+        env:
+          DEPLOY_GATE: '1'
+          VITE_SHEETS_WEBAPP_URL: ${{ secrets.VITE_SHEETS_WEBAPP_URL }}
       - run: bun run build
         env:
           GITHUB_PAGES: 'true'

@@ -8,6 +8,7 @@ import { useSheetLists } from '~/hooks/useSheetLists'
 import { fetchSheetLists, publishLists } from '~/lib/config.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { buttonClass } from './Button'
+import { LetterDraft } from './LetterDraft'
 
 export function AdminScreen() {
   const settings = useSettings()
@@ -21,6 +22,7 @@ export function AdminScreen() {
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
   const [scannedId, setScannedId] = useState<string | null>(null)
   const [scanFor, setScanFor] = useState<string | null>(null)
+  const [tab, setTab] = useState<'enqueteurs' | 'courrier'>('enqueteurs')
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -179,13 +181,53 @@ export function AdminScreen() {
     <div className="grid gap-4">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Administration</h1>
-        <p className="mt-2 text-base leading-relaxed text-muted">
-          Lisez le QR-code d’un appareil, ou collez son identifiant. Une cellule vide n’autorise aucun appareil.
-        </p>
+        <div className="mt-3 flex gap-1" role="tablist" aria-label="Administration">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'enqueteurs'}
+            onClick={() => setTab('enqueteurs')}
+            className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-full px-3 text-sm font-bold ${
+              tab === 'enqueteurs' ? 'bg-pine text-paper' : 'text-muted hover:bg-mist hover:text-ink'
+            }`}
+          >
+            Enquêteurs
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'courrier'}
+            onClick={() => setTab('courrier')}
+            className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-full px-3 text-center text-sm font-bold ${
+              tab === 'courrier' ? 'bg-pine text-paper' : 'text-muted hover:bg-mist hover:text-ink'
+            }`}
+          >
+            projet de courrier
+          </button>
+        </div>
       </div>
 
-      {notice ? <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">{notice}</p> : null}
+      {tab === 'courrier' ? (
+        <section className="grid gap-3" role="tabpanel">
+          <h2 className="text-2xl font-extrabold leading-tight tracking-tight">
+            Demande de listes électorales à adresser à la préfecture du Doubs
+          </h2>
+          <LetterDraft />
+        </section>
+      ) : null}
 
+      {tab === 'enqueteurs' ? (
+        <p className="text-base leading-relaxed text-muted">
+          Lisez le QR-code d’un appareil, ou collez son identifiant. Une cellule vide n’autorise aucun appareil.
+        </p>
+      ) : null}
+
+      {tab === 'enqueteurs' && notice ? (
+        <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">{notice}</p>
+      ) : null}
+
+      {tab === 'enqueteurs' ? (
+      <>
       <section className="grid gap-2 rounded-2xl border border-line bg-card px-3 py-3">
         <h2 className="font-extrabold">Nouvel enquêteur</h2>
         <button
@@ -320,7 +362,9 @@ export function AdminScreen() {
           </section>
         ))}
       </div>
-      {scanFor ? (
+      </>
+      ) : null}
+      {tab === 'enqueteurs' && scanFor ? (
         <Suspense fallback={<p className="fixed inset-x-0 bottom-4 z-30 text-center text-sm font-bold text-paper">Ouverture de l’appareil photo…</p>}>
           <QrScanner onResult={acceptScan} onClose={() => setScanFor(null)} />
         </Suspense>

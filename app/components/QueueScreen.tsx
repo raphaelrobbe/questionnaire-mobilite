@@ -8,6 +8,7 @@ import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { flushOutbox, removeResponse, retryResponse, statusLabel, type LocalStatus } from '~/lib/outbox.client'
 import { Button } from './Button'
+import { TestChip } from './TestMark'
 
 type Filter = 'toutes' | 'attente' | 'envoyees' | 'enregistrees'
 type Confirm = { id: string; kind: 'delete' | 'resend' }
@@ -151,7 +152,10 @@ export function QueueScreen() {
           {visible.map((row) => (
             <li key={row.id} className="rounded-[28px] border border-line bg-card px-4 py-4">
               <div className="flex items-start justify-between gap-3">
-                <p className="font-extrabold">{answerPreview(row.answers)}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-extrabold">{answerPreview(row.answers)}</p>
+                  {row.test ? <TestChip /> : null}
+                </div>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${badgeClass(row.status)}`}>
                   {statusLabel(row.status)}
                 </span>

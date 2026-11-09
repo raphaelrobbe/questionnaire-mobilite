@@ -1,17 +1,19 @@
+import { useNavigate } from '@remix-run/react'
 import { useEffect, useState } from 'react'
 import { classifyEndpoint, endpointMessage, type EndpointIssue } from '~/common/endpoint'
 import { useSettings } from '~/hooks/useSettings'
-import { copyText, getDeviceId } from '~/lib/settings.client'
+import { getDeviceId, updateSettings } from '~/lib/settings.client'
 import { probeEndpoint } from '~/lib/sheets.client'
 import { Button } from './Button'
+import { DeviceIdPanel } from './DeviceId'
 
 export function SettingsScreen() {
   const settings = useSettings()
+  const navigate = useNavigate()
   const [deviceId, setDeviceId] = useState('')
-  const [copied, setCopied] = useState(false)
-  const [copyError, setCopyError] = useState(false)
   const [probe, setProbe] = useState<'idle' | 'loading' | 'confirmed' | 'sent' | 'error'>('idle')
   const [probeMessage, setProbeMessage] = useState<string | null>(null)
+  const [signedOut, setSignedOut] = useState(false)
 
   useEffect(() => {
     setDeviceId(getDeviceId())
@@ -42,16 +44,28 @@ export function SettingsScreen() {
     }
   }
 
-  async function copyDeviceId() {
-    setCopyError(false)
-    const ok = await copyText(deviceId)
-    setCopied(ok)
-    setCopyError(!ok)
-  }
-
   return (
     <div className="grid gap-4">
-      <h1 className="text-3xl font-extrabold tracking-tight">Réglages</h1>
+      <section className="rounded-[28px] border-2 border-test bg-test px-5 py-5 text-test-ink">
+        <h1 className="text-2xl font-extrabold tracking-tight">Mode test</h1>
+        <p className="mt-2 text-base font-semibold leading-snug">
+          Sans identifiant autorisé, ce mode ouvre le questionnaire. Les réponses partent dans la feuille « Réponses TEST » du même tableur, et pas dans Réponses.
+        </p>
+        <button
+          type="button"
+          aria-pressed={settings.testMode}
+          onClick={() => {
+            const testMode = !settings.testMode
+            updateSettings({ testMode })
+            if (testMode) navigate('/')
+          }}
+          className="mt-4 inline-flex min-h-14 w-full items-center justify-center rounded-2xl bg-test-ink px-4 text-base font-extrabold text-test"
+        >
+          {settings.testMode ? 'Désactiver le mode test' : 'Activer le mode test'}
+        </button>
+      </section>
+
+      <h2 className="text-3xl font-extrabold tracking-tight">Réglages</h2>
 
       <p className={`text-sm font-semibold ${hint.tone === 'warn' ? 'text-clay' : hint.tone === 'ok' ? 'text-leaf' : 'text-muted'}`}>{hint.text}</p>
 
@@ -69,12 +83,27 @@ export function SettingsScreen() {
         <p className="mt-1 text-sm leading-relaxed text-muted">
           Copiez cet identifiant et envoyez-le à l’administrateur. Il l’autorise pour votre nom.
         </p>
-        <p className="mt-3 break-all font-mono text-sm">{deviceId || '…'}</p>
-        <Button variant="secondary" className="mt-3" disabled={!deviceId} onClick={() => void copyDeviceId()}>
-          {copied ? 'Identifiant copié' : 'Copier l’identifiant'}
-        </Button>
-        {copyError ? (
-          <p className="mt-2 text-sm font-semibold text-clay">La copie a échoué. Sélectionnez l’identifiant ci-dessus et copiez-le.</p>
+        <DeviceIdPanel
+          deviceId={deviceId}
+          leading={
+            settings.interviewer.trim() ? (
+              <Button
+                variant="danger"
+                className="min-w-0 flex-1 px-2"
+                onClick={() => {
+                  updateSettings({ interviewer: '' })
+                  setSignedOut(true)
+                }}
+              >
+                Déconnexion
+              </Button>
+            ) : null
+          }
+        />
+        {signedOut ? (
+          <p role="status" className="mt-2 text-sm font-semibold leading-relaxed text-pine">
+            Déconnecté. Les fiches restent sur cet appareil. La connexion sera à refaire.
+          </p>
         ) : null}
       </section>
     </div>

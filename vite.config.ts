@@ -45,6 +45,6 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['app/**/*.test.ts'],
+    include: process.env.DEPLOY_GATE === '1' ? ['scripts/reponse-non-autorisee.test.ts'] : ['app/**/*.test.ts'],
   },
 })

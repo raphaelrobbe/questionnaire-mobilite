@@ -7,6 +7,7 @@ import {
   type Vehicle,
 } from '~/common/survey'
 import { Button } from './Button'
+import { Reveal } from './Reveal'
 
 export function VehiclesStep({
   cars,
@@ -24,13 +25,14 @@ export function VehiclesStep({
       <section className="grid gap-3">
         <h2 className="text-lg font-extrabold">Voitures</h2>
         {cars.map((vehicle, index) => (
-          <VehicleCard
-            key={`car-${index}`}
-            title={`Voiture ${index + 1}`}
-            vehicle={vehicle}
-            onChange={(patch) => onCars(changeVehicle(cars, index, patch))}
-            onRemove={() => onCars(removeVehicle(cars, index))}
-          />
+          <Reveal key={`car-${index}`}>
+            <VehicleCard
+              title={`Voiture ${index + 1}`}
+              vehicle={vehicle}
+              onChange={(patch) => onCars(changeVehicle(cars, index, patch))}
+              onRemove={() => onCars(removeVehicle(cars, index))}
+            />
+          </Reveal>
         ))}
         <Button variant="secondary" disabled={cars.length >= MAX_VEHICLES} onClick={() => onCars(addVehicle(cars))}>
           Ajouter une voiture
@@ -39,13 +41,14 @@ export function VehiclesStep({
       <section className="grid gap-3">
         <h2 className="text-lg font-extrabold">2/3 roues motorisés</h2>
         {twoWheelers.map((vehicle, index) => (
-          <VehicleCard
-            key={`wheel-${index}`}
-            title={`2/3 roues ${index + 1}`}
-            vehicle={vehicle}
-            onChange={(patch) => onTwoWheelers(changeVehicle(twoWheelers, index, patch))}
-            onRemove={() => onTwoWheelers(removeVehicle(twoWheelers, index))}
-          />
+          <Reveal key={`wheel-${index}`}>
+            <VehicleCard
+              title={`2/3 roues ${index + 1}`}
+              vehicle={vehicle}
+              onChange={(patch) => onTwoWheelers(changeVehicle(twoWheelers, index, patch))}
+              onRemove={() => onTwoWheelers(removeVehicle(twoWheelers, index))}
+            />
+          </Reveal>
         ))}
         <Button variant="secondary" disabled={twoWheelers.length >= MAX_VEHICLES} onClick={() => onTwoWheelers(addVehicle(twoWheelers))}>
           Ajouter un 2/3 roues

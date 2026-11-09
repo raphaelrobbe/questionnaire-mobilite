@@ -1,11 +1,13 @@
-import { AGE_BANDS, DRIVE_OPTIONS, MAX_PEOPLE, addPerson, changePerson, removePerson, type Person } from '~/common/survey'
+import { AGE_BANDS, DRIVE_OPTIONS, MAX_PEOPLE, addPerson, asksAutonomie, changePerson, removePerson, type Person } from '~/common/survey'
 import { Button } from './Button'
+import { Reveal } from './Reveal'
 
 export function HouseholdStep({ people, onChange }: { people: Person[]; onChange: (people: Person[]) => void }) {
   return (
     <div className="mt-6 grid gap-4">
       {people.map((person, index) => (
-        <fieldset key={index} className="grid gap-3 rounded-[28px] border border-line bg-card px-4 py-4">
+        <Reveal key={index}>
+        <fieldset className="grid gap-3 rounded-[28px] border border-line bg-card px-4 py-4">
           <legend className="px-1 font-extrabold">Personne {index + 1}</legend>
           <div>
             <p className="text-sm font-bold text-muted">Tranche d’âge</p>
@@ -33,12 +35,26 @@ export function HouseholdStep({ people, onChange }: { people: Person[]; onChange
               ))}
             </div>
           </div>
+          {asksAutonomie(person) ? (
+            <Reveal>
+            <label className="flex min-h-11 items-start gap-3">
+              <input
+                type="checkbox"
+                checked={person.manqueAutonomie}
+                onChange={(event) => onChange(changePerson(people, index, { manqueAutonomie: event.target.checked }))}
+                className="mt-1 size-5 accent-pine"
+              />
+              <span className="font-bold">Lié à un manque d’autonomie</span>
+            </label>
+            </Reveal>
+          ) : null}
           {people.length > 1 ? (
             <Button variant="ghost" className="w-auto justify-self-start px-0" onClick={() => onChange(removePerson(people, index))}>
               Retirer cette personne
             </Button>
           ) : null}
         </fieldset>
+        </Reveal>
       ))}
       <Button variant="secondary" disabled={people.length >= MAX_PEOPLE} onClick={() => onChange(addPerson(people))}>
         Ajouter une personne

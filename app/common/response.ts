@@ -1,3 +1,4 @@
+import { COLLECTIF_CONSENT, PHONE_CONSENT } from './consent'
 import { isEmail, personLine, sanitizeAnswers, vehicleLine, type Answers } from './survey'
 
 const CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -27,9 +28,15 @@ export type ResponseRecord = {
   createdAt: string
   deviceId: string
   interviewer: string
+  test: boolean
   latitude: number | null
   longitude: number | null
   answers: Answers
+}
+
+/** Une réponse sans appareil autorisé n’est gardée que si la fiche est en mode test. */
+export function responseIsKept(record: Pick<ResponseRecord, 'test' | 'interviewer'>): boolean {
+  return record.test || Boolean(record.interviewer.trim())
 }
 
 export const SHEET_HEADERS = [
@@ -64,6 +71,8 @@ export type MailBody = {
   email: string
   recontact: 'oui' | 'non'
   collectif: 'oui' | 'non'
+  texteRecontact: string
+  texteCollectif: string
 }
 
 export type SheetHeader = (typeof SHEET_HEADERS)[number]
@@ -122,12 +131,15 @@ export function mailBody(record: ResponseRecord): MailBody {
     email: isEmail(answers.email) ? answers.email : '',
     recontact: answers.recontact === 'oui' ? 'oui' : 'non',
     collectif: answers.collectif ? 'oui' : 'non',
+    texteRecontact: answers.recontact === 'oui' ? clip(answers.recontactText || PHONE_CONSENT, 400) : '',
+    texteCollectif: answers.collectif ? clip(answers.collectifText || COLLECTIF_CONSENT, 400) : '',
   }
 }
 
 export function responseBody(record: ResponseRecord) {
   return {
     kind: 'response' as const,
+    test: record.test,
     headers: [...SHEET_HEADERS],
     row: toSheetRow(record),
   }

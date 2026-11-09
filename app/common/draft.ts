@@ -5,6 +5,7 @@ export type Draft = {
   code: string
   step: number
   consent: boolean
+  test: boolean
   answers: Answers
   latitude: number | null
   longitude: number | null
@@ -15,6 +16,7 @@ export function emptyDraft(): Draft {
     code: responseCode(),
     step: 0,
     consent: false,
+    test: false,
     answers: emptyAnswers(),
     latitude: null,
     longitude: null,
@@ -38,6 +40,7 @@ export function sanitizeDraft(input: unknown): Draft | null {
     code: isResponseCode(code) ? code : responseCode(),
     step: Math.min(step, Math.max(steps.length - 1, 0)),
     consent: source.consent === true,
+    test: source.test === true,
     answers,
     latitude: coordinate(source.latitude, 90),
     longitude: coordinate(source.longitude, 180),
@@ -46,4 +49,14 @@ export function sanitizeDraft(input: unknown): Draft | null {
 
 export function draftIsStarted(draft: Draft): boolean {
   return draft.consent || draft.step > 0 || draft.latitude !== null || draft.longitude !== null || hasAnyAnswer(draft.answers)
+}
+
+/** Une fiche ouverte puis quittée sans réponse ne reste pas dans la liste. */
+export function draftHasContent(draft: Draft): boolean {
+  return hasAnyAnswer(draft.answers)
+}
+
+/** Une fiche de test ne s’ouvre qu’en mode test, et une fiche réelle qu’en dehors. */
+export function draftMatchesMode(draft: Pick<Draft, 'test'>, testMode: boolean): boolean {
+  return draft.test === testMode
 }

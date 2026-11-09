@@ -1,4 +1,5 @@
-import { draftIsStarted, emptyDraft, sanitizeDraft, type Draft } from '~/common/draft'
+import { draftHasContent, draftIsStarted, emptyDraft, sanitizeDraft, type Draft } from '~/common/draft'
+import { loadSettings } from '~/lib/settings.client'
 
 export type { Draft }
 
@@ -49,7 +50,10 @@ function migrateLegacy(): void {
 }
 
 export function listDrafts(): Draft[] {
-  return readAll()
+  const drafts = readAll()
+  const kept = drafts.filter(draftHasContent)
+  if (kept.length !== drafts.length) writeAll(kept)
+  return kept
 }
 
 export function loadDraft(code: string): Draft | null {
@@ -57,6 +61,10 @@ export function loadDraft(code: string): Draft | null {
 }
 
 export function saveDraft(draft: Draft): void {
+  if (!draftHasContent(draft)) {
+    removeDraft(draft.code)
+    return
+  }
   const rest = readAll().filter((item) => item.code !== draft.code)
   writeAll([draft, ...rest])
 }
@@ -66,7 +74,8 @@ export function removeDraft(code: string): void {
 }
 
 export function createDraft(): Draft {
-  const draft = emptyDraft()
-  saveDraft(draft)
+  const draft = { ...emptyDraft(), test: loadSettings().testMode }
+  const rest = readAll().filter((item) => item.code !== draft.code)
+  writeAll([draft, ...rest])
   return draft
 }

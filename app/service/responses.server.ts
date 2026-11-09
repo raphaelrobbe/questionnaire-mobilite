@@ -15,7 +15,7 @@ export async function submitResponse(
   fetchImpl: FetchLike = fetch,
   adminEndpoint = '',
 ): Promise<'confirmed'> {
-  if (adminEndpoint.trim()) {
+  if (!record.test && adminEndpoint.trim()) {
     const mail = mailBody(record)
     const admin = assertEndpoint(adminEndpoint)
     const mailResponse = await fetchImpl(admin.url, {

@@ -1,7 +1,7 @@
 import { DeviceUnknown } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
 import { ARRIVAL_TRIES, ArrivalStopped, pollArrival } from '~/common/receipt'
-import type { ResponseRecord } from '~/common/response'
+import { responseIsKept, type ResponseRecord } from '~/common/response'
 import { loadSettings, updateSettings } from './settings.client'
 import { codeIsStored, confirmInterviewer, submitRecord, type SendStatus } from './sheets.client'
 
@@ -81,12 +81,20 @@ function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => 
 }
 
 function counted(row: LocalResponse): LocalResponse {
-  return { ...row, lookups: typeof row.lookups === 'number' && Number.isFinite(row.lookups) ? row.lookups : 0 }
+  return {
+    ...row,
+    test: row.test === true,
+    lookups: typeof row.lookups === 'number' && Number.isFinite(row.lookups) ? row.lookups : 0,
+  }
 }
 
 export async function listResponses(): Promise<LocalResponse[]> {
   const rows = await withStore<LocalResponse[]>('readonly', (store) => store.getAll() as IDBRequest<LocalResponse[]>)
-  return rows.map(counted).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  const countedRows = rows.map(counted)
+  for (const row of countedRows) {
+    if (!responseIsKept(row)) await removeResponse(row.id)
+  }
+  return countedRows.filter((row) => responseIsKept(row)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
 }
 
 async function read(id: string): Promise<LocalResponse | null> {
@@ -100,6 +108,7 @@ async function write(row: LocalResponse): Promise<void> {
 }
 
 export async function keepResponse(record: ResponseRecord): Promise<LocalResponse> {
+  if (!responseIsKept(record)) throw new Error('Cette réponse n’est pas enregistrée.')
   const row: LocalResponse = {
     ...record,
     answers: {
@@ -129,19 +138,24 @@ function toRecord(row: LocalResponse): ResponseRecord {
     createdAt: row.createdAt,
     deviceId: row.deviceId,
     interviewer: row.interviewer,
+    test: row.test === true,
     latitude: row.latitude,
     longitude: row.longitude,
     answers: row.answers,
   }
 }
 
-async function attempt(row: LocalResponse): Promise<LocalResponse> {
+async function attempt(row: LocalResponse): Promise<LocalResponse | null> {
   const settings = loadSettings()
   const classified = classifyEndpoint(settings.endpoint)
   if (!classified.ok || !navigator.onLine) return row
+  if (!responseIsKept(row)) {
+    await removeResponse(row.id)
+    return null
+  }
   try {
-    const interviewer = await confirmInterviewer(settings.adminEndpoint, row.deviceId)
-    const status = await submitRecord({ ...toRecord(row), interviewer }, classified.url, settings.adminEndpoint)
+    const interviewer = row.test ? row.interviewer.trim() || 'Test' : await confirmInterviewer(settings.adminEndpoint, row.deviceId)
+    const status = await submitRecord({ ...toRecord(row), interviewer, test: row.test }, classified.url, settings.adminEndpoint)
     const next: LocalResponse = {
       ...row,
       interviewer,
@@ -154,7 +168,11 @@ async function attempt(row: LocalResponse): Promise<LocalResponse> {
     await write(next)
     return next
   } catch (error) {
-    if (error instanceof DeviceUnknown) updateSettings({ interviewer: '' })
+    if (error instanceof DeviceUnknown) {
+      updateSettings({ interviewer: '' })
+      await removeResponse(row.id)
+      return null
+    }
     const message = error instanceof Error ? error.message : 'Envoi impossible.'
     const next: LocalResponse = {
       ...row,
@@ -199,7 +217,7 @@ export function flushOutbox(): Promise<void> {
     for (const row of rows) {
       if (row.status === 'confirmed' || row.status === 'sent') continue
       const next = await attempt(row)
-      if (next.status === 'sent') sentIds.push(next.id)
+      if (next?.status === 'sent') sentIds.push(next.id)
     }
   }).then(() => {
     for (const id of sentIds) confirmArrival(id)
@@ -233,7 +251,7 @@ async function watchArrival(id: string): Promise<void> {
       if (!navigator.onLine) throw new ArrivalStopped()
       const row = await read(id)
       if (!row || row.status !== 'sent') throw new ArrivalStopped()
-      return codeIsStored(classified.url, row.id)
+      return codeIsStored(classified.url, row.id, row.test)
     },
     onMiss: async () => {
       let stop = false

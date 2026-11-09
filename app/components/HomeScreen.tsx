@@ -1,17 +1,21 @@
 import { Link, useNavigate } from '@remix-run/react'
 import { useEffect, useState } from 'react'
 import { DeviceUnknown, isAdminSession } from '~/common/config'
+import { canUseSurvey } from '~/common/settings'
 import { classifyEndpoint } from '~/common/endpoint'
 import { formatWhen } from '~/common/format'
 import { answerPreview, draftTitle, mapsDestination } from '~/common/survey'
+import { draftMatchesMode } from '~/common/draft'
 import { createDraft, listDrafts, removeDraft, type Draft } from '~/lib/draft.client'
 import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { useInstall } from '~/lib/install.client'
-import { copyText, getDeviceId } from '~/lib/settings.client'
+import { getDeviceId } from '~/lib/settings.client'
 import { confirmInterviewer } from '~/lib/sheets.client'
 import { Button, buttonClass } from './Button'
+import { DeviceIdPanel } from './DeviceId'
+import { TestChip } from './TestMark'
 import { MapsLink } from './MapsLink'
 import { statusLabel } from '~/lib/outbox.client'
 
@@ -27,11 +31,6 @@ export function HomeScreen() {
   const [abandonCode, setAbandonCode] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [copyError, setCopyError] = useState(false)
-  const [qrSvg, setQrSvg] = useState<string | null>(null)
-  const [qrBusy, setQrBusy] = useState(false)
-  const [qrError, setQrError] = useState(false)
 
   useEffect(() => {
     setDrafts(listDrafts())
@@ -60,59 +59,16 @@ export function HomeScreen() {
     }
   }
 
-  async function showQr() {
-    if (!deviceId || qrBusy) return
-    if (qrSvg) {
-      setQrSvg(null)
-      return
-    }
-    setQrBusy(true)
-    setQrError(false)
-    try {
-      const { deviceQrSvg } = await import('~/lib/qr/draw.client')
-      setQrSvg(deviceQrSvg(deviceId))
-    } catch {
-      setQrError(true)
-    } finally {
-      setQrBusy(false)
-    }
-  }
-
-  async function copyDeviceId() {
-    setCopyError(false)
-    const ok = await copyText(deviceId)
-    setCopied(ok)
-    setCopyError(!ok)
-  }
-
   if (!settings || !ready || !rows) {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’enquête…</p>
   }
 
-  if (!settings.interviewer.trim()) {
+  if (!canUseSurvey(settings)) {
     return (
       <div className="grid gap-4">
         <section className="rounded-[28px] border border-line bg-card px-5 py-5">
           <h1 className="text-sm font-bold text-muted">Identifiant de cet appareil</h1>
-          <p className="mt-3 break-all font-mono text-sm">{deviceId}</p>
-          <Button variant="secondary" className="mt-3" disabled={!deviceId} onClick={() => void copyDeviceId()}>
-            {copied ? 'Identifiant copié' : 'Copier l’identifiant'}
-          </Button>
-          <Button variant="secondary" className="mt-2" disabled={!deviceId || qrBusy} onClick={() => void showQr()}>
-            {qrSvg ? 'Masquer le QR-code' : 'Afficher le QR-code'}
-          </Button>
-          {qrSvg ? (
-            <div
-              className="mx-auto mt-4 w-56 [&_svg]:h-auto [&_svg]:w-full"
-              role="img"
-              aria-label="QR-code de l’identifiant"
-              dangerouslySetInnerHTML={{ __html: qrSvg }}
-            />
-          ) : null}
-          {qrError ? <p className="mt-2 text-sm font-semibold text-clay">Le QR-code n’a pas pu être affiché.</p> : null}
-          {copyError ? (
-            <p className="mt-2 text-sm font-semibold text-clay">La copie a échoué. Sélectionnez l’identifiant ci-dessus et copiez-le.</p>
-          ) : null}
+          <DeviceIdPanel deviceId={deviceId} />
         </section>
         <Button disabled={connecting || !deviceId} onClick={() => void connect()}>
           {connecting ? 'Connexion…' : 'Connexion'}
@@ -139,7 +95,7 @@ export function HomeScreen() {
 
       <section className="rounded-[28px] border border-line bg-card px-5 py-5 shadow-[0_12px_40px_rgba(28,25,21,0.06)]">
         <p className="text-sm font-bold text-muted">Enquêteur</p>
-        <p className="text-lg font-extrabold">{settings.interviewer.trim()}</p>
+        <p className="text-lg font-extrabold">{settings.interviewer.trim() || 'Test'}</p>
         {isAdminSession(lists.interviewers, settings.interviewer) ? (
           <Link to="/admin" className="mt-3 inline-flex min-h-11 items-center font-bold text-leaf">
             Administration
@@ -164,14 +120,21 @@ export function HomeScreen() {
       </button>
       {drafts.length > 0 ? (
         <ul className="grid gap-2">
-          {drafts.map((item) => (
-            <li key={item.code} className="relative rounded-2xl border border-line bg-card px-4 py-3">
-              <p className={`font-bold ${mapsDestination(item.answers) ? 'pr-28' : ''}`}>{draftTitle(item.answers)}</p>
-              <MapsLink answers={item.answers} compact className="absolute right-4 top-3" />
-              <p className="absolute bottom-3 right-3 rounded-full bg-pine px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
+          {[...drafts]
+            .sort((left, right) => Number(draftMatchesMode(right, settings.testMode)) - Number(draftMatchesMode(left, settings.testMode)))
+            .map((item) => {
+            const locked = !draftMatchesMode(item, settings.testMode)
+            return (
+            <li key={item.code} className={`relative rounded-2xl border border-line bg-card px-4 py-3 ${locked ? 'opacity-50' : ''}`}>
+              <div className={`flex flex-wrap items-center gap-2 ${!locked && mapsDestination(item.answers) ? 'pr-28' : ''}`}>
+                <p className={`font-bold ${locked ? 'text-muted' : ''}`}>{draftTitle(item.answers)}</p>
+                {item.test ? <TestChip /> : null}
+              </div>
+              {locked ? null : <MapsLink answers={item.answers} compact className="absolute right-4 top-3" />}
+              <p className={`absolute bottom-3 right-3 rounded-full px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] ${locked ? 'bg-line text-muted' : 'bg-pine text-paper'}`}>
                 {item.code}
               </p>
-              {abandonCode === item.code ? (
+              {!locked && abandonCode === item.code ? (
                 <div className="mt-3 pr-28">
                   <p className="font-bold">Effacer cette fiche commencée ?</p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
@@ -193,16 +156,25 @@ export function HomeScreen() {
                 </div>
               ) : (
                 <div className="mt-2 flex gap-4 pr-28">
-                  <Link to={`/entretien?fiche=${item.code}`} className="inline-flex min-h-11 items-center font-bold text-leaf">
-                    Continuer
-                  </Link>
-                  <button type="button" className="inline-flex min-h-11 items-center font-bold text-danger" onClick={() => setAbandonCode(item.code)}>
-                    Abandonner
-                  </button>
+                  {locked ? (
+                    <p className="self-center text-sm font-semibold text-muted">
+                      {item.test ? 'Activez le mode test pour ouvrir cette fiche.' : 'Désactivez le mode test pour ouvrir cette fiche.'}
+                    </p>
+                  ) : (
+                    <>
+                      <Link to={`/entretien?fiche=${item.code}`} className="inline-flex min-h-11 items-center font-bold text-leaf">
+                        Continuer
+                      </Link>
+                      <button type="button" className="inline-flex min-h-11 items-center font-bold text-danger" onClick={() => setAbandonCode(item.code)}>
+                        Abandonner
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </li>
-          ))}
+            )
+          })}
         </ul>
       ) : null}
 
@@ -229,7 +201,10 @@ export function HomeScreen() {
           <ul className="mt-3 grid gap-2">
             {recent.map((row) => (
               <li key={row.id} className="rounded-2xl border border-line bg-card px-4 py-3">
-                <p className="font-bold">{answerPreview(row.answers)}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-bold">{answerPreview(row.answers)}</p>
+                  {row.test ? <TestChip /> : null}
+                </div>
                 <p className="mt-1 text-sm font-semibold text-muted">
                   {formatWhen(row.createdAt)} · {statusLabel(row.status)}
                 </p>
@@ -248,13 +223,19 @@ export function HomeScreen() {
 }
 
 function InstallOffer({ offer }: { offer: ReturnType<typeof useInstall> }) {
-  if (!offer.show) return null
   return (
     <div className="grid gap-2">
-      <Button variant="secondary" onClick={() => void offer.install()}>
-        Installer l’application
-      </Button>
-      {offer.hint ? (
+      <div className={`grid gap-2 ${offer.show ? 'grid-cols-2' : ''}`}>
+        {offer.show ? (
+          <Button variant="secondary" className="min-w-0 w-full px-3 leading-tight" onClick={() => void offer.install()}>
+            Installer l’application
+          </Button>
+        ) : null}
+        <Link to="/protection" prefetch="intent" className={buttonClass('secondary', 'min-w-0 w-full px-3 leading-tight')}>
+          Protection des données
+        </Link>
+      </div>
+      {offer.show && offer.hint ? (
         <p role="status" className="text-sm font-semibold leading-relaxed text-muted">
           {offer.hint}
         </p>

@@ -27,6 +27,8 @@ const ENQUETE_HEADERS = [
   'Adresse mail',
   'recontact',
   'collectif',
+  'Texte recontact',
+  'Texte collectif',
 ]
 const INTERVIEWERS_TAB = 'Enquêteurs'
 const COMMUNES_TAB = 'Communes'
@@ -345,6 +347,8 @@ function writeMail(body) {
     'Adresse mail': clipText(body.email, 120).toLowerCase(),
     recontact: body.recontact === 'oui' ? 'oui' : 'non',
     collectif: body.collectif === 'oui' ? 'oui' : 'non',
+    'Texte recontact': body.recontact === 'oui' ? clipText(body.texteRecontact, 400) : '',
+    'Texte collectif': body.collectif === 'oui' ? clipText(body.texteCollectif, 400) : '',
   }
   const values = headers.map(function (header) {
     return record[header] || ''

@@ -1,5 +1,5 @@
 /**
- * Script du tableur PUBLIC. Une seule feuille : Réponses.
+ * Script du tableur PUBLIC. Feuille Réponses, et Réponses TEST pour le mode test.
  * Collez ce fichier dans Extensions → Apps Script, ouvert depuis CE tableur.
  * Déployer → Application Web → Exécuter en tant que : Moi → Qui a accès : Tout le monde.
  * L'URL /exec va dans VITE_SHEETS_WEBAPP_URL.
@@ -12,13 +12,14 @@
  * Après une modification : Déployer → Gérer les déploiements → crayon → Nouvelle version.
  */
 const TAB_NAME = 'Réponses'
+const TEST_TAB_NAME = 'Réponses TEST'
 
 function doGet(e) {
   var params = e && e.parameter ? e.parameter : {}
   var callback = String(params.callback || '')
   var payload
   try {
-    if (String(params.action || '') === 'code') payload = lookupCode(params.code)
+    if (String(params.action || '') === 'code') payload = lookupCode(params.code, String(params.test || '') === '1')
     else payload = { ok: true, service: 'questionnaire-mobilite-reponses' }
   } catch (error) {
     payload = { ok: false, stored: false, error: String(error && error.message ? error.message : error).slice(0, 180) }
@@ -31,10 +32,10 @@ function doGet(e) {
   return json(payload)
 }
 
-function lookupCode(code) {
+function lookupCode(code, test) {
   var text = String(code || '').trim()
   if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(text)) return { ok: true, stored: false }
-  var sheet = spreadsheet().getSheetByName(TAB_NAME)
+  var sheet = spreadsheet().getSheetByName(test ? TEST_TAB_NAME : TAB_NAME)
   if (!sheet) return { ok: true, stored: false }
   return { ok: true, stored: hasCode(sheet, readHeaders(sheet), text) }
 }
@@ -57,6 +58,7 @@ function doPost(e) {
           return !isPrivateHeader(header)
         }),
         withoutPrivate(body.row),
+        body.test === true,
       )
     } finally {
       lock.releaseLock()
@@ -104,10 +106,11 @@ function withoutPrivate(row) {
   return clean
 }
 
-function responseSheet() {
+function responseSheet(test) {
   const book = spreadsheet()
-  let sheet = book.getSheetByName(TAB_NAME)
-  if (!sheet) sheet = book.insertSheet(TAB_NAME)
+  const name = test ? TEST_TAB_NAME : TAB_NAME
+  let sheet = book.getSheetByName(name)
+  if (!sheet) sheet = book.insertSheet(name)
   return sheet
 }
 
@@ -148,10 +151,10 @@ function hasCode(sheet, headers, code) {
   return false
 }
 
-function writeRow(headersFromClient, row) {
+function writeRow(headersFromClient, row, test) {
   const code = String(row && row.id ? row.id : '').trim()
   if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw new Error('Code illisible.')
-  const sheet = responseSheet()
+  const sheet = responseSheet(test === true)
   const wanted = headersFromClient.filter(Boolean)
   if (!wanted.length) throw new Error('En-têtes manquants.')
   let headers = readHeaders(sheet)

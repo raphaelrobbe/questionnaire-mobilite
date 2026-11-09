@@ -6,6 +6,7 @@ import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { Mark } from './Mark'
+import { TestBanner } from './TestMark'
 
 const links = [
   { to: '/', label: 'Accueil' },
@@ -30,6 +31,7 @@ export function Shell({ children }: { children: ReactNode }) {
       >
         Aller au contenu
       </a>
+      {settings?.testMode ? <TestBanner /> : null}
       {interviewing ? null : (
         <header className="border-b border-line bg-card/90 backdrop-blur">
           <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 py-3">

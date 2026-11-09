@@ -29,6 +29,7 @@ export async function confirmInterviewer(adminEndpoint: string, deviceId: string
 }
 
 export async function submitRecord(record: ResponseRecord, endpoint: string, adminEndpoint: string): Promise<SendStatus> {
+  if (record.test) return post(endpoint, JSON.stringify(responseBody(record)))
   const mailed = await post(adminEndpoint, JSON.stringify(mailBody(record)))
   const responses = await post(endpoint, JSON.stringify(responseBody(record)))
   return mailed === 'confirmed' && responses === 'confirmed' ? 'confirmed' : responses
@@ -71,12 +72,13 @@ async function post(endpoint: string, body: string): Promise<SendStatus> {
   return 'sent'
 }
 
-export async function codeIsStored(endpoint: string, code: string): Promise<boolean> {
+export async function codeIsStored(endpoint: string, code: string, test = false): Promise<boolean> {
   const target = classifyEndpoint(endpoint)
   if (!target.ok || target.kind !== 'google-script') return false
   const url = new URL(target.url)
   url.searchParams.set('action', 'code')
   url.searchParams.set('code', code)
+  if (test) url.searchParams.set('test', '1')
   const payload = await getScriptJson(url, 8000, 'Le tableur des réponses ne répond pas.')
   return readStoredFlag(payload)
 }

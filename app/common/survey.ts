@@ -1,4 +1,5 @@
 import { communesOnOffer, fold, PONTARLIER } from './config'
+import { emptyMotives, motiveIssue, motivesStarted, sanitizeMotives, type Motives } from './motives'
 
 export const MAX_PEOPLE = 12
 export const MAX_VEHICLES = 8
@@ -7,7 +8,7 @@ export type AgeBand = '0-14' | '15-17' | '18-24' | '25-39' | '40-64' | '65+'
 export type Drive = 'non' | 'accompagnee' | 'oui'
 export type Motor = 'electrique' | 'hybride' | 'thermique'
 
-export type Person = { age: AgeBand | ''; drive: Drive | '' }
+export type Person = { age: AgeBand | ''; drive: Drive | ''; manqueAutonomie: boolean }
 export type Vehicle = { motor: Motor | ''; sansPermis: boolean }
 
 export type Recontact = 'oui' | 'non'
@@ -21,8 +22,13 @@ export type Answers = {
   people: Person[]
   cars: Vehicle[]
   twoWheelers: Vehicle[]
+  motives: Motives
   recontact: Recontact | ''
+  /** Phrase affichée sur la case au moment où elle a été cochée. Vide sinon. */
+  recontactText: string
   collectif: boolean
+  /** Phrase affichée sur la case au moment où elle a été cochée. Vide sinon. */
+  collectifText: string
   email: string
   phone: string
 }
@@ -57,11 +63,17 @@ export type Step =
   | { kind: 'consent' }
   | { kind: 'household' }
   | { kind: 'vehicles' }
+  | { kind: 'motives' }
   | { kind: 'contact' }
   | { kind: 'review' }
 
 export function emptyPerson(): Person {
-  return { age: '', drive: '' }
+  return { age: '', drive: '', manqueAutonomie: false }
+}
+
+/** 15 ans ou plus, et ne conduit pas. */
+export function asksAutonomie(person: Pick<Person, 'age' | 'drive'>): boolean {
+  return person.drive === 'non' && person.age !== '' && person.age !== '0-14'
 }
 
 export function emptyVehicle(): Vehicle {
@@ -78,8 +90,11 @@ export function emptyAnswers(): Answers {
     people: [emptyPerson()],
     cars: [],
     twoWheelers: [],
+    motives: emptyMotives(1),
     recontact: '',
+    recontactText: '',
     collectif: false,
+    collectifText: '',
     email: '',
     phone: '',
   }
@@ -93,6 +108,7 @@ export function buildSteps(_answers: Answers): Step[] {
     { kind: 'consent' },
     { kind: 'household' },
     { kind: 'vehicles' },
+    { kind: 'motives' },
     { kind: 'contact' },
     { kind: 'review' },
   ]
@@ -115,7 +131,7 @@ export function isEmail(value: string): boolean {
 }
 
 export function wantsEmail(answers: Answers): boolean {
-  return answers.recontact === 'oui' || answers.collectif
+  return answers.collectif
 }
 
 function clip(value: string, max: number): string {
@@ -134,6 +150,8 @@ function labelOf<T extends string>(options: Labeled<T>[], value: string): string
 export function sanitizeAnswers(input: unknown): Answers {
   const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const people = sanitizePeople(source.people)
+  const cars = sanitizeVehicles(source.cars)
+  const twoWheelers = sanitizeVehicles(source.twoWheelers)
   const recontact = source.recontact === 'oui' || source.recontact === 'non' ? source.recontact : ''
   const collectif = source.collectif === true
   const email = typeof source.email === 'string' ? normalizeEmail(source.email) : ''
@@ -144,12 +162,15 @@ export function sanitizeAnswers(input: unknown): Answers {
     adresse: text(source.adresse, 160),
     complement: text(source.complement, 160),
     people: people.length ? people : [emptyPerson()],
-    cars: sanitizeVehicles(source.cars),
-    twoWheelers: sanitizeVehicles(source.twoWheelers),
+    cars,
+    twoWheelers,
+    motives: sanitizeMotives(source.motives, people.length || 1, cars.length, twoWheelers.length),
     recontact,
+    recontactText: recontact === 'oui' ? text(source.recontactText, 400) : '',
     collectif,
-    email: recontact === 'oui' || collectif ? email : '',
-    phone: text(source.phone, 40),
+    collectifText: collectif ? text(source.collectifText, 400) : '',
+    email: collectif ? email : '',
+    phone: recontact === 'oui' ? text(source.phone, 40) : '',
   }
 }
 
@@ -161,7 +182,9 @@ function sanitizePeople(input: unknown): Person[] {
   if (!Array.isArray(input)) return []
   return input.slice(0, MAX_PEOPLE).map((item) => {
     const source = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
-    return { age: known(AGE_BANDS, source.age), drive: known(DRIVE_OPTIONS, source.drive) }
+    const age = known(AGE_BANDS, source.age)
+    const drive = known(DRIVE_OPTIONS, source.drive)
+    return { age, drive, manqueAutonomie: asksAutonomie({ age, drive }) && source.manqueAutonomie === true }
   })
 }
 
@@ -194,6 +217,8 @@ export function patchAnswers(answers: Answers, patch: Partial<Answers>): Answers
     const value = patch[key]
     if (typeof value === 'string') next[key] = clip(value, editableText[key])
   }
+  if (next.recontact !== 'oui') next.phone = ''
+  if (!next.collectif) next.email = ''
   return next
 }
 
@@ -253,11 +278,11 @@ export function issueForVehicles(answers: Answers): string | null {
 }
 
 export function issueForContact(answers: Answers): string | null {
-  if (answers.recontact !== 'oui' && answers.recontact !== 'non') {
-    return 'Indiquez si la personne accepte d’être recontactée.'
+  if (answers.recontact === 'oui') {
+    const phone = respondentPhone(answers.phone)
+    if (!phone) return phone === null ? 'Ce numéro ne contient aucun chiffre.' : 'Indiquez un numéro de téléphone.'
   }
   if (wantsEmail(answers) && !isEmail(answers.email)) return 'Indiquez une adresse mail.'
-  if (respondentPhone(answers.phone) === null) return 'Ce numéro ne contient aucun chiffre.'
   return null
 }
 
@@ -266,6 +291,7 @@ export function stepIssue(step: Step, answers: Answers, communes: string[]): str
   if (step.kind === 'household') return issueForHousehold(answers)
   if (step.kind === 'vehicles') return issueForVehicles(answers)
   if (step.kind === 'contact') return issueForContact(answers)
+  if (step.kind === 'motives') return motiveIssue(answers.motives)
   return null
 }
 
@@ -273,7 +299,8 @@ export function personLine(person: Person): string {
   const age = labelOf(AGE_BANDS, person.age)
   const drive = labelOf(DRIVE_OPTIONS, person.drive)
   if (!age || !drive) return ''
-  return `${age}, ${drive.charAt(0).toLocaleLowerCase('fr')}${drive.slice(1)}`
+  const driving = `${drive.charAt(0).toLocaleLowerCase('fr')}${drive.slice(1)}`
+  return person.manqueAutonomie ? `${age}, ${driving}, manque d’autonomie` : `${age}, ${driving}`
 }
 
 export function vehicleLine(vehicle: Vehicle): string {
@@ -294,8 +321,9 @@ export function summary(input: Answers): { label: string; value: string }[] {
     { label: 'Foyer', value: people.join(' · ') },
     { label: 'Voitures', value: cars.length ? cars.join(' · ') : 'Aucune' },
     { label: '2/3 roues', value: twoWheelers.length ? twoWheelers.join(' · ') : 'Aucun' },
-    { label: 'Recontact', value: answers.recontact === 'oui' ? 'Oui' : answers.recontact === 'non' ? 'Non' : '' },
-    { label: 'Collectif Mobilités du Haut-Doubs', value: answers.collectif ? 'Oui' : 'Non' },
+    { label: 'Motifs', value: motivesStarted(answers.motives) ? 'Gardés sur le téléphone' : '' },
+    { label: 'Recontact', value: answers.recontact === 'oui' ? 'Oui' : 'Non' },
+    { label: 'Collectif Mobilité Haut-Doubs', value: answers.collectif ? 'Oui' : 'Non' },
     { label: 'Adresse mail', value: answers.email },
     { label: 'Téléphone', value: answers.phone },
   ].filter((line) => line.value !== '')
@@ -340,6 +368,7 @@ export function hasAnyAnswer(input: Answers): boolean {
       answers.people.some((person) => person.age || person.drive) ||
       answers.cars.length ||
       answers.twoWheelers.length ||
+      motivesStarted(answers.motives) ||
       answers.recontact !== '' ||
       answers.collectif ||
       answers.email !== '' ||
