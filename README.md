@@ -38,7 +38,7 @@ Deux fichiers Drive, deux scripts. Aucun des deux n’ouvre l’autre.
 
 Une enquête ne démarre que si le couple enquêteur + identifiant d’appareil est autorisé. La feuille Enquêteurs a trois colonnes : « Prénom Nom », « Identifiants appareils autorisés » et « Admin ». La cellule d’identifiants vaut `[]` (personne), un identifiant seul, ou `[id1, id2]`. L’enquêteur copie son identifiant dans Réglages et l’envoie à l’administrateur. Si Admin vaut `oui` et que cet appareil est déjà autorisé pour lui, l’écran Administration permet d’ajouter ou de retirer des identifiants. Le premier administrateur s’ajoute à la main dans le tableur.
 
-Google ne renvoie pas d’accusé de réception au navigateur. Après le premier entretien test, ouvrez l’onglet Réponses. Les envois suivants portent la mention « Envoyée ».
+Le téléphone ne lit pas la réponse de l’envoi. Deux secondes après, il demande au script public si le code est dans Réponses, puis toutes les deux secondes, cinq fois en tout. Tant que le code n’est pas retrouvé, la fiche reste « Envoyée » : partie, sans garantie. Une fois le code retrouvé, elle passe « Enregistrée ». Il faut coller la nouvelle version de `scripts/google-apps-script/reponses/Code.gs` et redéployer ce script pour que cette lecture existe.
 
 Sans l’URL du script privé, les fiches déjà gardées restent dans la file, mais une nouvelle enquête ne peut pas démarrer : la liste des appareils autorisés est illisible.
 

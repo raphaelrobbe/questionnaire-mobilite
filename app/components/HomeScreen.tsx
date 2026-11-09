@@ -36,7 +36,8 @@ export function HomeScreen() {
     deviceId && lists.status === 'ready' ? startRefusal(lists.interviewers, settings.interviewer, deviceId) : null
   const gate = lists.status === 'error' ? lists.message || 'Listes indisponibles.' : refusal
   const waiting = rows.filter((row) => row.status === 'pending' || row.status === 'error')
-  const sent = rows.filter((row) => row.status === 'sent' || row.status === 'confirmed')
+  const sent = rows.filter((row) => row.status === 'sent')
+  const recorded = rows.filter((row) => row.status === 'confirmed')
   const recent = rows.slice(0, 3)
 
   return (
@@ -125,7 +126,16 @@ export function HomeScreen() {
       <section>
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-lg font-extrabold">Sur cet appareil</h2>
-          {sent.length > 0 ? <p className="text-sm font-semibold text-muted">{sent.length} envoyée{sent.length > 1 ? 's' : ''}</p> : null}
+          {sent.length > 0 || recorded.length > 0 ? (
+            <p className="text-sm font-semibold text-muted">
+              {[
+                sent.length > 0 ? `${sent.length} envoyée${sent.length > 1 ? 's' : ''}` : '',
+                recorded.length > 0 ? `${recorded.length} enregistrée${recorded.length > 1 ? 's' : ''}` : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          ) : null}
         </div>
         {error ? <p className="mt-3 text-danger">{error}</p> : null}
         {recent.length === 0 ? (

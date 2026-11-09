@@ -8,13 +8,14 @@ import { useSettings } from '~/hooks/useSettings'
 import { flushOutbox, removeResponse, retryResponse, statusLabel, type LocalStatus } from '~/lib/outbox.client'
 import { Button } from './Button'
 
-type Filter = 'toutes' | 'attente' | 'envoyees'
+type Filter = 'toutes' | 'attente' | 'envoyees' | 'enregistrees'
 type Confirm = { id: string; kind: 'delete' | 'resend' }
 
 const filters: { id: Filter; label: string }[] = [
   { id: 'toutes', label: 'Toutes' },
   { id: 'attente', label: 'À envoyer' },
   { id: 'envoyees', label: 'Envoyées' },
+  { id: 'enregistrees', label: 'Enregistrées' },
 ]
 
 export function QueueScreen() {
@@ -121,7 +122,7 @@ export function QueueScreen() {
         {busy ? 'Envoi…' : waiting === 0 ? 'Rien à envoyer' : `Envoyer la file (${waiting})`}
       </Button>
 
-      <div className="flex gap-2" role="tablist" aria-label="Filtrer la file">
+      <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Filtrer la file">
         {filters.map((item) => (
           <button
             key={item.id}
@@ -129,7 +130,7 @@ export function QueueScreen() {
             role="tab"
             aria-selected={filter === item.id}
             onClick={() => setFilter(item.id)}
-            className={`min-h-11 flex-1 rounded-full text-sm font-bold ${
+            className={`min-h-11 rounded-full text-sm font-bold ${
               filter === item.id ? 'bg-pine text-paper' : 'bg-card text-muted'
             }`}
           >
@@ -163,7 +164,7 @@ export function QueueScreen() {
                       ? row.status === 'sent' || row.status === 'confirmed'
                         ? 'Supprimer la copie sur ce téléphone ? La ligne déjà partie dans le tableur, s’il y en a une, reste en place.'
                         : 'Supprimer cette fiche de ce téléphone ? Elle ne sera pas envoyée.'
-                      : 'Renvoyer créera une deuxième ligne si la première est déjà dans le tableur.'}
+                      : 'Renvoyer réessaie l’envoi. Le même code ne crée pas une seconde ligne.'}
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>
@@ -200,13 +201,14 @@ export function QueueScreen() {
 
 function matches(filter: Filter, status: LocalStatus): boolean {
   if (filter === 'attente') return status === 'pending' || status === 'error'
-  if (filter === 'envoyees') return status === 'sent' || status === 'confirmed'
+  if (filter === 'envoyees') return status === 'sent'
+  if (filter === 'enregistrees') return status === 'confirmed'
   return true
 }
 
 function badgeClass(status: LocalStatus): string {
   if (status === 'error') return 'bg-danger-bg text-danger'
-  if (status === 'pending') return 'bg-clay-bg text-clay'
+  if (status === 'pending' || status === 'sent') return 'bg-clay-bg text-clay'
   if (status === 'confirmed') return 'bg-mist text-pine'
   return 'bg-mist text-leaf'
 }

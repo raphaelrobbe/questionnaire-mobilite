@@ -7,12 +7,35 @@
  * Ce script n'ouvre aucun autre fichier. Il n'a pas la liste des enquêteurs
  * ni les adresses mail. Une adresse reçue par erreur est ignorée, pas écrite.
  * Le même code n'ajoute pas une seconde ligne.
+ * action=code répond seulement si ce code est déjà dans la feuille, sans renvoyer la ligne.
  * Après une modification : Déployer → Gérer les déploiements → crayon → Nouvelle version.
  */
 const TAB_NAME = 'Réponses'
 
-function doGet() {
-  return json({ ok: true, service: 'questionnaire-mobilite-reponses' })
+function doGet(e) {
+  var params = e && e.parameter ? e.parameter : {}
+  var callback = String(params.callback || '')
+  var payload
+  try {
+    if (String(params.action || '') === 'code') payload = lookupCode(params.code)
+    else payload = { ok: true, service: 'questionnaire-mobilite-reponses' }
+  } catch (error) {
+    payload = { ok: false, stored: false, error: String(error && error.message ? error.message : error).slice(0, 180) }
+  }
+  if (/^[A-Za-z_$][A-Za-z0-9_$]{0,40}$/.test(callback)) {
+    return ContentService.createTextOutput(callback + '(' + JSON.stringify(payload) + ')').setMimeType(
+      ContentService.MimeType.JAVASCRIPT,
+    )
+  }
+  return json(payload)
+}
+
+function lookupCode(code) {
+  var text = String(code || '').trim()
+  if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(text)) return { ok: true, stored: false }
+  var sheet = spreadsheet().getSheetByName(TAB_NAME)
+  if (!sheet) return { ok: true, stored: false }
+  return { ok: true, stored: hasCode(sheet, readHeaders(sheet), text) }
 }
 
 function doPost(e) {

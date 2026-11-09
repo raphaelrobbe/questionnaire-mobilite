@@ -9,6 +9,7 @@ import { capturePosition } from '~/lib/geo.client'
 import { flushOne, keepResponse, type LocalResponse } from '~/lib/outbox.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { useOnline } from '~/hooks/useOnline'
+import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { Button, buttonClass } from './Button'
@@ -155,6 +156,7 @@ export function Interview() {
           status: 'pending',
           lastError: null,
           attempts: 0,
+          lookups: 0,
           updatedAt: record.createdAt,
         },
       )
@@ -370,14 +372,16 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function Saved({ row, onNext }: { row: LocalResponse; onNext: () => void }) {
-  const copy = savedCopy(row)
+  const { rows } = useOutbox()
+  const live = rows?.find((item) => item.id === row.id) ?? row
+  const copy = savedCopy(live)
   return (
     <div className="grid gap-4">
       <section className="rounded-[28px] bg-pine px-5 py-6 text-paper">
-        <p className="text-sm font-bold uppercase tracking-[0.16em] text-paper/70">Fiche gardée</p>
-        <h1 className="mt-2 text-3xl font-extrabold tracking-tight">{copy.title}</h1>
-        <p className="mt-4 font-mono text-4xl font-extrabold tracking-[0.18em]">{row.id}</p>
-        <p className="mt-3 text-base leading-relaxed text-paper/85">{copy.detail}</p>
+        {copy.kicker ? <p className="text-sm font-bold uppercase tracking-[0.16em] text-paper/70">{copy.kicker}</p> : null}
+        <h1 className={`${copy.kicker ? 'mt-2' : ''} text-3xl font-extrabold tracking-tight`}>{copy.title}</h1>
+        <p className="mt-4 font-mono text-4xl font-extrabold tracking-[0.18em]">{live.id}</p>
+        {copy.detail ? <p className="mt-3 text-base leading-relaxed text-paper/85">{copy.detail}</p> : null}
       </section>
       <button type="button" className={buttonClass('primary')} onClick={onNext}>
         Personne suivante
@@ -385,7 +389,7 @@ function Saved({ row, onNext }: { row: LocalResponse; onNext: () => void }) {
       <Link to="/" className={buttonClass('secondary')}>
         Retour à l’accueil
       </Link>
-      {row.status === 'pending' || row.status === 'error' ? (
+      {live.status === 'pending' || live.status === 'error' ? (
         <Link to="/file" className="text-center font-bold text-leaf">
           Voir la file d’envoi
         </Link>
@@ -394,20 +398,26 @@ function Saved({ row, onNext }: { row: LocalResponse; onNext: () => void }) {
   )
 }
 
-function savedCopy(row: LocalResponse): { title: string; detail: string } {
+function savedCopy(row: LocalResponse): { kicker: string; title: string; detail: string } {
   if (row.status === 'confirmed') {
-    return { title: 'Ligne confirmée.', detail: 'Le serveur a répondu. La fiche est dans le tableur.' }
+    return { kicker: '', title: 'Réponses enregistrées.', detail: 'Le code a été retrouvé dans le tableur.' }
   }
   if (row.status === 'sent') {
     return {
-      title: 'Envoyée au tableur.',
-      detail: 'Google ne renvoie pas d’accusé au téléphone. La ligne est dans l’onglet Réponses.',
+      kicker: '',
+      title: 'Réponses envoyées.',
+      detail: 'Leur arrivée dans le tableur n’est pas encore garantie.',
     }
   }
   if (row.status === 'error') {
-    return { title: 'Gardée sur ce téléphone.', detail: row.lastError || 'L’envoi a échoué. La file réessaiera.' }
+    return {
+      kicker: 'Fiche gardée',
+      title: 'Gardée sur ce téléphone.',
+      detail: row.lastError || 'L’envoi a échoué. La file réessaiera.',
+    }
   }
   return {
+    kicker: 'Fiche gardée',
     title: 'Gardée sur ce téléphone.',
     detail: 'Elle partira dès que le réseau et le tableur seront là. Rien n’est perdu.',
   }

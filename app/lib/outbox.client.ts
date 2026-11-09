@@ -1,7 +1,8 @@
 import { classifyEndpoint } from '~/common/endpoint'
+import { ARRIVAL_TRIES, ArrivalStopped, pollArrival } from '~/common/receipt'
 import type { ResponseRecord } from '~/common/response'
 import { loadSettings } from './settings.client'
-import { submitRecord, type SendStatus } from './sheets.client'
+import { codeIsStored, submitRecord, type SendStatus } from './sheets.client'
 
 const DB_NAME = 'questionnaire-mobilite'
 const STORE = 'responses'
@@ -13,6 +14,7 @@ export type LocalResponse = ResponseRecord & {
   status: LocalStatus
   lastError: string | null
   attempts: number
+  lookups: number
   updatedAt: string
 }
 
@@ -77,14 +79,18 @@ function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => 
   )
 }
 
+function counted(row: LocalResponse): LocalResponse {
+  return { ...row, lookups: typeof row.lookups === 'number' && Number.isFinite(row.lookups) ? row.lookups : 0 }
+}
+
 export async function listResponses(): Promise<LocalResponse[]> {
   const rows = await withStore<LocalResponse[]>('readonly', (store) => store.getAll() as IDBRequest<LocalResponse[]>)
-  return rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  return rows.map(counted).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
 }
 
 async function read(id: string): Promise<LocalResponse | null> {
   const row = await withStore<LocalResponse | undefined>('readonly', (store) => store.get(id))
-  return row ?? null
+  return row ? counted(row) : null
 }
 
 async function write(row: LocalResponse): Promise<void> {
@@ -104,6 +110,7 @@ export async function keepResponse(record: ResponseRecord): Promise<LocalRespons
     status: 'pending',
     lastError: null,
     attempts: 0,
+    lookups: 0,
     updatedAt: new Date().toISOString(),
   }
   await write(row)
@@ -138,6 +145,7 @@ async function attempt(row: LocalResponse): Promise<LocalResponse> {
       status,
       lastError: null,
       attempts: row.attempts + 1,
+      lookups: status === 'sent' ? 0 : row.lookups,
       updatedAt: new Date().toISOString(),
     }
     await write(next)
@@ -161,6 +169,9 @@ export function flushOne(id: string): Promise<LocalResponse | null> {
     const row = await read(id)
     if (!row || row.status === 'confirmed' || row.status === 'sent') return row
     return attempt(row)
+  }).then((row) => {
+    if (row?.status === 'sent') confirmArrival(row.id)
+    return row
   })
 }
 
@@ -171,22 +182,93 @@ export function retryResponse(id: string): Promise<LocalResponse | null> {
     const pending: LocalResponse = { ...row, status: 'pending', lastError: null, updatedAt: new Date().toISOString() }
     await write(pending)
     return attempt(pending)
+  }).then((row) => {
+    if (row?.status === 'sent') confirmArrival(row.id)
+    return row
   })
 }
 
 export function flushOutbox(): Promise<void> {
+  const sentIds: string[] = []
   return lock(async () => {
     const rows = await listResponses()
     for (const row of rows) {
       if (row.status === 'confirmed' || row.status === 'sent') continue
-      await attempt(row)
+      const next = await attempt(row)
+      if (next.status === 'sent') sentIds.push(next.id)
     }
+  }).then(() => {
+    for (const id of sentIds) confirmArrival(id)
+  })
+}
+
+const checking = new Set<string>()
+
+function confirmArrival(id: string) {
+  if (checking.has(id)) return
+  checking.add(id)
+  void watchArrival(id).finally(() => checking.delete(id))
+}
+
+async function resumeArrivalChecks(): Promise<void> {
+  const rows = await listResponses()
+  for (const row of rows) {
+    if (row.status === 'sent' && row.lookups < ARRIVAL_TRIES) confirmArrival(row.id)
+  }
+}
+
+async function watchArrival(id: string): Promise<void> {
+  const settings = loadSettings()
+  const classified = classifyEndpoint(settings.endpoint)
+  if (!classified.ok || classified.kind !== 'google-script') return
+  const current = await read(id)
+  if (!current || current.status !== 'sent' || current.lookups >= ARRIVAL_TRIES) return
+  const found = await pollArrival({
+    wait: delay,
+    lookup: async () => {
+      if (!navigator.onLine) throw new ArrivalStopped()
+      const row = await read(id)
+      if (!row || row.status !== 'sent') throw new ArrivalStopped()
+      return codeIsStored(classified.url, row.id)
+    },
+    onMiss: async () => {
+      let stop = false
+      await lock(async () => {
+        const row = await read(id)
+        if (!row || row.status !== 'sent') {
+          stop = true
+          return
+        }
+        const lookups = row.lookups + 1
+        await write({ ...row, lookups, updatedAt: new Date().toISOString() })
+        if (lookups >= ARRIVAL_TRIES) stop = true
+      })
+      return stop ? 'stop' : 'continue'
+    },
+  })
+  if (!found) return
+  await lock(async () => {
+    const row = await read(id)
+    if (!row || row.status !== 'sent') return
+    await write({
+      ...row,
+      status: 'confirmed',
+      lookups: row.lookups + 1,
+      lastError: null,
+      updatedAt: new Date().toISOString(),
+    })
+  })
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
   })
 }
 
 export function startAutoSync(): () => void {
   const run = () => {
-    void flushOutbox()
+    void flushOutbox().then(() => resumeArrivalChecks())
   }
   const onVisible = () => {
     if (document.visibilityState === 'visible') run()
@@ -209,6 +291,6 @@ export function statusLabel(status: LocalStatus): string {
     case 'sent':
       return 'Envoyée'
     case 'confirmed':
-      return 'Confirmée'
+      return 'Enregistrée'
   }
 }
