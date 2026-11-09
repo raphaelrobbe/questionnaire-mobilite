@@ -55,46 +55,38 @@ export function fetchSheetLists(endpoint: string, query: ConfigQuery = {}): Prom
   return inflight
 }
 
-function requestSheetLists(endpoint: string, query: ConfigQuery): Promise<SheetLists> {
+const LISTS_SILENCE = 'Les feuilles Enquêteurs et Communes ne répondent pas.'
+
+async function requestSheetLists(endpoint: string, query: ConfigQuery): Promise<SheetLists> {
   const target = classifyEndpoint(endpoint)
   if (!target.ok || target.kind !== 'google-script') {
-    return Promise.reject(new Error('Le tableur n’est pas branché.'))
+    throw new Error('Le tableur n’est pas branché.')
   }
-  const callbackName = `qmConfig_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
   const url = new URL(target.url)
-  url.searchParams.set('callback', callbackName)
   if (query.device) url.searchParams.set('device', query.device)
   if (query.who) url.searchParams.set('who', query.who)
   if (query.action) url.searchParams.set('action', query.action)
   if (query.interviewer) url.searchParams.set('interviewer', query.interviewer)
   if (query.target) url.searchParams.set('target', query.target)
   if (query.phone) url.searchParams.set('phone', query.phone)
+  return readListsPayload(await getScriptJson(url, 12000, LISTS_SILENCE))
+}
 
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    let settled = false
-    const timer = window.setTimeout(() => finish(new Error('Les feuilles Enquêteurs et Communes ne répondent pas.')), 12000)
-
-    function finish(error?: Error, lists?: SheetLists) {
-      if (settled) return
-      settled = true
-      window.clearTimeout(timer)
-      delete (window as unknown as Record<string, unknown>)[callbackName]
-      script.remove()
-      if (error) reject(error)
-      else resolve(lists as SheetLists)
-    }
-
-    ;(window as unknown as Record<string, (payload: unknown) => void>)[callbackName] = (payload) => {
-      try {
-        finish(undefined, readListsPayload(payload))
-      } catch (error) {
-        finish(error instanceof Error ? error : new Error('Liste illisible.'))
-      }
-    }
-    script.src = url.toString()
-    // La redirection vers script.googleusercontent.com déclenche error sur certains téléphones,
-    // puis le script s'exécute. On n'interrompt pas : sans réponse, le délai ci-dessus échoue.
-    document.head.appendChild(script)
-  })
+/**
+ * Lecture directe. Une balise script ne s'exécute pas sur le téléphone après la redirection
+ * de script.google.com, et l'appel restait sans réponse jusqu'au délai.
+ */
+export async function getScriptJson(url: URL, timeoutMs: number, timeoutMessage: string): Promise<unknown> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { method: 'GET', redirect: 'follow', cache: 'no-store', signal: controller.signal })
+    if (!response.ok) throw new Error(timeoutMessage)
+    return await response.json()
+  } catch (error) {
+    if (error instanceof Error && error.message === timeoutMessage) throw error
+    throw new Error(timeoutMessage)
+  } finally {
+    window.clearTimeout(timer)
+  }
 }

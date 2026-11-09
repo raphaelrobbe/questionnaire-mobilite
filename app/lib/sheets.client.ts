@@ -3,7 +3,7 @@ import { assertEndpoint, classifyEndpoint } from '~/common/endpoint'
 import { readSheetResult } from '~/common/http'
 import { readStoredFlag } from '~/common/receipt'
 import { mailBody, pingBody, responseBody, type ResponseRecord } from '~/common/response'
-import { fetchSheetLists, publishLists } from '~/lib/config.client'
+import { fetchSheetLists, getScriptJson, publishLists } from '~/lib/config.client'
 import { loadSettings, updateSettings } from '~/lib/settings.client'
 
 export type SendStatus = 'confirmed' | 'sent'
@@ -71,38 +71,14 @@ async function post(endpoint: string, body: string): Promise<SendStatus> {
   return 'sent'
 }
 
-export function codeIsStored(endpoint: string, code: string): Promise<boolean> {
+export async function codeIsStored(endpoint: string, code: string): Promise<boolean> {
   const target = classifyEndpoint(endpoint)
-  if (!target.ok || target.kind !== 'google-script') return Promise.resolve(false)
-  const callbackName = `qmCode_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  if (!target.ok || target.kind !== 'google-script') return false
   const url = new URL(target.url)
-  url.searchParams.set('callback', callbackName)
   url.searchParams.set('action', 'code')
   url.searchParams.set('code', code)
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    let settled = false
-    const timer = window.setTimeout(() => finish(new Error('Le tableur des réponses ne répond pas.')), 8000)
-    function finish(error?: Error, stored?: boolean) {
-      if (settled) return
-      settled = true
-      window.clearTimeout(timer)
-      delete (window as unknown as Record<string, unknown>)[callbackName]
-      script.remove()
-      if (error) reject(error)
-      else resolve(stored === true)
-    }
-    ;(window as unknown as Record<string, (payload: unknown) => void>)[callbackName] = (payload) => {
-      try {
-        finish(undefined, readStoredFlag(payload))
-      } catch (error) {
-        finish(error instanceof Error ? error : new Error('Lecture illisible.'))
-      }
-    }
-    script.src = url.toString()
-    // Même redirection que la lecture des feuilles : error n'empêche pas le script de répondre.
-    document.head.appendChild(script)
-  })
+  const payload = await getScriptJson(url, 8000, 'Le tableur des réponses ne répond pas.')
+  return readStoredFlag(payload)
 }
 
 function postBlind(url: string, body: string): Promise<Response> {
