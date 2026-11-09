@@ -1,5 +1,6 @@
 import { communesOnOffer, fold, PONTARLIER } from './config'
-import { emptyMotives, motiveIssue, motivesStarted, sanitizeMotives, type Motives } from './motives'
+import { emptyMotives, motivesStarted, sanitizeMotives, type Motives } from './motives'
+import { actualJourneyIssue, defaultJourneys, journeysStarted, offerJourneyIssue, sanitizeJourneys, type Journey } from './journeys'
 
 export const MAX_PEOPLE = 12
 export const MAX_VEHICLES = 8
@@ -23,6 +24,7 @@ export type Answers = {
   cars: Vehicle[]
   twoWheelers: Vehicle[]
   motives: Motives
+  journeys: Journey[]
   recontact: Recontact | ''
   /** Phrase affichée sur la case au moment où elle a été cochée. Vide sinon. */
   recontactText: string
@@ -64,6 +66,7 @@ export type Step =
   | { kind: 'household' }
   | { kind: 'vehicles' }
   | { kind: 'motives' }
+  | { kind: 'offers' }
   | { kind: 'contact' }
   | { kind: 'review' }
 
@@ -91,6 +94,7 @@ export function emptyAnswers(): Answers {
     cars: [],
     twoWheelers: [],
     motives: emptyMotives(1),
+    journeys: defaultJourneys(),
     recontact: '',
     recontactText: '',
     collectif: false,
@@ -109,6 +113,7 @@ export function buildSteps(_answers: Answers): Step[] {
     { kind: 'household' },
     { kind: 'vehicles' },
     { kind: 'motives' },
+    { kind: 'offers' },
     { kind: 'contact' },
     { kind: 'review' },
   ]
@@ -165,6 +170,7 @@ export function sanitizeAnswers(input: unknown): Answers {
     cars,
     twoWheelers,
     motives: sanitizeMotives(source.motives, people.length || 1, cars.length, twoWheelers.length),
+    journeys: sanitizeJourneys(source.journeys, people.length || 1, cars, twoWheelers),
     recontact,
     recontactText: recontact === 'oui' ? text(source.recontactText, 400) : '',
     collectif,
@@ -291,7 +297,8 @@ export function stepIssue(step: Step, answers: Answers, communes: string[]): str
   if (step.kind === 'household') return issueForHousehold(answers)
   if (step.kind === 'vehicles') return issueForVehicles(answers)
   if (step.kind === 'contact') return issueForContact(answers)
-  if (step.kind === 'motives') return motiveIssue(answers.motives)
+  if (step.kind === 'motives') return actualJourneyIssue(answers.journeys, answers.people.length)
+  if (step.kind === 'offers') return offerJourneyIssue(answers.journeys, answers.people.length)
   return null
 }
 
@@ -369,6 +376,7 @@ export function hasAnyAnswer(input: Answers): boolean {
       answers.cars.length ||
       answers.twoWheelers.length ||
       motivesStarted(answers.motives) ||
+      journeysStarted(answers.journeys) ||
       answers.recontact !== '' ||
       answers.collectif ||
       answers.email !== '' ||

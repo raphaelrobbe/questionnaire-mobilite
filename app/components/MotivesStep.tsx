@@ -1,481 +1,681 @@
-import { useCallback, useEffect, useState } from 'react'
-import { AGE_BANDS, questionSide, type Answers, type Person } from '~/common/survey'
-import {
-  BUS_CHOICES,
-  BUS_OFTEN,
-  DAYS,
-  GAVE_UP,
-  SLOTS,
-  WHY_NOT,
-  busQuestion,
-  considerQuestion,
-  canCopyHours,
-  copyHours,
-  goesQuestion,
-  motiveReveal,
-  FREQUENCIES,
-  setPersonTheme,
-  toggleDaySlot,
-  toggleSlotFlexible,
-  vehicleModeOptions,
-  type Motives,
-  type PersonTheme,
-  type SlotId,
-  type Trip,
-} from '~/common/motives'
-import { Button } from './Button'
+import { useEffect, useRef, useState } from 'react'
+import { DOMICILE, RARE_COUNTS, RARE_UNITS, addJourney, journeyHeading, journeyTouched, tripReplacedRiders, tripRiders, updateJourney, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
+import { SLOTS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId } from '~/common/motives'
+import { AGE_BANDS, type Answers, type Person } from '~/common/survey'
+import { communesOnOffer, filterCommunes, fold } from '~/common/config'
 import { Reveal } from './Reveal'
 
-export function motivePersonLabel(person: Person | undefined, index: number): string {
-  const age = person ? AGE_BANDS.find((band) => band.value === person.age)?.label : ''
-  const who = `Personne ${index + 1}`
-  return age ? `${who} · ${age}` : who
-}
+const SLOT_GROUPS: { label: string; slots: SlotId[] }[] = [
+  { label: 'Très matinal', slots: ['4-6', '6-8'] },
+  { label: 'Matinée', slots: ['8-10', '10-12'] },
+  { label: 'Temps de midi', slots: ['12-14'] },
+  { label: 'Après-midi', slots: ['14-16', '16-18'] },
+  { label: 'Soirée', slots: ['18-20', '20-22'] },
+  { label: 'Nuit', slots: ['22-0', '0-4'] },
+]
+
+const REPLACED = [
+  { id: 'toujours', label: 'Toujours' },
+  { id: 'souvent', label: 'Souvent' },
+  { id: 'parfois', label: 'Parfois' },
+  { id: 'jamais', label: 'Jamais' },
+] as const
 
 export function MotivesStep({
+  kind,
   answers,
+  communes,
   onChange,
-  onAwaitingDay,
 }: {
+  kind: JourneyKind
   answers: Answers
-  onChange: (motives: Motives) => void
-  onAwaitingDay?: (awaiting: boolean) => void
+  communes: string[]
+  onChange: (journeys: Journey[]) => void
 }) {
-  const theme = answers.motives.cursor.theme
-  const personIndex = Math.min(answers.motives.cursor.person, Math.max(answers.people.length - 1, 0))
-  const named = Boolean(answers.motives.autre.trim())
-  const row = theme === 'autre' && !named ? undefined : answers.motives.people[personIndex]?.[theme]
-  const side = questionSide(answers.commune)
-  const modes = vehicleModeOptions(answers.cars, answers.twoWheelers)
-  const reveal = row ? motiveReveal(theme, row, answers.motives.autre) : null
-  const [pendingHours, setPendingHours] = useState({ actual: false, bus: false })
-  const reportPending = useCallback((part: 'actual' | 'bus', awaiting: boolean) => {
-    setPendingHours((current) => (current[part] === awaiting ? current : { ...current, [part]: awaiting }))
-  }, [])
-  const reportActual = useCallback((awaiting: boolean) => reportPending('actual', awaiting), [reportPending])
-  const reportBus = useCallback((awaiting: boolean) => reportPending('bus', awaiting), [reportPending])
-  useEffect(() => {
-    onAwaitingDay?.(pendingHours.actual || pendingHours.bus)
-  }, [onAwaitingDay, pendingHours])
-  useEffect(() => () => onAwaitingDay?.(false), [onAwaitingDay])
+  const [open, setOpen] = useState(-1)
+  const pin = useRef(-1)
+  const listed = answers.journeys.flatMap((journey, index) => (journey.kind === kind ? [{ journey, index }] : []))
+  const shown = listed.flatMap((item, listedIndex) => (journeyTouched(item.journey) || open === listedIndex ? [{ ...item, listedIndex }] : []))
 
-  function update(patch: Partial<PersonTheme>) {
-    if (!row) return
-    onChange(setPersonTheme(answers.motives, personIndex, theme, patch))
+  function change(index: number, patch: Partial<Journey>) {
+    onChange(updateJourney(answers.journeys, index, patch))
+  }
+
+  function add() {
+    const hiddenBlank = listed.findIndex((item, position) => !journeyTouched(item.journey) && open !== position)
+    if (hiddenBlank >= 0) {
+      pin.current = hiddenBlank
+      setOpen(hiddenBlank)
+      return
+    }
+    const next = addJourney(answers.journeys, kind)
+    if (next === answers.journeys) return
+    pin.current = next.filter((journey) => journey.kind === kind).length - 1
+    onChange(next)
+    setOpen(pin.current)
   }
 
   return (
-    <div className="mt-4 grid gap-4">
-      {theme === 'autre' ? (
-        <label className="grid gap-2">
-          <span className="font-bold">Activité</span>
-          <input
-            value={answers.motives.autre}
-            maxLength={80}
-            placeholder="Une activité qui n’est pas dans la liste"
-            onChange={(event) => onChange({ ...answers.motives, autre: event.target.value.slice(0, 80) })}
-            className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
-          />
-          {named ? null : <span className="text-base text-muted">S’il n’y en a pas, continuez.</span>}
-        </label>
-      ) : null}
-      {row ? (
-        <div className="grid gap-5">
-          <Choice
-            title={goesQuestion(theme, side, answers.motives.autre)}
-            options={[
-              { id: 'oui', label: 'Oui' },
-              { id: 'non', label: 'Non' },
-            ]}
-            value={row.goes}
-            onChange={(goes) => update({ goes: goes as PersonTheme['goes'] })}
-          />
-          {reveal?.actualFrequency ? (
-            <Reveal>
-              <TripFields
-                title="Déplacements actuels"
-                trip={row.actual}
-                modes={modes}
-                showHours={reveal.actualHours}
-                showModes={reveal.actualModes}
-                onChange={(actual) => update({ actual })}
-                onAwaitingDay={reportActual}
-                boardKey={`${theme}:${personIndex}:actual`}
-              />
-            </Reveal>
-          ) : null}
-          {reveal?.consider ? (
-            <Reveal>
-              <Choice
-                title={considerQuestion(theme, side, answers.motives.autre) ?? ''}
-                options={[
-                  { id: 'oui', label: 'Oui' },
-                  { id: 'non', label: 'Non' },
-                ]}
-                value={row.wouldConsider}
-                onChange={(wouldConsider) => update({ wouldConsider: wouldConsider as PersonTheme['goes'] })}
-              />
-            </Reveal>
-          ) : null}
-          {reveal?.bus ? (
-            <div className="grid gap-3">
-              <Reveal>
-                <div className="grid gap-3">
-                  <p className="text-lg font-extrabold leading-snug">{busQuestion(side)}</p>
-                  <p className="text-base text-muted">Pensez bien aux nouveaux usages qui pourraient découler de l’offre de transports.</p>
-                  <div className="flex flex-wrap gap-2">
-                    {BUS_CHOICES.map((option) => (
-                      <Chip key={option.id} selected={row.bus === option.id} label={option.label} onClick={() => update({ bus: option.id })} />
-                    ))}
-                  </div>
-                </div>
-              </Reveal>
-              {reveal.busOften ? (
-                <Reveal>
-                  <div className="grid gap-2">
-                    <p className="font-bold">Vous la prendriez…</p>
-                    <div className="flex flex-wrap gap-2">
-                      {BUS_OFTEN.map((option) => (
-                        <Chip
-                          key={option.id}
-                          selected={row.busOften === option.id}
-                          label={option.label}
-                          onClick={() => update({ busOften: option.id })}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </Reveal>
-              ) : null}
-              {reveal.busFrequency ? (
-                <Reveal>
-                  <TripFields
-                    title="Horaires souhaités"
-                    trip={row.busTrip}
-                    hint={row.goes === 'oui' ? row.actual : undefined}
-                    modes={modes}
-                    showHours={reveal.busHours}
-                    showModes={false}
-                    onChange={(busTrip) => update({ busTrip })}
-                    onAwaitingDay={reportBus}
-                    boardKey={`${theme}:${personIndex}:bus`}
-                    onCopy={
-                      reveal.busHours && canCopyHours(row)
-                        ? () => update({ busTrip: copyHours(row.actual, row.busTrip) })
-                        : undefined
-                    }
-                  />
-                </Reveal>
-              ) : null}
-            </div>
-          ) : null}
-          {reveal?.why ? (
-            <Reveal>
-            <div className="grid gap-2">
-              <p className="text-lg font-extrabold leading-snug">
-                Pourquoi un transport en commun ne répondrait-il pas à votre besoin de déplacement ?
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {WHY_NOT.map((option) => (
-                  <Chip
-                    key={option.id}
-                    selected={row.whyNot.includes(option.id)}
-                    label={option.label}
-                    onClick={() =>
-                      update({
-                        whyNot: row.whyNot.includes(option.id) ? row.whyNot.filter((id) => id !== option.id) : [...row.whyNot, option.id],
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-            </Reveal>
-          ) : null}
-          {reveal?.gaveUp ? (
-            <Reveal>
-              <Choice
-                title="Avez-vous déjà renoncé à faire le déplacement en raison du manque de transports en commun ?"
-                options={GAVE_UP}
-                value={row.gaveUp}
-                onChange={(gaveUp) => update({ gaveUp: gaveUp as PersonTheme['gaveUp'] })}
-              />
-            </Reveal>
-          ) : null}
+    <div className="mt-5">
+      {shown.length ? (
+        <div className="grid gap-3">
+          {shown.map((item, position) => (
+            <TripCard
+              key={`${kind}-${item.index}`}
+              journey={item.journey}
+              position={position}
+              listedIndex={item.listedIndex}
+              pin={pin}
+              open={open === item.listedIndex}
+              answers={answers}
+              communes={communes}
+              onOpen={() => setOpen(open === item.listedIndex ? -1 : item.listedIndex)}
+              onChange={(patch) => change(item.index, patch)}
+            />
+          ))}
         </div>
       ) : null}
+      <button type="button" className="mt-3 min-h-12 w-full rounded-2xl bg-pine px-4 text-base font-extrabold text-paper hover:bg-pine-deep" onClick={add}>
+        Ajouter un trajet
+      </button>
     </div>
   )
 }
 
-function TripFields({
-  title,
-  trip,
-  hint,
-  modes,
-  showHours,
-  showModes,
+function TripCard({
+  journey,
+  position,
+  listedIndex,
+  pin,
+  open,
+  answers,
+  communes,
+  onOpen,
   onChange,
-  onCopy,
-  onAwaitingDay,
-  boardKey,
 }: {
-  title: string
-  trip: Trip
-  hint?: Trip
-  modes: { id: string; label: string }[]
-  showHours: boolean
-  showModes: boolean
-  onChange: (trip: Trip) => void
-  onCopy?: () => void
-  onAwaitingDay?: (awaiting: boolean) => void
-  boardKey: string
+  journey: Journey
+  position: number
+  listedIndex: number
+  pin: { current: number }
+  open: boolean
+  answers: Answers
+  communes: string[]
+  onOpen: () => void
+  onChange: (patch: Partial<Journey>) => void
 }) {
+  const cardRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (!open || pin.current !== listedIndex) return
+    pin.current = -1
+    const node = cardRef.current
+    if (!node) return
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!node.isConnected) return
+        const topBar = document.querySelector('[data-test-banner]')?.getBoundingClientRect().height ?? 0
+        window.scrollTo({ top: Math.max(0, window.scrollY + node.getBoundingClientRect().top - topBar), behavior })
+      })
+    })
+  }, [open, listedIndex, pin])
+
+  if (!open) {
+    return (
+      <button type="button" className="min-h-12 w-full rounded-2xl border border-line bg-paper px-4 py-2 text-left" onClick={onOpen}>
+        <TripHeading journey={journey} position={position} />
+      </button>
+    )
+  }
+
+  const modes = vehicleModeOptions(answers.cars, answers.twoWheelers)
+  const wouldRide = journey.kind === 'nouveau' || journey.replaced === 'toujours' || journey.replaced === 'souvent' || journey.replaced === 'parfois'
+
   return (
-    <div className="grid gap-3">
-      <p className="text-lg font-extrabold">{title}</p>
-      <div>
-        <p className="font-bold">À quelle fréquence ?</p>
-        <div className="mt-2 grid gap-2">
-          {FREQUENCIES.map((frequency) => (
-            <button
-              key={frequency}
-              type="button"
-              aria-pressed={trip.perWeek === frequency}
-              onClick={() => onChange({ ...trip, perWeek: frequency })}
-              className={`min-h-12 rounded-2xl border px-4 text-left text-sm font-bold leading-snug ${
-                trip.perWeek === frequency ? 'border-pine bg-pine text-paper' : 'border-line bg-paper text-ink'
-              }`}
+    <article ref={cardRef} className="rounded-2xl border border-line bg-white p-3">
+      <button type="button" className="min-h-10 w-full py-1 text-left" onClick={onOpen}>
+        <TripHeading journey={journey} position={position} />
+      </button>
+
+      <fieldset className="mt-3">
+        <legend className="text-base font-extrabold">Pour quel motif ?</legend>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {THEME_IDS.map((theme) => (
+            <Chip
+              key={theme}
+              pressed={journey.theme === theme}
+              idle={choiceFill('one', Boolean(journey.theme))}
+              onClick={() => onChange({ theme: journey.theme === theme ? '' : theme })}
             >
-              {frequency}
-            </button>
+              {themeLabel(theme, '')}
+            </Chip>
           ))}
         </div>
-      </div>
-      {showHours ? (
-        <Reveal className="grid gap-3">
-          <p className="font-bold">Quels jours et quels horaires ?</p>
-          {onCopy ? (
-            <Button variant="secondary" onClick={onCopy}>
-              Reprendre les mêmes horaires
-            </Button>
-          ) : null}
-          <HoursBoard key={boardKey} trip={trip} hint={hint} onChange={onChange} onAwaitingDay={onAwaitingDay} />
-        </Reveal>
+        {journey.theme ? (
+          <Reveal>
+            <label className="mt-2 block text-base font-extrabold">
+              Préciser l’activité <span className="font-medium text-muted">(facultatif)</span>
+              <input
+                value={journey.autre}
+                maxLength={80}
+                aria-label="Préciser l’activité"
+                className={`mt-2 min-h-12 w-full rounded-2xl px-4 text-base font-medium ${fieldClass(journey.autre.trim(), true)}`}
+                onChange={(event) => onChange({ autre: event.target.value })}
+              />
+            </label>
+          </Reveal>
+        ) : null}
+      </fieldset>
+
+      {journey.kind === 'actuel' ? (
+        <People title="Qui fait ce trajet ?" rule="many" people={answers.people} selected={tripRiders(journey, answers.people.length)} onToggle={(riders) => onChange({ riders })} />
       ) : null}
-      {showModes ? (
-        <Reveal>
-        <div>
-          <p className="font-bold">Par quel moyen de transport ?</p>
+
+      {journey.kind === 'actuel' ? (
+        <fieldset className="mt-4">
+          <legend className="text-base font-extrabold">Avec quel véhicule ?</legend>
           <div className="mt-2 flex flex-wrap gap-2">
             {modes.map((mode) => (
               <Chip
                 key={mode.id}
-                selected={trip.modes.includes(mode.id)}
-                label={mode.label}
-                onClick={() =>
-                  onChange({
-                    ...trip,
-                    modes: trip.modes.includes(mode.id) ? trip.modes.filter((id) => id !== mode.id) : [...trip.modes, mode.id],
-                  })
-                }
-              />
+                pressed={journey.mode === mode.id}
+                idle={choiceFill('one', Boolean(journey.mode))}
+                onClick={() => onChange({ mode: journey.mode === mode.id ? '' : mode.id })}
+              >
+                {mode.label}
+              </Chip>
             ))}
           </div>
-        </div>
+        </fieldset>
+      ) : null}
+
+      <Hours aller={journey.aller} retour={journey.retour} onAller={(aller) => onChange({ aller })} onRetour={(retour) => onChange({ retour })} />
+
+      <Frequency journey={journey} onChange={onChange} />
+
+      <RouteField
+        origin={journey.origin ?? DOMICILE}
+        originPlace={journey.originPlace ?? ''}
+        destination={journey.destination}
+        place={journey.place}
+        communes={communes}
+        onOrigin={(origin) => onChange({ origin })}
+        onOriginPlace={(originPlace) => onChange({ originPlace })}
+        onDestination={(destination) => onChange({ destination })}
+        onPlace={(place) => onChange({ place })}
+      />
+
+      {journey.kind === 'actuel' ? (
+        <>
+          <fieldset className="mt-4">
+            <legend className="text-base font-extrabold">
+              Pourrait-il être fait en transport en commun, si l’offre était efficace, fiable et financièrement intéressante ?
+            </legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {REPLACED.map((choice) => (
+                <Chip
+                  key={choice.id}
+                  pressed={journey.replaced === choice.id}
+                  idle={choiceFill('one', REPLACED.some((item) => item.id === journey.replaced))}
+                  onClick={() => onChange({ replaced: journey.replaced === choice.id ? '' : choice.id })}
+                >
+                  {choice.label}
+                </Chip>
+              ))}
+            </div>
+          </fieldset>
+        </>
+      ) : null}
+
+      {wouldRide ? (
+        <Reveal>
+          <People
+            title="Qui le ferait en transport en commun ?"
+            hint="La personne qui conduit peut ne plus le faire."
+            rule="many"
+            people={answers.people}
+            selected={tripReplacedRiders(journey, answers.people.length)}
+            onToggle={(replacedRiders) => onChange({ replacedRiders })}
+          />
         </Reveal>
       ) : null}
-    </div>
+
+      <label className="mt-4 block text-base font-extrabold">
+        Commentaire <span className="font-medium text-muted">(facultatif)</span>
+        <textarea
+          value={journey.comment}
+          maxLength={400}
+          rows={2}
+          className={`mt-2 w-full rounded-2xl px-4 py-3 text-base font-medium ${fieldClass(journey.comment.trim(), true)}`}
+          onChange={(event) => onChange({ comment: event.target.value })}
+        />
+      </label>
+    </article>
   )
 }
 
-function HoursBoard({
-  trip,
-  hint,
-  onChange,
-  onAwaitingDay,
-}: {
-  trip: Trip
-  hint?: Trip
-  onChange: (trip: Trip) => void
-  onAwaitingDay?: (awaiting: boolean) => void
-}) {
-  const [opened, setOpened] = useState<Record<string, true>>({})
-  const awaiting = Object.keys(opened).some((id) => {
-    const split = id.indexOf(':')
-    const direction = id.slice(0, split) as 'aller' | 'retour'
-    const slot = id.slice(split + 1) as SlotId
-    return !DAYS.some((day) => trip.days[day.id]?.[direction].some((pick) => pick.slot === slot))
-  })
-  useEffect(() => {
-    onAwaitingDay?.(awaiting)
-  }, [awaiting, onAwaitingDay])
-  useEffect(() => () => onAwaitingDay?.(false), [onAwaitingDay])
+const PLACE_PRESETS = [{ commune: 'Pontarlier', places: ['Lycée Xavier Marmier', 'Gare SNCF', 'Hôpital', 'Zone industrielle', 'Zone commerciale Hyper U', 'Centre-ville'] }]
 
-  function reveal(direction: 'aller' | 'retour', slot: SlotId, chosen: number) {
-    const id = `${direction}:${slot}`
-    if (opened[id] || chosen > 0) {
-      setOpened((current) => {
-        if (!current[id]) return current
-        const next = { ...current }
-        delete next[id]
-        return next
-      })
-      if (chosen > 0) onChange(clearDirectionSlot(trip, direction, slot))
-      return
-    }
-    setOpened((current) => ({ ...current, [id]: true }))
-  }
-
+function TripHeading({ journey, position }: { journey: Journey; position: number }) {
+  const { title, route } = journeyHeading(journey, position)
   return (
-    <div className="grid grid-cols-2 items-start gap-x-1.5 gap-y-1">
-      <p className="text-sm font-bold text-muted">Aller</p>
-      <p className="text-sm font-bold text-muted">Retour</p>
-      {SLOTS.map((slot) =>
-        (['aller', 'retour'] as const).map((direction) => (
-          <SlotCell
-            key={`${direction}:${slot.id}`}
-            direction={direction}
-            slot={slot}
-            trip={trip}
-            hint={hint}
-            open={Boolean(opened[`${direction}:${slot.id}`])}
-            onHour={() => reveal(direction, slot.id, DAYS.filter((day) => trip.days[day.id]?.[direction].some((pick) => pick.slot === slot.id)).length)}
-            onChange={onChange}
-          />
-        )),
-      )}
-    </div>
+    <span className="block">
+      <span className="block text-base font-extrabold leading-tight">{title}</span>
+      <span className="mt-0.5 block text-sm font-medium leading-tight text-muted">{route}</span>
+    </span>
   )
 }
 
-function SlotCell({
-  direction,
-  slot,
-  trip,
-  hint,
-  open,
-  onHour,
-  onChange,
-}: {
-  direction: 'aller' | 'retour'
-  slot: (typeof SLOTS)[number]
-  trip: Trip
-  hint?: Trip
-  open: boolean
-  onHour: () => void
-  onChange: (trip: Trip) => void
-}) {
-  const chosen = DAYS.filter((day) => trip.days[day.id]?.[direction].some((pick) => pick.slot === slot.id))
-  const shown = open || chosen.length > 0
-  const flexible = chosen.length > 0 && chosen.every((day) => trip.days[day.id]?.[direction].some((pick) => pick.slot === slot.id && pick.flexible))
-  const marked = !shown && DAYS.some((day) => hint?.days[day.id]?.[direction].some((pick) => pick.slot === slot.id))
-  return (
-    <div className="grid gap-0.5">
-      <button
-        type="button"
-        aria-pressed={shown}
-        onClick={onHour}
-        className={`min-h-10 rounded-lg border px-1.5 text-left text-xs font-bold leading-tight ${
-          shown ? 'border-pine bg-pine text-paper' : marked ? 'border-line bg-mist text-ink' : 'border-line bg-paper text-ink'
-        }`}
-      >
-        {slot.label}
-      </button>
-      {shown ? (
-        <div className="grid grid-cols-3 gap-0.5">
-          {DAYS.map((day) => {
-            const selected = chosen.some((item) => item.id === day.id)
-            const hinted = !selected && Boolean(hint?.days[day.id]?.[direction].some((pick) => pick.slot === slot.id))
-            const waiting = chosen.length === 0
-            return (
-              <button
-                key={day.id}
-                type="button"
-                aria-pressed={selected}
-                aria-label={`${slot.label}, ${day.label}`}
-                onClick={() => onChange(toggleDaySlot(trip, day.id, direction, slot.id))}
-                className={`inline-flex min-h-8 items-center justify-center rounded-md border px-0.5 text-[11px] font-extrabold ${
-                  selected
-                    ? 'border-pine bg-pine text-paper'
-                    : waiting
-                      ? 'border-test-ink bg-test text-test-ink'
-                      : hinted
-                        ? 'border-line bg-mist text-ink'
-                        : 'border-line bg-paper text-ink'
-                }`}
-              >
-                {day.mark}
-              </button>
-            )
-          })}
-        </div>
-      ) : null}
-      {chosen.length ? (
-        <label className="flex items-center gap-1 px-0.5 text-[11px] font-semibold text-muted">
-          <input
-            type="checkbox"
-            checked={flexible}
-            onChange={() => onChange(toggleSlotFlexible(trip, direction, slot.id))}
-            className="size-3.5 accent-pine"
-          />
-          Flexible
-        </label>
-      ) : null}
-    </div>
-  )
+function placesFor(commune: string): string[] {
+  const key = fold(commune.trim())
+  return PLACE_PRESETS.find((item) => fold(item.commune) === key)?.places ?? []
 }
 
-function clearDirectionSlot(trip: Trip, direction: 'aller' | 'retour', slot: SlotId): Trip {
-  const days: Trip['days'] = { ...trip.days }
-  for (const day of DAYS) {
-    const item = days[day.id]
-    if (!item) continue
-    const next = {
-      aller: direction === 'aller' ? item.aller.filter((pick) => pick.slot !== slot) : item.aller,
-      retour: direction === 'retour' ? item.retour.filter((pick) => pick.slot !== slot) : item.retour,
-    }
-    if (next.aller.length === 0 && next.retour.length === 0) delete days[day.id]
-    else days[day.id] = next
-  }
-  return { ...trip, days }
-}
-
-function Choice({
-  title,
-  options,
-  value,
-  onChange,
+function RouteField({
+  origin,
+  originPlace,
+  destination,
+  place,
+  communes,
+  onOrigin,
+  onOriginPlace,
+  onDestination,
+  onPlace,
 }: {
-  title: string
-  options: { id: string; label: string }[]
-  value: string
-  onChange: (value: string) => void
+  origin: string
+  originPlace: string
+  destination: string
+  place: string
+  communes: string[]
+  onOrigin: (origin: string) => void
+  onOriginPlace: (place: string) => void
+  onDestination: (destination: string) => void
+  onPlace: (place: string) => void
 }) {
+  const home = origin.trim() === DOMICILE
   return (
-    <div className="grid gap-2">
-      <p className="text-lg font-extrabold leading-snug">{title}</p>
-      <div className="flex flex-wrap gap-2">
-        {options.map((option) => (
-          <Chip key={option.id} selected={value === option.id} label={option.label} onClick={() => onChange(option.id)} />
-        ))}
+    <div className="mt-4 rounded-2xl border border-line p-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-2">
+      <p className="text-base font-extrabold">De</p>
+      <p className="text-base font-extrabold text-muted" aria-hidden>
+        →
+      </p>
+      <p className="text-base font-extrabold">À</p>
+      <div>
+        {home ? (
+          <span className="inline-flex h-8 items-center rounded-md bg-pine pl-1.5 text-sm font-extrabold text-white">
+            {DOMICILE}
+            <button type="button" aria-label="Retirer Domicile" className="px-1.5 text-base leading-none" onClick={() => onOrigin('')}>
+              ×
+            </button>
+          </span>
+        ) : (
+          <>
+            <CommuneInput label="De" value={origin} communes={communes} onChange={onOrigin} />
+            <button type="button" className={`mt-1 h-8 rounded-md px-1.5 text-sm font-extrabold ${idleClass('free')}`} onClick={() => onOrigin(DOMICILE)}>
+              Domicile
+            </button>
+          </>
+        )}
+        <PlaceField commune={home ? '' : origin} value={originPlace} onChange={onOriginPlace} />
+      </div>
+      <span />
+      <div>
+        <CommuneInput label="À" value={destination} communes={communes} onChange={onDestination} />
+        <PlaceField commune={destination} value={place} onChange={onPlace} />
+      </div>
       </div>
     </div>
   )
 }
 
-function Chip({ selected, label, onClick }: { selected: boolean; label: string; onClick: () => void }) {
+function CommuneInput({ label, value, communes, onChange }: { label: string; value: string; communes: string[]; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const matches = filterCommunes(communesOnOffer(communes), value, 8)
+  const exact = matches.length === 1 && fold(matches[0]) === fold(value.trim())
+  const show = open && value.trim().length > 0 && !exact
+
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        maxLength={120}
+        role="combobox"
+        aria-label={label}
+        aria-expanded={show}
+        aria-autocomplete="list"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        className={`min-h-10 w-full rounded-xl px-2 text-sm font-medium ${fieldClass(Boolean(value.trim()), false)}`}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onChange={(event) => {
+          setOpen(true)
+          onChange(event.target.value)
+        }}
+      />
+      {show ? (
+        <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-line bg-card py-1 shadow-sm">
+          {matches.length ? (
+            matches.map((name) => (
+              <li key={name}>
+                <button
+                  type="button"
+                  className="min-h-10 w-full px-2 text-left text-sm font-bold"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onChange(name)
+                    setOpen(false)
+                  }}
+                >
+                  {name}
+                </button>
+              </li>
+            ))
+          ) : (
+            <li className="px-2 py-2 text-sm font-semibold text-clay">Aucune commune ne commence ainsi.</li>
+          )}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+function PlaceField({ commune, value, onChange }: { commune: string; value: string; onChange: (place: string) => void }) {
+  const places = placesFor(commune)
+  const chosen = places.some((item) => item === value.trim())
+  return (
+    <label className="mt-2 block text-sm font-extrabold leading-tight">
+      Préciser <span className="font-medium text-muted">(facultatif)</span>
+      {places.length ? (
+        <span className="mt-1 flex flex-wrap gap-0.5">
+          {places.map((item) => (
+            <button
+              key={item}
+              type="button"
+              aria-pressed={value.trim() === item}
+              className={`h-8 rounded-md px-1.5 text-sm font-extrabold ${value.trim() === item ? 'bg-pine text-white' : idleClass(choiceFill('free-one', chosen))}`}
+              onClick={() => onChange(value.trim() === item ? '' : item)}
+            >
+              {item}
+            </button>
+          ))}
+        </span>
+      ) : null}
+      <input
+        value={value}
+        maxLength={80}
+        aria-label="Préciser"
+        className={`mt-1 min-h-10 w-full rounded-xl px-2 text-sm font-medium ${fieldClass(Boolean(value.trim()), true)}`}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  )
+}
+
+function Frequency({ journey, onChange }: { journey: Journey; onChange: (patch: Partial<Journey>) => void }) {
+  const weeksRef = useRef<HTMLInputElement>(null)
+  const focusWeeks = useRef(false)
+
+  useEffect(() => {
+    if (!focusWeeks.current || journey.pace !== 'intervalle') return
+    focusWeeks.current = false
+    weeksRef.current?.focus()
+  }, [journey.pace])
+
+  function chooseInterval() {
+    if (journey.pace !== 'intervalle') {
+      focusWeeks.current = true
+      onChange({ pace: 'intervalle', regularity: 'regulier' })
+      return
+    }
+    weeksRef.current?.focus()
+  }
+
+  function toggleDay(day: Weekday) {
+    const days = journey.days.includes(day) ? journey.days.filter((item) => item !== day) : [...journey.days, day]
+    onChange({ days, regularity: 'regulier' })
+  }
+
+  return (
+    <fieldset className="mt-4">
+      <legend className="text-base font-extrabold">À quelle fréquence ?</legend>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Chip
+          pressed={journey.regularity === 'irregulier'}
+          idle={choiceFill('one', Boolean(journey.regularity))}
+          onClick={() => onChange({ regularity: journey.regularity === 'irregulier' ? '' : 'irregulier' })}
+        >
+          Pas régulier
+        </Chip>
+        <Chip
+          pressed={journey.regularity === 'regulier'}
+          idle={choiceFill('one', Boolean(journey.regularity))}
+          onClick={() => onChange({ regularity: journey.regularity === 'regulier' ? '' : 'regulier' })}
+        >
+          Régulier
+        </Chip>
+      </div>
+      {journey.regularity === 'irregulier' ? (
+        <Reveal>
+          <div className="mt-2 flex w-full flex-nowrap items-center gap-0.5">
+            {RARE_COUNTS.map((count) => (
+              <button
+                key={count}
+                type="button"
+                aria-pressed={journey.rareCount === count}
+                className={`min-w-6 ${lineButton(journey.rareCount === count, choiceFill('one', Boolean(journey.rareCount)))}`}
+                onClick={() => onChange({ rareCount: journey.rareCount === count ? '' : count, regularity: 'irregulier' })}
+              >
+                {count}
+              </button>
+            ))}
+            <span className="shrink-0 px-0.5 text-sm font-bold">fois par</span>
+            {RARE_UNITS.map((unit) => (
+              <button
+                key={unit.id}
+                type="button"
+                aria-pressed={journey.rareUnit === unit.id}
+                className={lineButton(journey.rareUnit === unit.id, choiceFill('one', Boolean(journey.rareUnit)))}
+                onClick={() => onChange({ rareUnit: journey.rareUnit === unit.id ? '' : unit.id, regularity: 'irregulier' })}
+              >
+                {unit.label}
+              </button>
+            ))}
+          </div>
+        </Reveal>
+      ) : null}
+      {journey.regularity === 'regulier' ? (
+        <Reveal>
+          <div className="mt-2 flex w-full flex-nowrap items-center gap-0.5">
+            <button
+              type="button"
+              aria-pressed={journey.pace === 'hebdo'}
+              className={lineButton(journey.pace === 'hebdo', choiceFill('one', journey.pace === 'hebdo' || journey.pace === 'intervalle'))}
+              onClick={() => onChange({ pace: journey.pace === 'hebdo' ? '' : 'hebdo', regularity: 'regulier' })}
+            >
+              Hebdomadaire
+            </button>
+            <button
+              type="button"
+              aria-pressed={journey.pace === 'intervalle'}
+              className={lineButton(journey.pace === 'intervalle', choiceFill('one', journey.pace === 'hebdo' || journey.pace === 'intervalle'))}
+              onClick={chooseInterval}
+            >
+              Toutes les
+            </button>
+            <input
+              ref={weeksRef}
+              inputMode="numeric"
+              aria-label="Nombre de semaines"
+              value={journey.everyWeeks}
+              disabled={journey.pace !== 'intervalle'}
+              className={`h-8 w-10 shrink-0 rounded-md px-0.5 text-center text-sm font-extrabold disabled:opacity-40 ${fieldClass(journey.pace !== 'intervalle' || Boolean(journey.everyWeeks.trim()), false)}`}
+              onChange={(event) => onChange({ everyWeeks: event.target.value.replace(/\D/g, '').slice(0, 2), pace: 'intervalle', regularity: 'regulier' })}
+            />
+            <span className="shrink-0 px-0.5 text-sm font-bold">semaines</span>
+          </div>
+          <div className="mt-2 flex w-full flex-nowrap gap-0.5">
+            {WEEKDAYS.map((day) => (
+              <button
+                key={day.id}
+                type="button"
+                aria-pressed={journey.days.includes(day.id)}
+                className={lineButton(journey.days.includes(day.id), choiceFill('many', journey.days.length > 0))}
+                onClick={() => toggleDay(day.id)}
+              >
+                {day.label}
+              </button>
+            ))}
+          </div>
+        </Reveal>
+      ) : null}
+    </fieldset>
+  )
+}
+
+function Hours({
+  aller,
+  retour,
+  onAller,
+  onRetour,
+}: {
+  aller: SlotId | ''
+  retour: SlotId | ''
+  onAller: (slot: SlotId | '') => void
+  onRetour: (slot: SlotId | '') => void
+}) {
+  const columns = 'grid grid-cols-[5.4rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3'
+  return (
+    <div className="mt-4">
+      <div className={`${columns} items-end pb-1`}>
+        <span />
+        <p className="text-center text-[13px] font-extrabold leading-tight">Horaire aller</p>
+        <p className="text-center text-[13px] font-extrabold leading-tight">
+          Horaire retour
+          <span className="mt-0.5 block text-xs font-medium text-muted">facultatif</span>
+        </p>
+      </div>
+      {SLOT_GROUPS.map((group, index) => (
+        <div key={group.label} className={`${columns} py-1.5 ${index > 0 ? 'border-t border-ink/15' : ''}`}>
+          <p className="text-left text-[13px] font-bold leading-tight">{group.label}</p>
+          <SlotPair slots={group.slots} value={aller} idle={choiceFill('one', Boolean(aller))} onPick={onAller} />
+          <SlotPair slots={group.slots} value={retour} idle={choiceFill('free-one', Boolean(retour))} onPick={onRetour} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SlotPair({
+  slots,
+  value,
+  idle,
+  onPick,
+}: {
+  slots: SlotId[]
+  value: SlotId | ''
+  idle: ChoiceFill
+  onPick: (slot: SlotId | '') => void
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-0.5">
+      {slots.map((id) => (
+        <SlotButton key={id} id={id} pressed={value === id} idle={idle} onPick={() => onPick(value === id ? '' : id)} />
+      ))}
+    </div>
+  )
+}
+
+function SlotButton({ id, pressed, idle, onPick }: { id: SlotId; pressed: boolean; idle: ChoiceFill; onPick: () => void }) {
   return (
     <button
       type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      className={`min-h-11 rounded-full border px-3 text-sm font-bold ${
-        selected ? 'border-pine bg-pine text-paper' : 'border-line bg-paper text-ink'
-      }`}
+      aria-pressed={pressed}
+      className={`h-9 rounded-lg px-1.5 text-[13px] font-extrabold leading-none ${pressed ? 'bg-pine text-white' : idleClass(idle)}`}
+      onClick={onPick}
     >
-      {label}
+      {SLOTS.find((slot) => slot.id === id)?.label}
     </button>
   )
 }
 
+function People({
+  title,
+  hint,
+  rule,
+  people,
+  selected,
+  onToggle,
+}: {
+  title: string
+  hint?: string
+  rule: 'many' | 'free'
+  people: Person[]
+  selected: number[]
+  onToggle: (indexes: number[]) => void
+}) {
+  const idle = choiceFill(rule, selected.length > 0)
+  return (
+    <fieldset className="mt-4">
+      <legend className="text-base font-extrabold">{title}</legend>
+      {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {people.map((person, index) => (
+          <Chip
+            key={index}
+            pressed={selected.includes(index)}
+            idle={idle}
+            onClick={() => onToggle(selected.includes(index) ? selected.filter((item) => item !== index) : [...selected, index])}
+          >
+            {personChip(person, index)}
+          </Chip>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
+
+function lineButton(pressed: boolean, idle: ChoiceFill): string {
+  return `h-8 flex-1 rounded-md px-0.5 text-sm font-extrabold ${pressed ? 'bg-pine text-white' : idleClass(idle)}`
+}
+
+function Chip({ pressed, idle, onClick, children }: { pressed: boolean; idle: ChoiceFill; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      className={`min-h-11 rounded-2xl px-3 text-sm font-extrabold ${pressed ? 'bg-pine text-white' : idleClass(idle)}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  )
+}
+
+type ChoiceRule = 'one' | 'many' | 'free' | 'free-one'
+type ChoiceFill = 'needed' | 'free' | 'plain'
+
+function choiceFill(rule: ChoiceRule, chosen: boolean): ChoiceFill {
+  if (rule === 'free-one') return chosen ? 'plain' : 'free'
+  if (rule === 'free' || (chosen && rule === 'many')) return 'free'
+  if (!chosen) return 'needed'
+  return 'plain'
+}
+
+function idleClass(fill: ChoiceFill): string {
+  if (fill === 'needed') return 'border border-line bg-rose-bg'
+  if (fill === 'free') return 'border border-line bg-mist'
+  return 'border border-line bg-paper'
+}
+
+function fieldClass(filled: boolean, optional: boolean): string {
+  if (filled) return idleClass('plain')
+  return idleClass(optional ? 'free' : 'needed')
+}
+
+function personChip(person: Person, index: number): string {
+  const age = AGE_BANDS.find((band) => band.value === person.age)?.label
+  return age ? `Personne ${index + 1} · ${age}` : `Personne ${index + 1}`
+}

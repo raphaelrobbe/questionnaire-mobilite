@@ -29,6 +29,7 @@ describe('questionnaire', () => {
       'household',
       'vehicles',
       'motives',
+      'offers',
       'contact',
       'review',
     ])

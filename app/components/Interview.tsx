@@ -2,7 +2,6 @@ import { Link, useNavigate, useSearchParams } from '@remix-run/react'
 import { useEffect, useRef, useState } from 'react'
 import { draftMatchesMode } from '~/common/draft'
 import { classifyEndpoint } from '~/common/endpoint'
-import { shiftMotive, themeLabel } from '~/common/motives'
 import { canUseSurvey } from '~/common/settings'
 import { buildSteps, patchAnswers, stepIssue, summary, type Answers } from '~/common/survey'
 import type { ResponseRecord } from '~/common/response'
@@ -21,7 +20,7 @@ import { MapsLink } from './MapsLink'
 import { CommuneStep } from './CommuneStep'
 import { ContactStep } from './ContactStep'
 import { HouseholdStep } from './HouseholdStep'
-import { motivePersonLabel, MotivesStep } from './MotivesStep'
+import { MotivesStep } from './MotivesStep'
 import { VehiclesStep } from './VehiclesStep'
 
 export function Interview() {
@@ -36,7 +35,6 @@ export function Interview() {
   const [saved, setSaved] = useState<LocalResponse | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [hoursPending, setHoursPending] = useState(false)
   const [geoError, setGeoError] = useState<string | null>(null)
   const [geoBusy, setGeoBusy] = useState(false)
   const [deviceId, setDeviceId] = useState('')
@@ -166,28 +164,12 @@ export function Interview() {
 
   function goNext() {
     if (!draft || !step || issue) return
-    if (step.kind === 'motives') {
-      const next = shiftMotive(draft.answers.motives, draft.answers.people.length, 1)
-      if (next) {
-        updateAnswers({ motives: next })
-        window.scrollTo(0, 0)
-        return
-      }
-    }
     update({ step: stepIndex + 1 })
     window.scrollTo(0, 0)
   }
 
   function goBack() {
     if (!draft || !step) return
-    if (step.kind === 'motives') {
-      const previous = shiftMotive(draft.answers.motives, draft.answers.people.length, -1)
-      if (previous) {
-        updateAnswers({ motives: previous })
-        window.scrollTo(0, 0)
-        return
-      }
-    }
     if (stepIndex > 0) update({ step: stepIndex - 1 })
     window.scrollTo(0, 0)
   }
@@ -243,8 +225,7 @@ export function Interview() {
         ? null
         : 'Cochez l’accord avant de continuer.'
       : stepIssue(step, draft.answers, lists.communes)
-  const issue =
-    step.kind === 'motives' && hoursPending ? 'Choisissez au moins un jour pour chaque horaire.' : storedIssue
+  const issue = storedIssue
 
   async function notePosition() {
     setGeoBusy(true)
@@ -375,17 +356,22 @@ export function Interview() {
 
       {step.kind === 'motives' ? (
         <section className="mt-6">
-          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            {themeLabel(draft.answers.motives.cursor.theme, draft.answers.motives.autre)}
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] leading-tight tracking-tight outline-none">
+            <span className="font-extrabold">Trajets que le foyer fait déjà</span>, quel que soit le moyen.
           </h1>
-          <p className="mt-2 text-lg font-bold">
-            {motivePersonLabel(draft.answers.people[draft.answers.motives.cursor.person], draft.answers.motives.cursor.person)}
+          <MotivesStep kind="actuel" answers={draft.answers} communes={lists.communes} onChange={(journeys) => updateAnswers({ journeys })} />
+        </section>
+      ) : null}
+
+      {step.kind === 'offers' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Trajets qu’une offre rendrait possibles
+          </h1>
+          <p className="mt-2 text-base text-muted">
+            Ils ne sont pas faits aujourd’hui. Ils le seraient en transport en commun, si l’offre était efficace, fiable et financièrement intéressante.
           </p>
-          <MotivesStep
-            answers={draft.answers}
-            onChange={(motives) => updateAnswers({ motives })}
-            onAwaitingDay={setHoursPending}
-          />
+          <MotivesStep kind="nouveau" answers={draft.answers} communes={lists.communes} onChange={(journeys) => updateAnswers({ journeys })} />
         </section>
       ) : null}
 

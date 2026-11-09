@@ -1,7 +1,7 @@
 export const THEME_IDS = ['travail', 'sante', 'administratif', 'loisirs', 'achats', 'visites', 'autre'] as const
 export type ThemeId = (typeof THEME_IDS)[number]
 
-export const SLOT_IDS = ['avant-6', '6-8', '8-10', '10-12', '12-14', '14-16', '16-18', '18-20', '20-22', '22-0', 'apres-0'] as const
+export const SLOT_IDS = ['4-6', '6-8', '8-10', '10-12', '12-14', '14-16', '16-18', '18-20', '20-22', '22-0', '0-4'] as const
 export type SlotId = (typeof SLOT_IDS)[number]
 
 export const DAY_IDS = ['semaine', 'samedi', 'dimanche'] as const
@@ -54,17 +54,17 @@ const THEME_COPY: Record<Exclude<ThemeId, 'autre'>, { label: string; reason: str
 }
 
 export const SLOTS: { id: SlotId; label: string }[] = [
-  { id: 'avant-6', label: 'Avant 6 h' },
-  { id: '6-8', label: '6 h–8 h' },
-  { id: '8-10', label: '8 h–10 h' },
-  { id: '10-12', label: '10 h–12 h' },
-  { id: '12-14', label: '12 h–14 h' },
-  { id: '14-16', label: '14 h–16 h' },
-  { id: '16-18', label: '16 h–18 h' },
-  { id: '18-20', label: '18 h–20 h' },
-  { id: '20-22', label: '20 h–22 h' },
-  { id: '22-0', label: '22 h–minuit' },
-  { id: 'apres-0', label: 'Après minuit' },
+  { id: '4-6', label: '4 - 6' },
+  { id: '6-8', label: '6 - 8' },
+  { id: '8-10', label: '8 - 10' },
+  { id: '10-12', label: '10 - 12' },
+  { id: '12-14', label: '12 - 14' },
+  { id: '14-16', label: '14 - 16' },
+  { id: '16-18', label: '16 - 18' },
+  { id: '18-20', label: '18 - 20' },
+  { id: '20-22', label: '20 - 22' },
+  { id: '22-0', label: '22 - 0' },
+  { id: '0-4', label: '0 - 4' },
 ]
 
 export const DAYS: { id: DayId; label: string; mark: string }[] = [
@@ -492,7 +492,8 @@ function cleanSlots(input: unknown): SlotPick[] {
   const picks: SlotPick[] = []
   for (const item of input) {
     if (!item || typeof item !== 'object') continue
-    const slot = (item as { slot?: unknown }).slot
+    const raw = (item as { slot?: unknown }).slot
+    const slot = raw === 'avant-6' ? '4-6' : raw === 'apres-0' ? '0-4' : raw
     if (typeof slot !== 'string' || !SLOT_IDS.includes(slot as SlotId) || seen.has(slot as SlotId)) continue
     seen.add(slot as SlotId)
     picks.push({ slot: slot as SlotId, flexible: (item as { flexible?: unknown }).flexible === true })

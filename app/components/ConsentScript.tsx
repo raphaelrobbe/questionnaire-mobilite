@@ -4,7 +4,7 @@ export function ConsentScript() {
       <p>Bonjour,</p>
       <p>
         Nous réalisons une enquête auprès des habitants du Haut-Doubs afin de mieux connaître leurs besoins en
-        déplacements vers Pontarlier.
+        déplacements locaux (de/vers Pontarlier et communes proches).
       </p>
       <p>
         Nous souhaitons notamment savoir comment les habitants se rendent actuellement à Pontarlier, quelles difficultés
