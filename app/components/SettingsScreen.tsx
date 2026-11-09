@@ -1,7 +1,9 @@
 import { useNavigate } from '@remix-run/react'
 import { useEffect, useState } from 'react'
+import { isAdminSession } from '~/common/config'
 import { classifyEndpoint, endpointMessage, type EndpointIssue } from '~/common/endpoint'
 import { useSettings } from '~/hooks/useSettings'
+import { useSheetLists } from '~/hooks/useSheetLists'
 import { getDeviceId, updateSettings } from '~/lib/settings.client'
 import { probeEndpoint } from '~/lib/sheets.client'
 import { Button } from './Button'
@@ -9,6 +11,7 @@ import { DeviceIdPanel } from './DeviceId'
 
 export function SettingsScreen() {
   const settings = useSettings()
+  const lists = useSheetLists()
   const navigate = useNavigate()
   const [deviceId, setDeviceId] = useState('')
   const [probe, setProbe] = useState<'idle' | 'loading' | 'confirmed' | 'sent' | 'error'>('idle')
@@ -23,15 +26,16 @@ export function SettingsScreen() {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture des réglages…</p>
   }
 
+  const admin = isAdminSession(lists.interviewers, settings.interviewer)
   const hint = connectionHint(settings.endpoint, settings.adminEndpoint)
 
   async function testConnection() {
     setProbe('loading')
     setProbeMessage(null)
     try {
-      const admin = await probeEndpoint(settings?.adminEndpoint ?? '')
+      const adminProbe = await probeEndpoint(settings?.adminEndpoint ?? '')
       const responses = await probeEndpoint(settings?.endpoint ?? '')
-      const result = admin === 'confirmed' && responses === 'confirmed' ? 'confirmed' : 'sent'
+      const result = adminProbe === 'confirmed' && responses === 'confirmed' ? 'confirmed' : 'sent'
       setProbe(result)
       setProbeMessage(
         result === 'confirmed'
@@ -55,9 +59,8 @@ export function SettingsScreen() {
           type="button"
           aria-pressed={settings.testMode}
           onClick={() => {
-            const testMode = !settings.testMode
-            updateSettings({ testMode })
-            if (testMode) navigate('/')
+            updateSettings({ testMode: !settings.testMode })
+            navigate('/')
           }}
           className="mt-4 inline-flex min-h-14 w-full items-center justify-center rounded-2xl bg-test-ink px-4 text-base font-extrabold text-test"
         >
@@ -67,15 +70,19 @@ export function SettingsScreen() {
 
       <h2 className="text-3xl font-extrabold tracking-tight">Réglages</h2>
 
-      <p className={`text-sm font-semibold ${hint.tone === 'warn' ? 'text-clay' : hint.tone === 'ok' ? 'text-leaf' : 'text-muted'}`}>{hint.text}</p>
+      {admin ? (
+        <>
+          <p className={`text-sm font-semibold ${hint.tone === 'warn' ? 'text-clay' : hint.tone === 'ok' ? 'text-leaf' : 'text-muted'}`}>{hint.text}</p>
 
-      <Button variant="secondary" disabled={hint.tone !== 'ok' || probe === 'loading'} onClick={() => void testConnection()}>
-        {probe === 'loading' ? 'Test…' : 'Tester la connexion'}
-      </Button>
-      {probeMessage ? (
-        <p role="status" className={`text-sm font-semibold ${probe === 'error' ? 'text-danger' : 'text-pine'}`}>
-          {probeMessage}
-        </p>
+          <Button variant="secondary" disabled={hint.tone !== 'ok' || probe === 'loading'} onClick={() => void testConnection()}>
+            {probe === 'loading' ? 'Test…' : 'Tester la connexion'}
+          </Button>
+          {probeMessage ? (
+            <p role="status" className={`text-sm font-semibold ${probe === 'error' ? 'text-danger' : 'text-pine'}`}>
+              {probeMessage}
+            </p>
+          ) : null}
+        </>
       ) : null}
 
       <section className="rounded-[28px] border border-line bg-card px-4 py-4">

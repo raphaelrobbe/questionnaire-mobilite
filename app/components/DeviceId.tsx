@@ -1,20 +1,28 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { copyText } from '~/lib/settings.client'
 import { Button } from './Button'
 
 export function DeviceIdPanel({ deviceId, leading }: { deviceId: string; leading?: ReactNode }) {
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copyNotice, setCopyNotice] = useState(0)
   const [copyError, setCopyError] = useState(false)
   const [qrSvg, setQrSvg] = useState<string | null>(null)
   const [qrBusy, setQrBusy] = useState(false)
   const [qrError, setQrError] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 10_000)
+    return () => window.clearTimeout(timer)
+  }, [copied, copyNotice])
 
   async function copyDeviceId() {
     setCopyError(false)
     const ok = await copyText(deviceId)
     setCopied(ok)
     setCopyError(!ok)
+    if (ok) setCopyNotice((current) => current + 1)
   }
 
   async function showQr() {

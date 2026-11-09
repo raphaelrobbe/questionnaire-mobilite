@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { AGE_BANDS, questionSide, type Answers, type Person } from '~/common/survey'
 import {
   BUS_CHOICES,
@@ -12,13 +13,11 @@ import {
   copyHours,
   goesQuestion,
   motiveReveal,
-  WEEK_BUTTONS,
+  FREQUENCIES,
   setPersonTheme,
-  toggleDay,
-  toggleFlexible,
-  toggleSlot,
+  toggleDaySlot,
+  toggleSlotFlexible,
   vehicleModeOptions,
-  type DayId,
   type Motives,
   type PersonTheme,
   type SlotId,
@@ -210,49 +209,34 @@ function TripFields({
     <div className="grid gap-3">
       <p className="text-lg font-extrabold">{title}</p>
       <div>
-        <p className="font-bold">Combien de fois par semaine ?</p>
-        <div className="mt-2 flex w-full gap-1">
-          {WEEK_BUTTONS.map((count) => (
+        <p className="font-bold">À quelle fréquence ?</p>
+        <div className="mt-2 grid gap-2">
+          {FREQUENCIES.map((frequency) => (
             <button
-              key={count}
+              key={frequency}
               type="button"
-              aria-pressed={trip.perWeek === count}
-              onClick={() => onChange({ ...trip, perWeek: count })}
-              className={`inline-flex min-h-12 min-w-0 flex-1 items-center justify-center rounded-full border px-0.5 font-bold whitespace-nowrap ${
-                count === '+ de 7' ? 'flex-[1.7] text-sm' : 'text-base'
-              } ${trip.perWeek === count ? 'border-pine bg-pine text-paper' : 'border-line bg-paper text-ink'}`}
+              aria-pressed={trip.perWeek === frequency}
+              onClick={() => onChange({ ...trip, perWeek: frequency })}
+              className={`min-h-12 rounded-2xl border px-4 text-left text-sm font-bold leading-snug ${
+                trip.perWeek === frequency ? 'border-pine bg-pine text-paper' : 'border-line bg-paper text-ink'
+              }`}
             >
-              {count}
+              {frequency}
             </button>
           ))}
         </div>
       </div>
       {showHours ? (
         <Reveal className="grid gap-3">
-          <div>
-            <p className="font-bold">Quels jours et quels horaires ?</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {DAYS.map((day) => (
-                <Chip key={day.id} selected={Boolean(trip.days[day.id])} label={day.label} onClick={() => onChange(toggleDay(trip, day.id))} />
-              ))}
-            </div>
-          </div>
+          <p className="font-bold">Quels jours et quels horaires ?</p>
           {onCopy ? (
             <Button variant="secondary" onClick={onCopy}>
               Reprendre les mêmes horaires
             </Button>
           ) : null}
+          <HoursBoard trip={trip} hint={hint} onChange={onChange} />
         </Reveal>
       ) : null}
-      {showHours
-        ? DAYS.map((day) =>
-            trip.days[day.id] ? (
-              <Reveal key={day.id}>
-                <DayGrid day={day.id} label={day.label} trip={trip} hint={hint} onChange={onChange} />
-              </Reveal>
-            ) : null,
-          )
-        : null}
       {showModes ? (
         <Reveal>
         <div>
@@ -279,92 +263,129 @@ function TripFields({
   )
 }
 
-function DayGrid({
-  day,
-  label,
-  trip,
-  hint,
-  onChange,
-}: {
-  day: DayId
-  label: string
-  trip: Trip
-  hint?: Trip
-  onChange: (trip: Trip) => void
-}) {
-  function change(direction: 'aller' | 'retour', picks: SlotPickList) {
-    const current = trip.days[day] ?? { aller: [], retour: [] }
-    onChange({ ...trip, days: { ...trip.days, [day]: { ...current, [direction]: picks } } })
+function HoursBoard({ trip, hint, onChange }: { trip: Trip; hint?: Trip; onChange: (trip: Trip) => void }) {
+  const [opened, setOpened] = useState<Record<string, true>>({})
+
+  function reveal(direction: 'aller' | 'retour', slot: SlotId, chosen: number) {
+    const id = `${direction}:${slot}`
+    if (opened[id] || chosen > 0) {
+      setOpened((current) => {
+        if (!current[id]) return current
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+      if (chosen > 0) onChange(clearDirectionSlot(trip, direction, slot))
+      return
+    }
+    setOpened((current) => ({ ...current, [id]: true }))
   }
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-line bg-card px-3 py-3">
-      <p className="font-extrabold">{label}</p>
-      <div className="grid grid-cols-2 gap-3">
-        <SlotColumn
-          title="Aller"
-          picks={trip.days[day]?.aller ?? []}
-          hinted={hint?.days[day]?.aller ?? []}
-          onToggle={(slot) => change('aller', toggleSlot(trip.days[day]?.aller ?? [], slot))}
-          onFlexible={(slot) => change('aller', toggleFlexible(trip.days[day]?.aller ?? [], slot))}
-        />
-        <SlotColumn
-          title="Retour"
-          picks={trip.days[day]?.retour ?? []}
-          hinted={hint?.days[day]?.retour ?? []}
-          onToggle={(slot) => change('retour', toggleSlot(trip.days[day]?.retour ?? [], slot))}
-          onFlexible={(slot) => change('retour', toggleFlexible(trip.days[day]?.retour ?? [], slot))}
-        />
-      </div>
+    <div className="grid grid-cols-2 items-start gap-x-1.5 gap-y-1">
+      <p className="text-sm font-bold text-muted">Aller</p>
+      <p className="text-sm font-bold text-muted">Retour</p>
+      {SLOTS.map((slot) =>
+        (['aller', 'retour'] as const).map((direction) => (
+          <SlotCell
+            key={`${direction}:${slot.id}`}
+            direction={direction}
+            slot={slot}
+            trip={trip}
+            hint={hint}
+            open={Boolean(opened[`${direction}:${slot.id}`])}
+            onHour={() => reveal(direction, slot.id, DAYS.filter((day) => trip.days[day.id]?.[direction].some((pick) => pick.slot === slot.id)).length)}
+            onChange={onChange}
+          />
+        )),
+      )}
     </div>
   )
 }
 
-type SlotPickList = { slot: SlotId; flexible: boolean }[]
-
-function SlotColumn({
-  title,
-  picks,
-  hinted,
-  onToggle,
-  onFlexible,
+function SlotCell({
+  direction,
+  slot,
+  trip,
+  hint,
+  open,
+  onHour,
+  onChange,
 }: {
-  title: string
-  picks: SlotPickList
-  hinted: SlotPickList
-  onToggle: (slot: SlotId) => void
-  onFlexible: (slot: SlotId) => void
+  direction: 'aller' | 'retour'
+  slot: (typeof SLOTS)[number]
+  trip: Trip
+  hint?: Trip
+  open: boolean
+  onHour: () => void
+  onChange: (trip: Trip) => void
 }) {
+  const chosen = DAYS.filter((day) => trip.days[day.id]?.[direction].some((pick) => pick.slot === slot.id))
+  const shown = open || chosen.length > 0
+  const flexible = chosen.length > 0 && chosen.every((day) => trip.days[day.id]?.[direction].some((pick) => pick.slot === slot.id && pick.flexible))
+  const marked = !shown && DAYS.some((day) => hint?.days[day.id]?.[direction].some((pick) => pick.slot === slot.id))
   return (
-    <div className="grid gap-1.5">
-      <p className="text-sm font-bold text-muted">{title}</p>
-      {SLOTS.map((slot) => {
-        const selected = picks.some((pick) => pick.slot === slot.id)
-        const flexible = picks.some((pick) => pick.slot === slot.id && pick.flexible)
-        const marked = !selected && hinted.some((pick) => pick.slot === slot.id)
-        return (
-          <div key={slot.id} className="grid gap-1">
-            <button
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onToggle(slot.id)}
-              className={`min-h-10 rounded-xl border px-2 text-left text-xs font-bold ${
-                selected ? 'border-pine bg-pine text-paper' : marked ? 'border-line bg-mist text-ink' : 'border-line bg-paper text-ink'
-              }`}
-            >
-              {slot.label}
-            </button>
-            {selected ? (
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-                <input type="checkbox" checked={flexible} onChange={() => onFlexible(slot.id)} className="size-4 accent-pine" />
-                Flexible
-              </label>
-            ) : null}
-          </div>
-        )
-      })}
+    <div className="grid gap-0.5">
+      <button
+        type="button"
+        aria-pressed={shown}
+        onClick={onHour}
+        className={`min-h-10 rounded-lg border px-1.5 text-left text-xs font-bold leading-tight ${
+          shown ? 'border-pine bg-pine text-paper' : marked ? 'border-line bg-mist text-ink' : 'border-line bg-paper text-ink'
+        }`}
+      >
+        {slot.label}
+      </button>
+      {shown ? (
+        <div className="grid grid-cols-3 gap-0.5">
+          {DAYS.map((day) => {
+            const selected = chosen.some((item) => item.id === day.id)
+            const hinted = !selected && Boolean(hint?.days[day.id]?.[direction].some((pick) => pick.slot === slot.id))
+            return (
+              <button
+                key={day.id}
+                type="button"
+                aria-pressed={selected}
+                aria-label={`${slot.label}, ${day.label}`}
+                onClick={() => onChange(toggleDaySlot(trip, day.id, direction, slot.id))}
+                className={`inline-flex min-h-8 items-center justify-center rounded-md border px-0.5 text-[11px] font-extrabold ${
+                  selected ? 'border-pine bg-pine text-paper' : hinted ? 'border-line bg-mist text-ink' : 'border-line bg-paper text-ink'
+                }`}
+              >
+                {day.mark}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+      {chosen.length ? (
+        <label className="flex items-center gap-1 px-0.5 text-[11px] font-semibold text-muted">
+          <input
+            type="checkbox"
+            checked={flexible}
+            onChange={() => onChange(toggleSlotFlexible(trip, direction, slot.id))}
+            className="size-3.5 accent-pine"
+          />
+          Flexible
+        </label>
+      ) : null}
     </div>
   )
+}
+
+function clearDirectionSlot(trip: Trip, direction: 'aller' | 'retour', slot: SlotId): Trip {
+  const days: Trip['days'] = { ...trip.days }
+  for (const day of DAYS) {
+    const item = days[day.id]
+    if (!item) continue
+    const next = {
+      aller: direction === 'aller' ? item.aller.filter((pick) => pick.slot !== slot) : item.aller,
+      retour: direction === 'retour' ? item.retour.filter((pick) => pick.slot !== slot) : item.retour,
+    }
+    if (next.aller.length === 0 && next.retour.length === 0) delete days[day.id]
+    else days[day.id] = next
+  }
+  return { ...trip, days }
 }
 
 function Choice({

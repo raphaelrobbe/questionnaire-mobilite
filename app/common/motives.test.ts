@@ -8,6 +8,8 @@ import {
   copyHours,
   emptyMotives,
   emptyTrip,
+  toggleDaySlot,
+  toggleSlotFlexible,
   followUp,
   goesQuestion,
   motiveReady,
@@ -34,7 +36,7 @@ describe('motifs de déplacement', () => {
             travail: {
               goes: 'oui',
               actual: {
-                perWeek: '4',
+                perWeek: 'Quelques fois par an',
                 days: { semaine: { aller: [{ slot: 'midi', flexible: true }, { slot: '8-10', flexible: true }], retour: [] } },
                 modes: ['car:0', 'car:3', 'taxi'],
               },
@@ -47,9 +49,9 @@ describe('motifs de déplacement', () => {
       0,
     )
     expect(clean.autre).toBe('Piscine ')
-    expect(clean.people[0]?.travail.actual.perWeek).toBe('4')
-    const plus = sanitizeMotives({ people: [{ travail: { goes: 'oui', actual: { perWeek: '12' } } }] }, 1, 1, 0)
-    expect(plus.people[0]?.travail.actual.perWeek).toBe('+ de 7')
+    expect(clean.people[0]?.travail.actual.perWeek).toBe('Quelques fois par an')
+    const plus = sanitizeMotives({ people: [{ travail: { goes: 'oui', actual: { perWeek: '4' } } }] }, 1, 1, 0)
+    expect(plus.people[0]?.travail.actual.perWeek).toBe('')
     const typed = sanitizeMotives({ people: [{ travail: { goes: 'oui', actual: { perWeek: '2,' } } }] }, 1, 1, 0)
     expect(typed.people[0]?.travail.actual.perWeek).toBe('')
     expect(clean.people[0]?.travail.actual.days.semaine?.aller).toEqual([{ slot: '8-10', flexible: true }])
@@ -63,7 +65,7 @@ describe('motifs de déplacement', () => {
     expect(followUp(row({ goes: 'non', bus: 'certainement' }))).toBe('gave-up')
     expect(followUp(row({ goes: 'non', bus: 'non' }))).toBe('none')
     const hours = {
-      perWeek: '2',
+      perWeek: 'Quelques fois par mois',
       days: { semaine: { aller: [{ slot: '8-10' as const, flexible: false }], retour: [] } },
       modes: ['taxi'],
     }
@@ -110,7 +112,7 @@ describe('motifs de déplacement', () => {
 
   test('oublie les réponses des questions qui ne s’affichent plus', () => {
     const hours = {
-      perWeek: '2',
+      perWeek: 'Quelques fois par mois',
       days: { semaine: { aller: [{ slot: '8-10' as const, flexible: false }], retour: [] } },
       modes: ['taxi'],
     }
@@ -128,7 +130,7 @@ describe('motifs de déplacement', () => {
     expect(again.people[0]?.travail.actual).toEqual(emptyTrip())
     expect(again.people[0]?.travail.bus).toBe('')
     const openDay = sanitizeMotives(
-      { people: [{ travail: { goes: 'oui', actual: { perWeek: '2', days: { semaine: { aller: [], retour: [] } }, modes: ['taxi'] }, bus: 'non' } }] },
+      { people: [{ travail: { goes: 'oui', actual: { perWeek: 'Quelques fois par mois', days: { semaine: { aller: [], retour: [] } }, modes: ['taxi'] }, bus: 'non' } }] },
       1,
       0,
       0,
@@ -154,13 +156,23 @@ describe('motifs de déplacement', () => {
     expect(busQuestion('vers')).toMatch(/pour Pontarlier/)
     expect(busQuestion('de')).toMatch(/vers les communes environnantes/)
     const source = { ...emptyTrip(), days: { samedi: { aller: [{ slot: '6-8' as const, flexible: false }], retour: [] } } }
-    const trip = copyHours(source, { ...emptyTrip(), perWeek: '3' })
-    expect(trip.perWeek).toBe('3')
+    const trip = copyHours(source, { ...emptyTrip(), perWeek: 'Plusieurs fois par semaine' })
+    expect(trip.perWeek).toBe('Plusieurs fois par semaine')
     expect(trip.days.samedi?.aller[0]?.slot).toBe('6-8')
     expect(trip.days.semaine).toBeUndefined()
     expect(canCopyHours(row({ goes: 'non', actual: source }))).toBe(false)
     expect(canCopyHours(row({ goes: 'oui', actual: emptyTrip() }))).toBe(false)
     expect(canCopyHours(row({ goes: 'oui', actual: source }))).toBe(true)
+    const marked = toggleDaySlot(toggleDaySlot(emptyTrip(), 'semaine', 'aller', '10-12'), 'samedi', 'retour', '10-12')
+    expect(marked.days.semaine?.aller.map((pick) => pick.slot)).toEqual(['10-12'])
+    expect(marked.days.samedi?.retour.map((pick) => pick.slot)).toEqual(['10-12'])
+    const cleared = toggleDaySlot(marked, 'semaine', 'aller', '10-12')
+    expect(cleared.days.semaine).toBeUndefined()
+    expect(cleared.days.samedi?.retour).toHaveLength(1)
+    const flex = toggleSlotFlexible(toggleDaySlot(marked, 'dimanche', 'aller', '10-12'), 'aller', '10-12')
+    expect(flex.days.semaine?.aller[0]?.flexible).toBe(true)
+    expect(flex.days.dimanche?.aller[0]?.flexible).toBe(true)
+    expect(flex.days.samedi?.retour[0]?.flexible).toBe(false)
   })
 
   test('reste sur le téléphone et apparaît seulement dans la relecture locale', () => {
@@ -188,13 +200,13 @@ describe('motifs de déplacement', () => {
     expect(refused.consider).toBe(true)
     expect(refused.bus).toBe(false)
     expect(motiveReveal('travail', row({ goes: 'non', wouldConsider: 'non' })).bus).toBe(true)
-    const going = motiveReveal('travail', row({ goes: 'oui', actual: { ...emptyTrip(), perWeek: '2' } }))
+    const going = motiveReveal('travail', row({ goes: 'oui', actual: { ...emptyTrip(), perWeek: 'Quelques fois par mois' } }))
     expect(going.actualHours).toBe(true)
     expect(going.actualModes).toBe(false)
     expect(going.bus).toBe(false)
     const hours = {
       ...emptyTrip(),
-      perWeek: '2',
+      perWeek: 'Quelques fois par mois',
       days: { semaine: { aller: [{ slot: '8-10' as const, flexible: false }], retour: [] } },
     }
     const afterHours = motiveReveal('travail', row({ goes: 'oui', actual: hours }))
@@ -230,7 +242,7 @@ describe('motifs de déplacement', () => {
     expect(motiveReady(autre)).toBe(true)
     expect(shiftMotive(autre, 2, 1)).toBeNull()
     const trip = {
-      perWeek: '1',
+      perWeek: 'Une fois par an ou moins',
       days: { semaine: { aller: [{ slot: '8-10' as const, flexible: false }], retour: [] } },
       modes: ['taxi'],
     }

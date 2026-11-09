@@ -67,10 +67,10 @@ export const SLOTS: { id: SlotId; label: string }[] = [
   { id: 'apres-0', label: 'Après minuit' },
 ]
 
-export const DAYS: { id: DayId; label: string }[] = [
-  { id: 'semaine', label: 'Lundi à vendredi' },
-  { id: 'samedi', label: 'Samedi' },
-  { id: 'dimanche', label: 'Dimanche' },
+export const DAYS: { id: DayId; label: string; mark: string }[] = [
+  { id: 'semaine', label: 'Lundi à vendredi', mark: 'LMMJV' },
+  { id: 'samedi', label: 'Samedi', mark: 'S' },
+  { id: 'dimanche', label: 'Dimanche', mark: 'D' },
 ]
 
 export const BUS_CHOICES: { id: Exclude<BusChoice, ''>; label: string }[] = [
@@ -331,6 +331,36 @@ export function toggleSlot(picks: SlotPick[], slot: SlotId): SlotPick[] {
   return [...picks, { slot, flexible: false }]
 }
 
+/** Coche ou retire un jour dans un horaire. Un jour sans aucun créneau disparaît. */
+export function toggleDaySlot(trip: Trip, day: DayId, direction: 'aller' | 'retour', slot: SlotId): Trip {
+  const current = trip.days[day] ?? { aller: [], retour: [] }
+  const next: DaySchedule = {
+    aller: direction === 'aller' ? toggleSlot(current.aller, slot) : current.aller,
+    retour: direction === 'retour' ? toggleSlot(current.retour, slot) : current.retour,
+  }
+  const days = { ...trip.days }
+  if (next.aller.length === 0 && next.retour.length === 0) delete days[day]
+  else days[day] = next
+  return { ...trip, days }
+}
+
+/** Passe Flexible pour tous les jours déjà cochés sur cet horaire. */
+export function toggleSlotFlexible(trip: Trip, direction: 'aller' | 'retour', slot: SlotId): Trip {
+  const chosen = DAY_IDS.filter((day) => trip.days[day]?.[direction].some((pick) => pick.slot === slot))
+  if (!chosen.length) return trip
+  const enable = chosen.some((day) => !trip.days[day]?.[direction].some((pick) => pick.slot === slot && pick.flexible))
+  const days = { ...trip.days }
+  for (const day of chosen) {
+    const item = days[day]
+    if (!item) continue
+    days[day] = {
+      ...item,
+      [direction]: item[direction].map((pick) => (pick.slot === slot ? { ...pick, flexible: enable } : pick)),
+    }
+  }
+  return { ...trip, days }
+}
+
 export function toggleFlexible(picks: SlotPick[], slot: SlotId): SlotPick[] {
   return picks.map((pick) => (pick.slot === slot ? { ...pick, flexible: !pick.flexible } : pick))
 }
@@ -426,7 +456,12 @@ function visibleTrip(trip: Trip): Trip {
   return tripHasHours(trip) ? trip : { ...trip, modes: [] }
 }
 
-export const WEEK_BUTTONS = ['1', '2', '3', '4', '5', '6', '7', '+ de 7'] as const
+export const FREQUENCIES = [
+  'Une fois par an ou moins',
+  'Quelques fois par an',
+  'Quelques fois par mois',
+  'Plusieurs fois par semaine',
+] as const
 
 function cleanTrip(input: unknown, carCount: number, wheelCount: number): Trip {
   const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
@@ -448,12 +483,7 @@ function cleanTrip(input: unknown, carCount: number, wheelCount: number): Trip {
 
 function weekButton(value: unknown): string {
   if (typeof value !== 'string') return ''
-  if ((WEEK_BUTTONS as readonly string[]).includes(value)) return value
-  if (!/^\d+$/.test(value)) return ''
-  const count = Number(value)
-  if (count >= 1 && count <= 7) return String(count)
-  if (count > 7) return '+ de 7'
-  return ''
+  return (FREQUENCIES as readonly string[]).includes(value) ? value : ''
 }
 
 function cleanSlots(input: unknown): SlotPick[] {

@@ -4,9 +4,14 @@
  * Déployer → Application Web → Exécuter en tant que : Moi → Qui a accès : Tout le monde.
  * L'URL /exec va dans VITE_SHEETS_WEBAPP_URL.
  *
- * Ce script n'ouvre aucun autre fichier. Il n'a pas la liste des enquêteurs
- * ni de quoi identifier une personne. Un nom, une adresse, un téléphone
- * ou des coordonnées reçus par erreur sont ignorés, pas écrits.
+ * Avant d'écrire dans Réponses, il vérifie l'identifiant d'appareil dans le
+ * fichier privé. L'identifiant de ce fichier se règle dans les propriétés du
+ * script, sous le nom ADMIN_SPREADSHEET_ID (la partie de son adresse entre
+ * /d/ et /edit). Il ne figure pas dans ce code. Sans cette propriété, ou si
+ * l'appareil n'est pas dans Enquêteurs, la ligne est refusée et la feuille
+ * n'est pas modifiée. Une fiche de test n'est écrite que dans Réponses TEST.
+ * Un nom, une adresse, un téléphone ou des coordonnées reçus par erreur sont
+ * ignorés, pas écrits.
  * Le même code n'ajoute pas une seconde ligne.
  * action=code répond seulement si ce code est déjà dans la feuille, sans renvoyer la ligne.
  * Après une modification : Déployer → Gérer les déploiements → crayon → Nouvelle version.
@@ -48,6 +53,8 @@ function doPost(e) {
     if (!body.row || typeof body.row !== 'object' || !Array.isArray(body.headers)) {
       return json({ ok: false, error: 'Ligne illisible.' })
     }
+    const test = body.test === true
+    if (!test) assertAuthorizedDevice(body.row.appareil)
     const lock = LockService.getScriptLock()
     lock.waitLock(15000)
     try {
@@ -58,7 +65,7 @@ function doPost(e) {
           return !isPrivateHeader(header)
         }),
         withoutPrivate(body.row),
-        body.test === true,
+        test,
       )
     } finally {
       lock.releaseLock()
@@ -67,6 +74,56 @@ function doPost(e) {
   } catch (error) {
     return json({ ok: false, error: String(error && error.message ? error.message : error).slice(0, 180) })
   }
+}
+
+function assertAuthorizedDevice(value) {
+  const device = normalizeDevice(value)
+  if (!device) throw new Error('Appareil non autorisé.')
+  const id = String(PropertiesService.getScriptProperties().getProperty('ADMIN_SPREADSHEET_ID') || '').trim()
+  if (!id) throw new Error('Fichier admin non configuré.')
+  const book = SpreadsheetApp.openById(id)
+  const sheet = book.getSheetByName('Enquêteurs')
+  if (!sheet) throw new Error('Feuille Enquêteurs introuvable.')
+  const lastRow = sheet.getLastRow()
+  const lastCol = sheet.getLastColumn()
+  if (lastRow < 2 || !lastCol) throw new Error('Appareil non autorisé.')
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+  let deviceCol = -1
+  for (let i = 0; i < headers.length; i++) {
+    if (String(headers[i] || '').trim() === 'Identifiants appareils autorisés') deviceCol = i
+  }
+  if (deviceCol === -1) throw new Error('Colonne « Identifiants appareils autorisés » introuvable.')
+  const values = sheet.getRange(2, deviceCol + 1, lastRow - 1, 1).getValues()
+  for (let row = 0; row < values.length; row++) {
+    const devices = parseDevices(values[row][0])
+    if (devices.indexOf(device) !== -1) return
+  }
+  throw new Error('Appareil non autorisé.')
+}
+
+function normalizeDevice(value) {
+  var text = String(value || '').trim().toLowerCase()
+  if (text.charAt(0) === '[' && text.charAt(text.length - 1) === ']') text = text.substring(1, text.length - 1).trim()
+  if (!text || text.length > 80 || /[\s,;\[\]]/.test(text)) return ''
+  return text
+}
+
+function parseDevices(value) {
+  const text = String(value || '').trim()
+  if (!text || text === '[]') return []
+  const wrapped = text.charAt(0) === '[' && text.charAt(text.length - 1) === ']'
+  const inner = wrapped ? text.substring(1, text.length - 1).trim() : text
+  if (!inner) return []
+  const parts = wrapped ? inner.split(',') : [inner]
+  const seen = {}
+  const list = []
+  for (let i = 0; i < parts.length; i++) {
+    const id = normalizeDevice(parts[i])
+    if (!id || seen[id]) continue
+    seen[id] = true
+    list.push(id)
+  }
+  return list
 }
 
 function spreadsheet() {

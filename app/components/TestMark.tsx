@@ -1,13 +1,43 @@
+import { useNavigate } from '@remix-run/react'
+import { updateSettings } from '~/lib/settings.client'
+
 export function TestBanner() {
+  const navigate = useNavigate()
+
+  function disable() {
+    updateSettings({ testMode: false })
+    navigate('/')
+  }
+
   return (
     <>
-      <p className="invisible px-4 py-2.5 text-center text-base font-extrabold tracking-wide" aria-hidden="true">
-        Mode test
-      </p>
-      <p data-test-banner className="fixed inset-x-0 top-0 z-30 bg-test px-4 py-2.5 text-center text-base font-extrabold tracking-wide text-test-ink">
-        Mode test
-      </p>
+      <BannerRow />
+      <div data-test-banner className="fixed inset-x-0 top-0 z-30 bg-test text-test-ink">
+        <BannerRow onDisable={disable} />
+      </div>
     </>
+  )
+}
+
+function BannerRow({ onDisable }: { onDisable?: () => void }) {
+  return (
+    <div className={`px-4 py-1.5 ${onDisable ? '' : 'invisible'}`} aria-hidden={onDisable ? undefined : true}>
+      <div className="mx-auto grid w-full max-w-lg grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <span />
+        <span className="text-center text-base font-extrabold tracking-wide">Mode test</span>
+        {onDisable ? (
+          <button
+            type="button"
+            onClick={onDisable}
+            className="inline-flex min-h-9 items-center justify-center justify-self-end rounded-xl bg-test-ink px-3 text-sm font-extrabold text-test"
+          >
+            Désactiver
+          </button>
+        ) : (
+          <span className="inline-flex min-h-9 items-center justify-self-end rounded-xl px-3 text-sm font-extrabold">Désactiver</span>
+        )}
+      </div>
+    </div>
   )
 }
 
