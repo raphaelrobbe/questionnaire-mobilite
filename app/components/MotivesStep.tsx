@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AGE_BANDS, questionSide, type Answers, type Person } from '~/common/survey'
 import {
   BUS_CHOICES,
@@ -32,7 +32,15 @@ export function motivePersonLabel(person: Person | undefined, index: number): st
   return age ? `${who} · ${age}` : who
 }
 
-export function MotivesStep({ answers, onChange }: { answers: Answers; onChange: (motives: Motives) => void }) {
+export function MotivesStep({
+  answers,
+  onChange,
+  onAwaitingDay,
+}: {
+  answers: Answers
+  onChange: (motives: Motives) => void
+  onAwaitingDay?: (awaiting: boolean) => void
+}) {
   const theme = answers.motives.cursor.theme
   const personIndex = Math.min(answers.motives.cursor.person, Math.max(answers.people.length - 1, 0))
   const named = Boolean(answers.motives.autre.trim())
@@ -40,6 +48,16 @@ export function MotivesStep({ answers, onChange }: { answers: Answers; onChange:
   const side = questionSide(answers.commune)
   const modes = vehicleModeOptions(answers.cars, answers.twoWheelers)
   const reveal = row ? motiveReveal(theme, row, answers.motives.autre) : null
+  const [pendingHours, setPendingHours] = useState({ actual: false, bus: false })
+  const reportPending = useCallback((part: 'actual' | 'bus', awaiting: boolean) => {
+    setPendingHours((current) => (current[part] === awaiting ? current : { ...current, [part]: awaiting }))
+  }, [])
+  const reportActual = useCallback((awaiting: boolean) => reportPending('actual', awaiting), [reportPending])
+  const reportBus = useCallback((awaiting: boolean) => reportPending('bus', awaiting), [reportPending])
+  useEffect(() => {
+    onAwaitingDay?.(pendingHours.actual || pendingHours.bus)
+  }, [onAwaitingDay, pendingHours])
+  useEffect(() => () => onAwaitingDay?.(false), [onAwaitingDay])
 
   function update(patch: Partial<PersonTheme>) {
     if (!row) return
@@ -81,6 +99,8 @@ export function MotivesStep({ answers, onChange }: { answers: Answers; onChange:
                 showHours={reveal.actualHours}
                 showModes={reveal.actualModes}
                 onChange={(actual) => update({ actual })}
+                onAwaitingDay={reportActual}
+                boardKey={`${theme}:${personIndex}:actual`}
               />
             </Reveal>
           ) : null}
@@ -137,6 +157,8 @@ export function MotivesStep({ answers, onChange }: { answers: Answers; onChange:
                     showHours={reveal.busHours}
                     showModes={false}
                     onChange={(busTrip) => update({ busTrip })}
+                    onAwaitingDay={reportBus}
+                    boardKey={`${theme}:${personIndex}:bus`}
                     onCopy={
                       reveal.busHours && canCopyHours(row)
                         ? () => update({ busTrip: copyHours(row.actual, row.busTrip) })
@@ -195,6 +217,8 @@ function TripFields({
   showModes,
   onChange,
   onCopy,
+  onAwaitingDay,
+  boardKey,
 }: {
   title: string
   trip: Trip
@@ -204,6 +228,8 @@ function TripFields({
   showModes: boolean
   onChange: (trip: Trip) => void
   onCopy?: () => void
+  onAwaitingDay?: (awaiting: boolean) => void
+  boardKey: string
 }) {
   return (
     <div className="grid gap-3">
@@ -234,7 +260,7 @@ function TripFields({
               Reprendre les mêmes horaires
             </Button>
           ) : null}
-          <HoursBoard trip={trip} hint={hint} onChange={onChange} />
+          <HoursBoard key={boardKey} trip={trip} hint={hint} onChange={onChange} onAwaitingDay={onAwaitingDay} />
         </Reveal>
       ) : null}
       {showModes ? (
@@ -263,8 +289,28 @@ function TripFields({
   )
 }
 
-function HoursBoard({ trip, hint, onChange }: { trip: Trip; hint?: Trip; onChange: (trip: Trip) => void }) {
+function HoursBoard({
+  trip,
+  hint,
+  onChange,
+  onAwaitingDay,
+}: {
+  trip: Trip
+  hint?: Trip
+  onChange: (trip: Trip) => void
+  onAwaitingDay?: (awaiting: boolean) => void
+}) {
   const [opened, setOpened] = useState<Record<string, true>>({})
+  const awaiting = Object.keys(opened).some((id) => {
+    const split = id.indexOf(':')
+    const direction = id.slice(0, split) as 'aller' | 'retour'
+    const slot = id.slice(split + 1) as SlotId
+    return !DAYS.some((day) => trip.days[day.id]?.[direction].some((pick) => pick.slot === slot))
+  })
+  useEffect(() => {
+    onAwaitingDay?.(awaiting)
+  }, [awaiting, onAwaitingDay])
+  useEffect(() => () => onAwaitingDay?.(false), [onAwaitingDay])
 
   function reveal(direction: 'aller' | 'retour', slot: SlotId, chosen: number) {
     const id = `${direction}:${slot}`
@@ -341,6 +387,7 @@ function SlotCell({
           {DAYS.map((day) => {
             const selected = chosen.some((item) => item.id === day.id)
             const hinted = !selected && Boolean(hint?.days[day.id]?.[direction].some((pick) => pick.slot === slot.id))
+            const waiting = chosen.length === 0
             return (
               <button
                 key={day.id}
@@ -349,7 +396,13 @@ function SlotCell({
                 aria-label={`${slot.label}, ${day.label}`}
                 onClick={() => onChange(toggleDaySlot(trip, day.id, direction, slot.id))}
                 className={`inline-flex min-h-8 items-center justify-center rounded-md border px-0.5 text-[11px] font-extrabold ${
-                  selected ? 'border-pine bg-pine text-paper' : hinted ? 'border-line bg-mist text-ink' : 'border-line bg-paper text-ink'
+                  selected
+                    ? 'border-pine bg-pine text-paper'
+                    : waiting
+                      ? 'border-test-ink bg-test text-test-ink'
+                      : hinted
+                        ? 'border-line bg-mist text-ink'
+                        : 'border-line bg-paper text-ink'
                 }`}
               >
                 {day.mark}

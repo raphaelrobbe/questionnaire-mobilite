@@ -36,6 +36,7 @@ export function Interview() {
   const [saved, setSaved] = useState<LocalResponse | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [hoursPending, setHoursPending] = useState(false)
   const [geoError, setGeoError] = useState<string | null>(null)
   const [geoBusy, setGeoBusy] = useState(false)
   const [deviceId, setDeviceId] = useState('')
@@ -236,12 +237,14 @@ export function Interview() {
     }
   }
 
-  const issue =
+  const storedIssue =
     step.kind === 'consent'
       ? draft.consent
         ? null
         : 'Cochez l’accord avant de continuer.'
       : stepIssue(step, draft.answers, lists.communes)
+  const issue =
+    step.kind === 'motives' && hoursPending ? 'Choisissez au moins un jour pour chaque horaire.' : storedIssue
 
   async function notePosition() {
     setGeoBusy(true)
@@ -378,7 +381,11 @@ export function Interview() {
           <p className="mt-2 text-lg font-bold">
             {motivePersonLabel(draft.answers.people[draft.answers.motives.cursor.person], draft.answers.motives.cursor.person)}
           </p>
-          <MotivesStep answers={draft.answers} onChange={(motives) => updateAnswers({ motives })} />
+          <MotivesStep
+            answers={draft.answers}
+            onChange={(motives) => updateAnswers({ motives })}
+            onAwaitingDay={setHoursPending}
+          />
         </section>
       ) : null}
 
