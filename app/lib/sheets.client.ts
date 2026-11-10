@@ -21,9 +21,9 @@ export async function confirmInterviewer(adminEndpoint: string, deviceId: string
   const admin = classifyEndpoint(adminEndpoint)
   if (!admin.ok || admin.kind !== 'google-script') throw new Error('Le tableur privé n’est pas branché.')
   const lists = await fetchSheetLists(admin.url, { device: deviceId, who: loadSettings().interviewer })
-  publishLists(lists)
   const person = interviewerForDevice(lists.interviewers, deviceId)
   if (!person) throw new DeviceUnknown()
+  publishLists(lists)
   updateSettings({ interviewer: person.name })
   return person.name
 }

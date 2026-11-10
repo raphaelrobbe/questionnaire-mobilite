@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { canUseSurvey, sanitizeSettings } from './settings'
+import { canRetryRow, canRetrySends, canSync, canUseSurvey, listsRequest, sanitizeSettings } from './settings'
 
 describe('réglages', () => {
   test('ne garde que des chaînes bornées', () => {
@@ -18,6 +18,16 @@ describe('réglages', () => {
     expect(canUseSurvey({ interviewer: '', testMode: false })).toBe(false)
     expect(canUseSurvey({ interviewer: '', testMode: true })).toBe(true)
     expect(canUseSurvey({ interviewer: 'Ada', testMode: false })).toBe(true)
+    expect(listsRequest({ interviewer: '', testMode: false })).toBe('none')
+    expect(listsRequest({ interviewer: '', testMode: true })).toBe('communes')
+    expect(listsRequest({ interviewer: 'Ada', testMode: true })).toBe('full')
+    expect(canRetrySends({ interviewer: '' })).toBe(false)
+    expect(canRetrySends({ interviewer: 'Ada' })).toBe(true)
+    expect(canSync({ interviewer: '', testMode: false })).toBe(false)
+    expect(canSync({ interviewer: '', testMode: true })).toBe(true)
+    expect(canRetryRow({ interviewer: '', testMode: true }, true)).toBe(true)
+    expect(canRetryRow({ interviewer: '', testMode: true }, false)).toBe(false)
+    expect(canRetryRow({ interviewer: '', testMode: false }, true)).toBe(false)
     expect('token' in settings).toBe(false)
   })
 })

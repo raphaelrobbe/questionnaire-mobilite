@@ -7,7 +7,7 @@ import { buildSteps, patchAnswers, stepIssue, summary, type Answers } from '~/co
 import type { ResponseRecord } from '~/common/response'
 import { createDraft, loadDraft, removeDraft, saveDraft, type Draft } from '~/lib/draft.client'
 import { capturePosition } from '~/lib/geo.client'
-import { flushOne, keepResponse, type LocalResponse } from '~/lib/outbox.client'
+import { flushOne, keepResponse, readableError, type LocalResponse } from '~/lib/outbox.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { useOnline } from '~/hooks/useOnline'
 import { useOutbox } from '~/hooks/useOutbox'
@@ -548,14 +548,14 @@ function savedCopy(row: LocalResponse): { kicker: string; title: string; detail:
   }
   if (row.status === 'error') {
     return {
-      kicker: 'Fiche gardée',
-      title: 'Gardée sur ce téléphone.',
-      detail: row.lastError || 'L’envoi a échoué. La file réessaiera.',
+      kicker: '',
+      title: 'Fiche gardée sur ce téléphone.',
+      detail: row.lastError ? readableError(row.lastError) : 'L’envoi a échoué. La file réessaiera.',
     }
   }
   return {
-    kicker: 'Fiche gardée',
-    title: 'Gardée sur ce téléphone.',
+    kicker: '',
+    title: 'Fiche gardée sur ce téléphone.',
     detail: 'Elle partira dès que le réseau et le tableur seront là. Rien n’est perdu.',
   }
 }

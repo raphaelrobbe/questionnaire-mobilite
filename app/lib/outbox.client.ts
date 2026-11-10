@@ -2,6 +2,7 @@ import { DeviceUnknown } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
 import { ARRIVAL_TRIES, ArrivalStopped, pollArrival } from '~/common/receipt'
 import { forgetPersonal, holdsPersonal, responseIsKept, type ResponseRecord } from '~/common/response'
+import { canRetryRow, canRetrySends, canSync } from '~/common/settings'
 import { forgetDraftPersonal } from './draft.client'
 import { loadSettings, updateSettings } from './settings.client'
 import { codeIsStored, confirmInterviewer, submitRecord, type SendStatus } from './sheets.client'
@@ -154,6 +155,13 @@ export async function removeResponse(id: string): Promise<void> {
   emit()
 }
 
+export async function removeConfirmedResponses(testMode: boolean): Promise<void> {
+  const rows = await listResponses()
+  for (const row of rows) {
+    if (row.status === 'confirmed' && row.test === testMode) await removeResponse(row.id)
+  }
+}
+
 function toRecord(row: LocalResponse): ResponseRecord {
   return {
     id: row.id,
@@ -196,7 +204,7 @@ async function attempt(row: LocalResponse): Promise<LocalResponse | null> {
       await removeResponse(row.id)
       return null
     }
-    const message = error instanceof Error ? error.message : 'Envoi impossible.'
+    const message = readableError(error instanceof Error ? error.message : 'Envoi impossible.')
     const next: LocalResponse = {
       ...row,
       status: 'error',
@@ -223,7 +231,7 @@ export function flushOne(id: string): Promise<LocalResponse | null> {
 export function retryResponse(id: string): Promise<LocalResponse | null> {
   return lock(async () => {
     const row = await read(id)
-    if (!row) return null
+    if (!row || !canRetryRow(loadSettings(), row.test)) return row
     const pending: LocalResponse = { ...row, status: 'pending', lastError: null, updatedAt: new Date().toISOString() }
     await write(pending)
     return attempt(pending)
@@ -234,11 +242,15 @@ export function retryResponse(id: string): Promise<LocalResponse | null> {
 }
 
 export function flushOutbox(): Promise<void> {
+  const settings = loadSettings()
+  if (!canSync(settings)) return Promise.resolve()
+  const connected = canRetrySends(settings)
   const sentIds: string[] = []
   return lock(async () => {
     const rows = await listResponses()
     for (const row of rows) {
       if (row.status === 'confirmed' || row.status === 'sent') continue
+      if (!connected && !row.test) continue
       const next = await attempt(row)
       if (next?.status === 'sent') sentIds.push(next.id)
     }
@@ -256,8 +268,12 @@ function confirmArrival(id: string) {
 }
 
 async function resumeArrivalChecks(): Promise<void> {
+  const settings = loadSettings()
+  if (!canSync(settings)) return
+  const connected = canRetrySends(settings)
   const rows = await listResponses()
   for (const row of rows) {
+    if (!connected && !row.test) continue
     if (row.status === 'sent' && row.lookups < ARRIVAL_TRIES) confirmArrival(row.id)
   }
 }
@@ -315,6 +331,7 @@ function delay(ms: number): Promise<void> {
 
 export function startAutoSync(): () => void {
   const run = () => {
+    if (!canSync(loadSettings())) return
     void flushOutbox().then(() => resumeArrivalChecks())
   }
   const onVisible = () => {
@@ -327,6 +344,10 @@ export function startAutoSync(): () => void {
     window.removeEventListener('online', run)
     document.removeEventListener('visibilitychange', onVisible)
   }
+}
+
+export function readableError(message: string): string {
+  return message === 'Failed to fetch' ? 'Erreur de connexion.' : message
 }
 
 export function statusLabel(status: LocalStatus): string {

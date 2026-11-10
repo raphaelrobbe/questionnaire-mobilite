@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { SheetLists } from '~/common/config'
 import { classifyEndpoint } from '~/common/endpoint'
+import { listsRequest } from '~/common/settings'
 import { fetchSheetLists, loadCachedLists, saveCachedLists, subscribeCachedLists } from '~/lib/config.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { useSettings } from './useSettings'
@@ -16,7 +17,9 @@ export function useSheetLists(): SheetListsState {
   const settings = useSettings()
   const endpoint = settings?.adminEndpoint ?? ''
   const interviewer = settings?.interviewer ?? ''
+  const testMode = settings?.testMode === true
   const settingsReady = settings !== null
+  const request = listsRequest({ interviewer, testMode })
   const [lists, setLists] = useState<SheetLists>(empty)
   const [status, setStatus] = useState<SheetListsState['status']>('loading')
   const [message, setMessage] = useState<string | null>(null)
@@ -36,6 +39,13 @@ export function useSheetLists(): SheetListsState {
       setLists(cached)
       setStatus('ready')
     }
+    if (request === 'none') {
+      if (!cached) {
+        setStatus('ready')
+        setMessage(null)
+      }
+      return
+    }
     const classified = classifyEndpoint(endpoint)
     if (!classified.ok || classified.kind !== 'google-script') {
       if (!cached) {
@@ -45,7 +55,10 @@ export function useSheetLists(): SheetListsState {
       return
     }
     let cancelled = false
-    void fetchSheetLists(classified.url, { device: getDeviceId(), who: interviewer })
+    void fetchSheetLists(
+      classified.url,
+      request === 'communes' ? { action: 'communes' } : { device: getDeviceId(), who: interviewer },
+    )
       .then((next) => {
         if (cancelled) return
         saveCachedLists(next)
@@ -61,7 +74,7 @@ export function useSheetLists(): SheetListsState {
     return () => {
       cancelled = true
     }
-  }, [settingsReady, endpoint, interviewer])
+  }, [settingsReady, endpoint, interviewer, request])
 
   return { ...lists, status, message }
 }

@@ -1,5 +1,32 @@
 import { useNavigate } from '@remix-run/react'
+import { useSettings } from '~/hooks/useSettings'
 import { updateSettings } from '~/lib/settings.client'
+
+export function TestModeCard() {
+  const settings = useSettings()
+  const navigate = useNavigate()
+  if (!settings) return null
+
+  return (
+    <section className="rounded-[28px] border-2 border-test bg-test px-5 py-5 text-test-ink">
+      <h1 className="text-2xl font-extrabold tracking-tight">Mode test</h1>
+      <p className="mt-2 text-base font-semibold leading-snug">
+        Sans identifiant autorisé, ce mode permet de tester le questionnaire en enregistrant les données dans un fichier spécifique de test.
+      </p>
+      <button
+        type="button"
+        aria-pressed={settings.testMode}
+        onClick={() => {
+          updateSettings({ testMode: !settings.testMode })
+          navigate('/')
+        }}
+        className="mt-4 inline-flex min-h-14 w-full items-center justify-center rounded-2xl bg-test-ink px-4 text-base font-extrabold text-test"
+      >
+        {settings.testMode ? 'Désactiver le mode test' : 'Activer le mode test'}
+      </button>
+    </section>
+  )
+}
 
 export function TestBanner() {
   const navigate = useNavigate()

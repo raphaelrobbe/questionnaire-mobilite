@@ -17,18 +17,19 @@ export function Shell({ children }: { children: ReactNode }) {
   const nav = settings && isAdminSession(lists.interviewers, settings.interviewer) ? [...links, { to: '/admin', label: 'Admin' }] : []
   const interviewing = location.pathname === '/entretien'
   const onSettings = location.pathname === '/reglages'
+  const returnsHome = onSettings || location.pathname === '/protection'
   const navigate = useNavigate()
 
-  function leaveSettings(event: MouseEvent<HTMLElement>) {
-    if (!onSettings) return
+  function leaveToHome(event: MouseEvent<HTMLElement>) {
+    if (!returnsHome) return
     const link = (event.target as HTMLElement).closest('a')
-    if (link && !link.hasAttribute('data-settings')) return
+    if (link && !(onSettings && link.hasAttribute('data-settings'))) return
     event.preventDefault()
     navigate('/')
   }
 
   return (
-    <div className="min-h-dvh bg-paper text-ink">
+    <div className="flex min-h-dvh flex-col bg-paper text-ink">
       <a
         href="#contenu"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-20 focus:rounded-full focus:bg-card focus:px-4 focus:py-2 focus:font-bold"
@@ -37,7 +38,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </a>
       {settings?.testMode ? <TestBanner /> : null}
       {interviewing ? null : (
-        <header className={`border-b border-line bg-card/90 backdrop-blur ${onSettings ? 'cursor-pointer' : ''}`} onClick={leaveSettings}>
+        <header className={`border-b border-line bg-card/90 backdrop-blur ${returnsHome ? 'cursor-pointer' : ''}`} onClick={leaveToHome}>
           <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 py-3">
             <Mark />
             <div className="min-w-0 flex-1">
@@ -84,7 +85,7 @@ export function Shell({ children }: { children: ReactNode }) {
           ) : null}
         </header>
       )}
-      <main id="contenu" className="mx-auto w-full max-w-lg px-4 pb-16 pt-4">
+      <main id="contenu" className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-4 pt-4">
         {children}
       </main>
     </div>

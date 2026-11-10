@@ -26,6 +26,27 @@ export function canUseSurvey(settings: Pick<Settings, 'interviewer' | 'testMode'
   return Boolean(settings.interviewer.trim()) || settings.testMode
 }
 
+/** Les fiches ordinaires ne repartent qu’une fois l’enquêteur reconnu. */
+export function canRetrySends(settings: Pick<Settings, 'interviewer'>): boolean {
+  return Boolean(settings.interviewer.trim())
+}
+
+/** Le réseau revenu relance l’envoi : tout si l’enquêteur est reconnu, seulement les fiches de test sinon. */
+export function canSync(settings: Pick<Settings, 'interviewer' | 'testMode'>): boolean {
+  return canRetrySends(settings) || settings.testMode
+}
+
+export function canRetryRow(settings: Pick<Settings, 'interviewer' | 'testMode'>, test: boolean): boolean {
+  return canRetrySends(settings) || (settings.testMode && test)
+}
+
+/** Hors connexion et hors mode test, aucune liste n’est demandée. */
+export function listsRequest(settings: Pick<Settings, 'interviewer' | 'testMode'>): 'full' | 'communes' | 'none' {
+  if (settings.interviewer.trim()) return 'full'
+  if (settings.testMode) return 'communes'
+  return 'none'
+}
+
 function clip(value: unknown, max: number): string {
   return typeof value === 'string' ? value.slice(0, max) : ''
 }

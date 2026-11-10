@@ -9,7 +9,7 @@ let inflight: Promise<SheetLists> | null = null
 export type ConfigQuery = {
   device?: string
   who?: string
-  action?: 'add' | 'remove' | 'create'
+  action?: 'add' | 'remove' | 'create' | 'communes'
   interviewer?: string
   target?: string
   phone?: string

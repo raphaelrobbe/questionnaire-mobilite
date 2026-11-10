@@ -5,7 +5,8 @@
  * L'URL /exec va dans VITE_ADMIN_WEBAPP_URL.
  *
  * Ce script n'ouvre aucun autre fichier. Il ne reçoit pas les réponses du questionnaire.
- * Une lecture sans identifiant reconnu ne renvoie aucun enquêteur.
+ * Une lecture sans identifiant reconnu ne renvoie ni enquêteur ni commune.
+ * action=communes, pour le mode test, ne renvoie que les noms de communes.
  * Un identifiant reconnu renvoie le nom de sa ligne et les communes.
  * Un identifiant porté par un administrateur renvoie toute la liste, avec les identifiants et les numéros.
  * La feuille Enquêtés relie l'identité au code à 8 caractères.
@@ -44,7 +45,8 @@ function doGet(e) {
   var payload
   try {
     var action = String(params.action || '')
-    if (action === 'add' || action === 'remove') payload = changeDevices(params, action)
+    if (action === 'communes') payload = readCommunes()
+    else if (action === 'add' || action === 'remove') payload = changeDevices(params, action)
     else if (action === 'create') payload = addInterviewer(params)
     else payload = readConfig(params.device, params.who)
   } catch (error) {
@@ -81,6 +83,17 @@ function spreadsheet() {
   const book = SpreadsheetApp.getActiveSpreadsheet()
   if (!book) throw new Error('Ouvrez le script depuis le tableur privé.')
   return book
+}
+
+function readCommunes() {
+  var communesSheet = spreadsheet().getSheetByName(COMMUNES_TAB)
+  if (!communesSheet) return { ok: false, error: 'Feuille Communes introuvable.' }
+  return {
+    ok: true,
+    service: 'questionnaire-mobilite',
+    interviewers: [],
+    communes: columnByHeader(communesSheet, COMMUNE_HEADER),
+  }
 }
 
 function readConfig(device, who) {

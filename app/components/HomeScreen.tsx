@@ -1,7 +1,7 @@
 import { Link, useNavigate } from '@remix-run/react'
 import { useEffect, useState } from 'react'
 import { DeviceUnknown, isAdminSession } from '~/common/config'
-import { canUseSurvey } from '~/common/settings'
+import { canRetryRow, canUseSurvey } from '~/common/settings'
 import { classifyEndpoint } from '~/common/endpoint'
 import { answerPreview, draftTitle, mapsDestination } from '~/common/survey'
 import { draftMatchesMode } from '~/common/draft'
@@ -13,10 +13,9 @@ import { useInstall } from '~/lib/install.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { confirmInterviewer } from '~/lib/sheets.client'
 import { Button, buttonClass } from './Button'
-import { DeviceIdPanel } from './DeviceId'
-import { TestChip } from './TestMark'
+import { TestChip, TestModeCard } from './TestMark'
 import { MapsLink } from './MapsLink'
-import { statusLabel, type LocalResponse } from '~/lib/outbox.client'
+import { flushOutbox, removeConfirmedResponses, retryResponse, statusLabel, type LocalResponse } from '~/lib/outbox.client'
 
 export function HomeScreen() {
   const settings = useSettings()
@@ -30,6 +29,10 @@ export function HomeScreen() {
   const [abandonCode, setAbandonCode] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
+  const [unauthorized, setUnauthorized] = useState(false)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [clearing, setClearing] = useState(false)
 
   useEffect(() => {
     setDrafts(listDrafts())
@@ -41,16 +44,20 @@ export function HomeScreen() {
     if (!settings || !deviceId || connecting) return
     setConnecting(true)
     setConnectError(null)
+    setUnauthorized(false)
     try {
       if (!navigator.onLine) {
         setConnectError('La première vérification a besoin du réseau.')
         return
       }
       await confirmInterviewer(settings.adminEndpoint, deviceId)
+      await flushOutbox()
     } catch (error) {
+      const refused = error instanceof DeviceUnknown
+      setUnauthorized(refused)
       setConnectError(
-        error instanceof DeviceUnknown
-          ? 'Cet appareil n’est pas autorisé. Envoyez cet identifiant à l’administrateur.'
+        refused
+          ? 'Cet appareil n’est pas autorisé. Contactez l’administrateur.'
           : 'La première vérification a besoin du réseau.',
       )
     } finally {
@@ -64,11 +71,8 @@ export function HomeScreen() {
 
   if (!canUseSurvey(settings)) {
     return (
+      <div className="flex flex-1 flex-col">
       <div className="grid gap-4">
-        <section className="rounded-[28px] border border-line bg-card px-5 py-5">
-          <h1 className="text-sm font-bold text-muted">Identifiant de cet appareil</h1>
-          <DeviceIdPanel deviceId={deviceId} />
-        </section>
         <Button disabled={connecting || !deviceId} onClick={() => void connect()}>
           {connecting ? 'Connexion…' : 'Connexion'}
         </Button>
@@ -77,15 +81,20 @@ export function HomeScreen() {
             {connectError}
           </p>
         ) : null}
+        {unauthorized ? <TestModeCard /> : null}
         <InstallOffer offer={installOffer} />
+      </div>
+      <PrivacyLink />
       </div>
     )
   }
 
   const endpoint = classifyEndpoint(settings.endpoint)
-  const listed = [...rows].sort(homeOrder)
+  const visibleDrafts = drafts.filter((item) => draftMatchesMode(item, settings.testMode))
+  const listed = rows.filter((row) => row.test === settings.testMode).sort(homeOrder)
 
   return (
+    <div className="flex flex-1 flex-col">
     <div className="grid gap-4">
       <InstallOffer offer={installOffer} />
 
@@ -108,23 +117,19 @@ export function HomeScreen() {
       <button type="button" className={buttonClass('primary')} onClick={() => navigate(`/entretien?fiche=${createDraft().code}`)}>
         Nouvelle personne
       </button>
-      {drafts.length > 0 ? (
+      {visibleDrafts.length > 0 ? (
         <ul className="grid gap-2">
-          {[...drafts]
-            .sort((left, right) => Number(draftMatchesMode(right, settings.testMode)) - Number(draftMatchesMode(left, settings.testMode)))
-            .map((item) => {
-            const locked = !draftMatchesMode(item, settings.testMode)
-            return (
-            <li key={item.code} className={`relative rounded-2xl border border-line bg-card px-4 py-3 ${locked ? 'opacity-50' : ''}`}>
-              <div className={`flex flex-wrap items-center gap-2 ${!locked && mapsDestination(item.answers) ? 'pr-16' : ''}`}>
-                <p className={`font-bold ${locked ? 'text-muted' : ''}`}>{draftTitle(item.answers)}</p>
+          {visibleDrafts.map((item) => (
+            <li key={item.code} className="relative rounded-2xl border border-line bg-card px-4 py-3">
+              <div className={`flex flex-wrap items-center gap-2 ${mapsDestination(item.answers) ? 'pr-16' : ''}`}>
+                <p className="font-bold">{draftTitle(item.answers)}</p>
                 {item.test ? <TestChip /> : null}
               </div>
-              {locked ? null : <MapsLink answers={item.answers} compact className="absolute right-4 top-3" />}
-              <p className={`absolute bottom-3 right-3 rounded-full px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] ${locked ? 'bg-line text-muted' : 'bg-pine text-paper'}`}>
+              <MapsLink answers={item.answers} compact className="absolute right-4 top-3" />
+              <p className="absolute bottom-3 right-3 rounded-full bg-pine px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
                 {item.code}
               </p>
-              {!locked && abandonCode === item.code ? (
+              {abandonCode === item.code ? (
                 <div className="mt-3 pr-28">
                   <p className="font-bold">Effacer cette fiche commencée ?</p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
@@ -146,30 +151,45 @@ export function HomeScreen() {
                 </div>
               ) : (
                 <div className="mt-2 flex gap-4 pr-28">
-                  {locked ? (
-                    <p className="self-center text-sm font-semibold text-muted">
-                      {item.test ? 'Activez le mode test pour ouvrir cette fiche.' : 'Désactivez le mode test pour ouvrir cette fiche.'}
-                    </p>
-                  ) : (
-                    <>
-                      <Link to={`/entretien?fiche=${item.code}`} className="inline-flex min-h-11 items-center font-bold text-leaf">
-                        Continuer
-                      </Link>
-                      <button type="button" className="inline-flex min-h-11 items-center font-bold text-danger" onClick={() => setAbandonCode(item.code)}>
-                        Abandonner
-                      </button>
-                    </>
-                  )}
+                  <Link to={`/entretien?fiche=${item.code}`} className="inline-flex min-h-11 items-center font-bold text-leaf">
+                    Continuer
+                  </Link>
+                  <button type="button" className="inline-flex min-h-11 items-center font-bold text-danger" onClick={() => setAbandonCode(item.code)}>
+                    Abandonner
+                  </button>
                 </div>
               )}
             </li>
-            )
-          })}
+          ))}
         </ul>
       ) : null}
 
       <section>
-        <h2 className="text-lg font-extrabold">Sur cet appareil</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-extrabold">Sur cet appareil</h2>
+          {listed.length > 0 && !clearing ? (
+            <button type="button" className="inline-flex min-h-11 shrink-0 items-center font-extrabold text-danger" onClick={() => setClearing(true)}>
+              Vider
+            </button>
+          ) : null}
+        </div>
+        {listed.length > 0 && clearing ? (
+          <div className="mt-1 grid justify-items-end gap-1 text-right">
+            <button
+              type="button"
+              className="text-sm font-bold leading-snug text-danger"
+              onClick={() => {
+                setClearing(false)
+                void removeConfirmedResponses(settings.testMode)
+              }}
+            >
+              Retirer les fiches enregistrées de cet appareil
+            </button>
+            <button type="button" className="inline-flex min-h-11 items-center text-sm font-bold" onClick={() => setClearing(false)}>
+              Annuler
+            </button>
+          </div>
+        ) : null}
         {error ? <p className="mt-3 text-danger">{error}</p> : null}
         {listed.length === 0 ? (
           <p className="mt-3 text-base leading-relaxed text-muted">
@@ -178,26 +198,89 @@ export function HomeScreen() {
         ) : (
           <ul className="mt-3 grid gap-2">
             {listed.map((row) => (
-              <li
+              <StoredFiche
                 key={row.id}
-                className={`flex min-h-11 items-center gap-2 rounded-2xl border border-line px-3 py-2 ${
-                  row.status === 'confirmed' ? 'bg-mist' : 'bg-clay-bg'
-                }`}
-              >
-                <p className="min-w-0 flex-1 truncate font-bold">{answerPreview(row.answers)}</p>
-                {row.test ? <TestChip /> : null}
-                {row.status === 'confirmed' ? null : (
-                  <span className="shrink-0 text-xs font-bold text-clay">{statusLabel(row.status)}</span>
-                )}
-                <span className="shrink-0 rounded-full bg-pine px-2 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
-                  {row.id}
-                </span>
-              </li>
+                row={row}
+                canRetry={canRetryRow(settings, row.test)}
+                open={openId === row.id}
+                retrying={retryingId === row.id}
+                onToggle={() => setOpenId(openId === row.id ? null : row.id)}
+                onRetry={() => {
+                  if (retryingId) return
+                  setRetryingId(row.id)
+                  void retryResponse(row.id).finally(() => setRetryingId(null))
+                }}
+              />
             ))}
           </ul>
         )}
       </section>
     </div>
+    <PrivacyLink />
+    </div>
+  )
+}
+
+function PrivacyLink() {
+  return (
+    <Link to="/protection" prefetch="intent" className="mt-auto flex min-h-11 items-end justify-center pb-1 pt-8 text-sm font-bold text-leaf">
+      Protection des données
+    </Link>
+  )
+}
+
+function StoredFiche({
+  row,
+  open,
+  canRetry,
+  retrying,
+  onToggle,
+  onRetry,
+}: {
+  row: LocalResponse
+  open: boolean
+  canRetry: boolean
+  retrying: boolean
+  onToggle: () => void
+  onRetry: () => void
+}) {
+  const confirmed = row.status === 'confirmed'
+  const expandable = canRetry && !confirmed
+  const line = (
+    <>
+      <p className="min-w-0 flex-1 truncate font-bold">{answerPreview(row.answers)}</p>
+      {row.test ? <TestChip /> : null}
+      {confirmed ? null : <span className="shrink-0 text-xs font-bold text-clay">{statusLabel(row.status)}</span>}
+      <span className="shrink-0 rounded-full bg-pine px-2 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
+        {row.id}
+      </span>
+    </>
+  )
+
+  return (
+    <li className={`rounded-2xl border border-line px-3 py-2 ${confirmed ? 'bg-mist' : 'bg-clay-bg'}`}>
+      {expandable ? (
+        <>
+          <button type="button" aria-expanded={open} onClick={onToggle} className="flex min-h-11 w-full items-center gap-2 text-left">
+            {line}
+          </button>
+          {open ? (
+            <div className="flex justify-end pb-1">
+              <button
+                type="button"
+                disabled={retrying}
+                onClick={onRetry}
+                className="inline-flex h-8 items-center rounded-lg bg-pine px-2.5 text-xs font-extrabold text-paper disabled:opacity-45"
+              >
+                Réessayer
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="flex min-h-11 items-center gap-2">{line}</div>
+      )}
+    </li>
   )
 }
 
@@ -208,20 +291,29 @@ function homeOrder(left: LocalResponse, right: LocalResponse): number {
   return left.createdAt < right.createdAt ? 1 : -1
 }
 
+function InstallIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v11" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 21h14" />
+    </svg>
+  )
+}
+
 function InstallOffer({ offer }: { offer: ReturnType<typeof useInstall> }) {
+  if (!offer.show) return null
   return (
     <div className="grid gap-2">
-      <div className={`grid gap-2 ${offer.show ? 'grid-cols-2' : ''}`}>
-        {offer.show ? (
-          <Button variant="secondary" className="min-w-0 w-full px-3 leading-tight" onClick={() => void offer.install()}>
-            Installer l’application
-          </Button>
-        ) : null}
-        <Link to="/protection" prefetch="intent" className={buttonClass('secondary', 'min-w-0 w-full px-3 leading-tight')}>
-          Protection des données
-        </Link>
-      </div>
-      {offer.show && offer.hint ? (
+      <button
+        type="button"
+        onClick={() => void offer.install()}
+        className="inline-flex min-h-9 w-fit items-center justify-center justify-self-end gap-1.5 rounded-full border border-line bg-card px-3 text-sm font-bold leading-tight text-ink hover:bg-mist"
+      >
+        <InstallIcon />
+        Installer l’application
+      </button>
+      {offer.hint ? (
         <p role="status" className="text-sm font-semibold leading-relaxed text-muted">
           {offer.hint}
         </p>

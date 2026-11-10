@@ -1,4 +1,3 @@
-import { useNavigate } from '@remix-run/react'
 import { useEffect, useState } from 'react'
 import { isAdminSession } from '~/common/config'
 import { classifyEndpoint, endpointMessage, type EndpointIssue } from '~/common/endpoint'
@@ -9,11 +8,11 @@ import { getDeviceId, updateSettings } from '~/lib/settings.client'
 import { probeEndpoint } from '~/lib/sheets.client'
 import { Button } from './Button'
 import { DeviceIdPanel } from './DeviceId'
+import { TestModeCard } from './TestMark'
 
 export function SettingsScreen() {
   const settings = useSettings()
   const lists = useSheetLists()
-  const navigate = useNavigate()
   const [deviceId, setDeviceId] = useState('')
   const [probe, setProbe] = useState<'idle' | 'loading' | 'confirmed' | 'sent' | 'error'>('idle')
   const [probeMessage, setProbeMessage] = useState<string | null>(null)
@@ -51,23 +50,7 @@ export function SettingsScreen() {
 
   return (
     <div className="grid gap-4">
-      <section className="rounded-[28px] border-2 border-test bg-test px-5 py-5 text-test-ink">
-        <h1 className="text-2xl font-extrabold tracking-tight">Mode test</h1>
-        <p className="mt-2 text-base font-semibold leading-snug">
-          Sans identifiant autorisé, ce mode ouvre le questionnaire. Les réponses partent dans la feuille « Réponses TEST » du même tableur, et pas dans Réponses.
-        </p>
-        <button
-          type="button"
-          aria-pressed={settings.testMode}
-          onClick={() => {
-            updateSettings({ testMode: !settings.testMode })
-            navigate('/')
-          }}
-          className="mt-4 inline-flex min-h-14 w-full items-center justify-center rounded-2xl bg-test-ink px-4 text-base font-extrabold text-test"
-        >
-          {settings.testMode ? 'Désactiver le mode test' : 'Activer le mode test'}
-        </button>
-      </section>
+      <TestModeCard />
 
       <h2 className="text-3xl font-extrabold tracking-tight">Réglages</h2>
 
