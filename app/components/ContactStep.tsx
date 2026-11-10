@@ -1,5 +1,6 @@
 import { COLLECTIF_CONSENT, PHONE_CONSENT } from '~/common/consent'
 import type { Answers } from '~/common/survey'
+import { fieldClass } from './fill'
 import { Reveal } from './Reveal'
 
 export function ContactStep({
@@ -43,7 +44,7 @@ export function ContactStep({
                 maxLength={40}
                 placeholder="06 12 34 56 78"
                 onChange={(event) => onChange({ phone: event.target.value })}
-                className="min-h-14 rounded-2xl border border-line bg-paper px-4 text-base outline-none focus:border-leaf"
+                className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(answers.phone.trim()), false)}`}
               />
             </label>
           </Reveal>
@@ -81,7 +82,7 @@ export function ContactStep({
                 maxLength={120}
                 placeholder="prenom@exemple.fr"
                 onChange={(event) => onChange({ email: event.target.value })}
-                className="min-h-14 rounded-2xl border border-line bg-paper px-4 text-base outline-none focus:border-leaf"
+                className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(answers.email.trim()), false)}`}
               />
             </label>
           </Reveal>

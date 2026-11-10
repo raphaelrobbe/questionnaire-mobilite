@@ -1,8 +1,8 @@
 import { Link } from '@remix-run/react'
-import type { MetaFunction } from '@remix-run/node'
+import { pageTitle } from '~/common/meta'
 import { buttonClass } from '~/components/Button'
 
-export const meta: MetaFunction = () => [{ title: 'Page introuvable · Enquête mobilité' }]
+export const meta = pageTitle('Page introuvable · Enquête mobilité Haut-Doubs')
 
 export default function NotFound() {
   return (

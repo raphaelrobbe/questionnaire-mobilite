@@ -4,6 +4,7 @@ import { SLOTS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId } from '~
 import { AGE_BANDS, type Answers, type Person } from '~/common/survey'
 import { communesOnOffer, filterCommunes, fold } from '~/common/config'
 import { Reveal } from './Reveal'
+import { choiceFill, fieldClass, idleClass, type ChoiceFill } from './fill'
 
 const SLOT_GROUPS: { label: string; slots: SlotId[] }[] = [
   { label: 'Très matinal', slots: ['4-6', '6-8'] },
@@ -172,7 +173,7 @@ function TripCard({
                 value={journey.autre}
                 maxLength={80}
                 aria-label="Préciser l’activité"
-                className={`mt-2 min-h-12 w-full rounded-2xl px-4 text-base font-medium ${fieldClass(journey.autre.trim(), true)}`}
+                className={`mt-2 min-h-12 w-full rounded-2xl px-4 text-base font-medium ${fieldClass(Boolean(journey.autre.trim()), true)}`}
                 onChange={(event) => onChange({ autre: event.target.value })}
               />
             </label>
@@ -259,7 +260,7 @@ function TripCard({
           value={journey.comment}
           maxLength={400}
           rows={2}
-          className={`mt-2 w-full rounded-2xl px-4 py-3 text-base font-medium ${fieldClass(journey.comment.trim(), true)}`}
+          className={`mt-2 w-full rounded-2xl px-4 py-3 text-base font-medium ${fieldClass(Boolean(journey.comment.trim()), true)}`}
           onChange={(event) => onChange({ comment: event.target.value })}
         />
       </label>
@@ -701,27 +702,6 @@ function Chip({ pressed, idle, onClick, children }: { pressed: boolean; idle: Ch
       {children}
     </button>
   )
-}
-
-type ChoiceRule = 'one' | 'many' | 'free' | 'free-one'
-type ChoiceFill = 'needed' | 'free' | 'plain'
-
-function choiceFill(rule: ChoiceRule, chosen: boolean): ChoiceFill {
-  if (rule === 'free-one') return chosen ? 'plain' : 'free'
-  if (rule === 'free' || (chosen && rule === 'many')) return 'free'
-  if (!chosen) return 'needed'
-  return 'plain'
-}
-
-function idleClass(fill: ChoiceFill): string {
-  if (fill === 'needed') return 'border border-line bg-rose-bg'
-  if (fill === 'free') return 'border border-line bg-mist'
-  return 'border border-line bg-paper'
-}
-
-function fieldClass(filled: boolean, optional: boolean): string {
-  if (filled) return idleClass('plain')
-  return idleClass(optional ? 'free' : 'needed')
 }
 
 function personChip(person: Person, index: number): string {

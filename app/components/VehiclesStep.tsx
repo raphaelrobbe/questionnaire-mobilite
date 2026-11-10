@@ -7,6 +7,7 @@ import {
   type Vehicle,
 } from '~/common/survey'
 import { Button } from './Button'
+import { choiceClass } from './fill'
 import { Reveal } from './Reveal'
 
 export function VehiclesStep({
@@ -81,9 +82,7 @@ function VehicleCard({
               type="button"
               aria-pressed={selected}
               onClick={() => onChange({ motor: option.value })}
-              className={`min-h-11 rounded-full border px-3 text-sm font-bold ${
-                selected ? 'border-pine bg-pine text-paper' : 'border-line bg-paper text-ink'
-              }`}
+              className={`min-h-11 rounded-full px-3 text-sm font-bold ${choiceClass(selected, 'one', Boolean(vehicle.motor))}`}
             >
               {option.label}
             </button>

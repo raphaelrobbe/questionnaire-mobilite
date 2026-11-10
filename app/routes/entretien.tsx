@@ -1,7 +1,7 @@
-import type { MetaFunction } from '@remix-run/node'
 import { Interview } from '~/components/Interview'
+import { pageTitle } from '~/common/meta'
 
-export const meta: MetaFunction = () => [{ title: 'Entretien · Enquête mobilité' }]
+export const meta = pageTitle('Entretien · Enquête mobilité Haut-Doubs')
 
 export default function Entretien() {
   return <Interview />

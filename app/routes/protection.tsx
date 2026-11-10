@@ -1,10 +1,9 @@
-import type { MetaFunction } from '@remix-run/node'
 import { PrivacyScreen } from '~/components/PrivacyScreen'
+import { pageTitle } from '~/common/meta'
 
-export const meta: MetaFunction = () => [
-  { title: 'Protection des données · Enquête mobilité' },
+export const meta = pageTitle('Protection des données · Enquête mobilité Haut-Doubs', [
   { name: 'robots', content: 'noindex, nofollow' },
-]
+])
 
 export default function Protection() {
   return <PrivacyScreen />

@@ -8,10 +8,10 @@ import { startAutoSync } from '~/lib/outbox.client'
 import stylesheet from '~/tailwind.css?url'
 
 export const meta: MetaFunction = () => [
-  { title: 'Enquête mobilité' },
+  { title: 'Enquête mobilité Haut-Doubs' },
   {
     name: 'description',
-    content: 'Enquête de terrain sur les déplacements. Les réponses partent dans un Google Sheet, ou restent sur le téléphone sans réseau.',
+    content: 'Enquête de terrain sur la mobilité des habitants du Haut-Doubs',
   },
 ]
 

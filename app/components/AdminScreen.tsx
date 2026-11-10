@@ -8,6 +8,7 @@ import { useSheetLists } from '~/hooks/useSheetLists'
 import { fetchSheetLists, publishLists } from '~/lib/config.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { buttonClass } from './Button'
+import { fieldClass } from './fill'
 import { LetterDraft } from './LetterDraft'
 
 export function AdminScreen() {
@@ -254,7 +255,7 @@ export function AdminScreen() {
           autoCapitalize="words"
           placeholder="Prénom Nom"
           onChange={(event) => setPersonName(event.target.value)}
-          className="min-h-11 rounded-xl border border-line bg-paper px-3 text-base outline-none focus:border-leaf"
+          className={`min-h-11 rounded-xl px-3 text-base outline-none focus:border-leaf ${fieldClass(Boolean(personName.trim()), false)}`}
         />
         <input
           value={personPhone}
@@ -266,7 +267,7 @@ export function AdminScreen() {
           spellCheck={false}
           placeholder="Numéro de téléphone, facultatif"
           onChange={(event) => setPersonPhone(event.target.value)}
-          className="min-h-11 rounded-xl border border-line bg-paper px-3 text-base outline-none focus:border-leaf"
+          className={`min-h-11 rounded-xl px-3 text-base outline-none focus:border-leaf ${fieldClass(Boolean(personPhone.trim()), true)}`}
         />
         <button
           type="button"
@@ -348,7 +349,7 @@ export function AdminScreen() {
                 spellCheck={false}
                 placeholder="Ajouter un identifiant"
                 onChange={(event) => setDrafts((current) => ({ ...current, [person.name]: event.target.value }))}
-                className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-paper px-3 font-mono text-sm outline-none focus:border-leaf"
+                className={`min-h-11 min-w-0 flex-1 rounded-xl px-3 font-mono text-sm outline-none focus:border-leaf ${fieldClass(Boolean((drafts[person.name] ?? '').trim()), false)}`}
               />
               <button
                 type="button"

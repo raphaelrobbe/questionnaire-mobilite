@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { communesOnOffer, filterCommunes } from '~/common/config'
+import { choiceClass, fieldClass } from './fill'
 
 export function CommuneStep({
   communes,
@@ -26,7 +27,7 @@ export function CommuneStep({
           spellCheck={false}
           placeholder="Filtrer la liste"
           onChange={(event) => setQuery(event.target.value)}
-          className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
+          className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(query.trim()), true)}`}
         />
       </label>
       {query.trim() && matches.length === 0 ? (
@@ -41,9 +42,7 @@ export function CommuneStep({
                 type="button"
                 aria-pressed={selected}
                 onClick={() => onSelect(name)}
-                className={`min-h-14 w-full rounded-2xl border px-4 text-left text-base font-bold ${
-                  selected ? 'border-pine bg-pine text-paper' : 'border-line bg-card text-ink'
-                }`}
+                className={`min-h-14 w-full rounded-2xl px-4 text-left text-base font-bold ${choiceClass(selected, 'one', Boolean(commune))}`}
               >
                 {name}
               </button>

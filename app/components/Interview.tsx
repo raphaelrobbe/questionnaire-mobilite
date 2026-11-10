@@ -14,6 +14,7 @@ import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { Button, buttonClass } from './Button'
+import { choiceFill, fieldClass, idleClass } from './fill'
 import { ConsentScript } from './ConsentScript'
 import { holdRevealScroll } from './Reveal'
 import { MapsLink } from './MapsLink'
@@ -277,7 +278,7 @@ export function Interview() {
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-leaf">À lire</p>
             <ConsentScript />
           </div>
-          <label className="mt-4 flex min-h-14 items-start gap-3 rounded-2xl border border-line bg-card px-4 py-4">
+          <label className={`mt-4 flex min-h-14 items-start gap-3 rounded-2xl px-4 py-4 ${idleClass(choiceFill('one', draft.consent))}`}>
             <input
               type="checkbox"
               checked={draft.consent}
@@ -507,7 +508,7 @@ function Field({
         placeholder={placeholder}
         maxLength={160}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-14 rounded-2xl border border-line bg-card px-4 text-base outline-none focus:border-leaf"
+        className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(value.trim()), true)}`}
       />
     </label>
   )

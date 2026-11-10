@@ -1,5 +1,6 @@
 import { AGE_BANDS, DRIVE_OPTIONS, MAX_PEOPLE, addPerson, asksAutonomie, changePerson, removePerson, type Person } from '~/common/survey'
 import { Button } from './Button'
+import { choiceClass } from './fill'
 import { Reveal } from './Reveal'
 
 export function HouseholdStep({ people, onChange }: { people: Person[]; onChange: (people: Person[]) => void }) {
@@ -16,6 +17,7 @@ export function HouseholdStep({ people, onChange }: { people: Person[]; onChange
                 <Chip
                   key={option.value}
                   selected={person.age === option.value}
+                  chosen={Boolean(person.age)}
                   label={option.label}
                   onClick={() => onChange(changePerson(people, index, { age: option.value }))}
                 />
@@ -31,6 +33,7 @@ export function HouseholdStep({ people, onChange }: { people: Person[]; onChange
                     <Chip
                       key={option.value}
                       selected={person.drive === option.value}
+                      chosen={Boolean(person.drive)}
                       label={option.label}
                       onClick={() => onChange(changePerson(people, index, { drive: option.value }))}
                     />
@@ -67,15 +70,13 @@ export function HouseholdStep({ people, onChange }: { people: Person[]; onChange
   )
 }
 
-function Chip({ selected, label, onClick }: { selected: boolean; label: string; onClick: () => void }) {
+function Chip({ selected, chosen, label, onClick }: { selected: boolean; chosen: boolean; label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={`min-h-11 rounded-full border px-3 text-sm font-bold ${
-        selected ? 'border-pine bg-pine text-paper' : 'border-line bg-paper text-ink'
-      }`}
+      className={`min-h-11 rounded-full px-3 text-sm font-bold ${choiceClass(selected, 'one', chosen)}`}
     >
       {label}
     </button>

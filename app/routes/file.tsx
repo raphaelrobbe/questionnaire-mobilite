@@ -1,7 +1,7 @@
 import { Navigate } from '@remix-run/react'
-import type { MetaFunction } from '@remix-run/node'
+import { pageTitle } from '~/common/meta'
 
-export const meta: MetaFunction = () => [{ title: 'Accueil · Enquête mobilité' }]
+export const meta = pageTitle('Accueil · Enquête mobilité Haut-Doubs')
 
 export default function FileRoute() {
   return <Navigate to="/" replace />
