@@ -1,7 +1,9 @@
-import { communesOnOffer, fold, PONTARLIER } from './config'
+import { fold, PONTARLIER } from './config'
+import { frenchCommunityFor } from './frenchCommunes'
+import { swissSectorFor } from './swissCommunes'
 import { type MapApp } from './settings'
 import { emptyMotives, motivesStarted, sanitizeMotives, type Motives } from './motives'
-import { actualJourneyIssue, defaultJourneys, journeysStarted, offerJourneyIssue, sanitizeJourneys, type Journey } from './journeys'
+import { DOMICILE, actualJourneyIssue, defaultJourneys, journeysStarted, offerJourneyIssue, sanitizeJourneys, type Journey } from './journeys'
 
 export const MAX_PEOPLE = 12
 export const MAX_VEHICLES = 8
@@ -15,7 +17,15 @@ export type Vehicle = { motor: Motor | ''; sansPermis: boolean }
 
 export type Recontact = 'oui' | 'non'
 
+export type Civility = 'monsieur' | 'madame'
+
+export const CIVILITY: Labeled<Civility>[] = [
+  { value: 'monsieur', label: 'Monsieur' },
+  { value: 'madame', label: 'Madame' },
+]
+
 export type Answers = {
+  civilite: Civility | ''
   nom: string
   prenom: string
   commune: string
@@ -34,6 +44,8 @@ export type Answers = {
   collectifText: string
   email: string
   phone: string
+  /** La personne souhaite devenir enquêteur. */
+  enqueteur: Recontact | ''
 }
 
 type Labeled<T extends string> = { value: T; label: string }
@@ -67,6 +79,7 @@ export type Step =
   | { kind: 'household' }
   | { kind: 'vehicles' }
   | { kind: 'motives' }
+  | { kind: 'reminders' }
   | { kind: 'offers' }
   | { kind: 'contact' }
   | { kind: 'review' }
@@ -86,6 +99,7 @@ export function emptyVehicle(): Vehicle {
 
 export function emptyAnswers(): Answers {
   return {
+    civilite: '',
     nom: '',
     prenom: '',
     commune: '',
@@ -102,6 +116,7 @@ export function emptyAnswers(): Answers {
     collectifText: '',
     email: '',
     phone: '',
+    enqueteur: '',
   }
 }
 
@@ -114,6 +129,7 @@ export function buildSteps(_answers: Answers): Step[] {
     { kind: 'household' },
     { kind: 'vehicles' },
     { kind: 'motives' },
+    { kind: 'reminders' },
     { kind: 'offers' },
     { kind: 'contact' },
     { kind: 'review' },
@@ -137,7 +153,11 @@ export function isEmail(value: string): boolean {
 }
 
 export function wantsEmail(answers: Answers): boolean {
-  return answers.collectif
+  return answers.collectif || answers.enqueteur === 'oui'
+}
+
+function keepsPhone(answers: Pick<Answers, 'recontact' | 'enqueteur'>): boolean {
+  return answers.recontact === 'oui' || answers.enqueteur === 'oui'
 }
 
 function clip(value: string, max: number): string {
@@ -160,8 +180,10 @@ export function sanitizeAnswers(input: unknown): Answers {
   const twoWheelers = sanitizeVehicles(source.twoWheelers)
   const recontact = source.recontact === 'oui' || source.recontact === 'non' ? source.recontact : ''
   const collectif = source.collectif === true
+  const enqueteur = source.enqueteur === 'oui' || source.enqueteur === 'non' ? source.enqueteur : ''
   const email = typeof source.email === 'string' ? normalizeEmail(source.email) : ''
   return {
+    civilite: known(CIVILITY, source.civilite),
     nom: text(source.nom, 80),
     prenom: text(source.prenom, 80),
     commune: text(source.commune, 120),
@@ -176,8 +198,9 @@ export function sanitizeAnswers(input: unknown): Answers {
     recontactText: recontact === 'oui' ? text(source.recontactText, 400) : '',
     collectif,
     collectifText: collectif ? text(source.collectifText, 400) : '',
-    email: collectif ? email : '',
-    phone: recontact === 'oui' ? text(source.phone, 40) : '',
+    email: collectif || enqueteur === 'oui' ? email : '',
+    phone: recontact === 'oui' || enqueteur === 'oui' ? text(source.phone, 40) : '',
+    enqueteur,
   }
 }
 
@@ -224,8 +247,8 @@ export function patchAnswers(answers: Answers, patch: Partial<Answers>): Answers
     const value = patch[key]
     if (typeof value === 'string') next[key] = clip(value, editableText[key])
   }
-  if (next.recontact !== 'oui') next.phone = ''
-  if (!next.collectif) next.email = ''
+  if (!keepsPhone(next)) next.phone = ''
+  if (!wantsEmail(next)) next.email = ''
   return next
 }
 
@@ -261,13 +284,11 @@ export function questionSide(commune: string): 'de' | 'vers' {
   return fold(commune) === fold(PONTARLIER) ? 'de' : 'vers'
 }
 
-export function issueForCommune(answers: Answers, communes: string[]): string | null {
-  if (!answers.commune) {
-    if (!communes.length) return 'La liste des communes n’est pas sur cet appareil.'
-    return 'Choisissez une commune dans la liste.'
-  }
-  if (!communesOnOffer(communes).includes(answers.commune)) return 'Cette commune n’est pas dans la liste.'
-  return null
+export function issueForCommune(answers: Answers): string | null {
+  const commune = answers.commune.trim()
+  if (!commune || fold(commune) === fold(DOMICILE)) return 'Choisissez une commune dans la liste.'
+  if (frenchCommunityFor(commune) || swissSectorFor(commune)) return null
+  return 'Cette commune n’est pas dans la liste.'
 }
 
 export function issueForHousehold(answers: Answers): string | null {
@@ -285,7 +306,8 @@ export function issueForVehicles(answers: Answers): string | null {
 }
 
 export function issueForContact(answers: Answers): string | null {
-  if (answers.recontact === 'oui') {
+  if (!answers.enqueteur) return 'Indiquez si la personne souhaite devenir enquêteur.'
+  if (keepsPhone(answers)) {
     const phone = respondentPhone(answers.phone)
     if (!phone) return phone === null ? 'Ce numéro ne contient aucun chiffre.' : 'Indiquez un numéro de téléphone.'
   }
@@ -293,8 +315,8 @@ export function issueForContact(answers: Answers): string | null {
   return null
 }
 
-export function stepIssue(step: Step, answers: Answers, communes: string[]): string | null {
-  if (step.kind === 'commune') return issueForCommune(answers, communes)
+export function stepIssue(step: Step, answers: Answers): string | null {
+  if (step.kind === 'commune') return issueForCommune(answers)
   if (step.kind === 'household') return issueForHousehold(answers)
   if (step.kind === 'vehicles') return issueForVehicles(answers)
   if (step.kind === 'contact') return issueForContact(answers)
@@ -324,7 +346,7 @@ export function summary(input: Answers): { label: string; value: string }[] {
   const cars = answers.cars.map(vehicleLine).filter(Boolean)
   const twoWheelers = answers.twoWheelers.map(vehicleLine).filter(Boolean)
   return [
-    { label: 'Nom', value: [answers.prenom, answers.nom].filter(Boolean).join(' ') },
+    { label: 'Nom', value: personName(answers) },
     { label: 'Commune', value: answers.commune },
     { label: 'Adresse', value: [answers.adresse, answers.complement].filter(Boolean).join(', ') },
     { label: 'Foyer', value: people.join(' · ') },
@@ -333,6 +355,7 @@ export function summary(input: Answers): { label: string; value: string }[] {
     { label: 'Motifs', value: motivesStarted(answers.motives) ? 'Gardés sur le téléphone' : '' },
     { label: 'Recontact', value: answers.recontact === 'oui' ? 'Oui' : 'Non' },
     { label: 'Collectif Mobilité Haut-Doubs', value: answers.collectif ? 'Oui' : 'Non' },
+    { label: 'Devenir enquêteur', value: answers.enqueteur === 'oui' ? 'Oui' : answers.enqueteur === 'non' ? 'Non' : '' },
     { label: 'Adresse mail', value: answers.email },
     { label: 'Téléphone', value: answers.phone },
   ].filter((line) => line.value !== '')
@@ -352,9 +375,13 @@ export function mapsDestination(answers: Pick<Answers, 'adresse' | 'commune'>, a
   return `https://www.google.com/maps/search/?api=1&query=${query}`
 }
 
+function personName(answers: Answers): string {
+  return [labelOf(CIVILITY, answers.civilite), answers.prenom, answers.nom].filter(Boolean).join(' ')
+}
+
 export function draftTitle(input: Answers): string {
   const answers = sanitizeAnswers(input)
-  const name = [answers.prenom, answers.nom].filter(Boolean).join(' ')
+  const name = personName(answers)
   if (name && answers.commune) return `${name} · ${answers.commune}`
   return name || answers.commune || 'Sans nom'
 }
@@ -375,7 +402,8 @@ function legacyPlace(input: unknown): string {
 export function hasAnyAnswer(input: Answers): boolean {
   const answers = sanitizeAnswers(input)
   return Boolean(
-    answers.nom ||
+    answers.civilite ||
+      answers.nom ||
       answers.prenom ||
       answers.commune ||
       answers.adresse ||
@@ -386,6 +414,7 @@ export function hasAnyAnswer(input: Answers): boolean {
       motivesStarted(answers.motives) ||
       journeysStarted(answers.journeys) ||
       answers.recontact !== '' ||
+      answers.enqueteur !== '' ||
       answers.collectif ||
       answers.email !== '' ||
       answers.phone !== '',

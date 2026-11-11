@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { DOMICILE, RARE_COUNTS, RARE_UNITS, addJourney, journeyHeading, journeyTouched, removeJourney, tripReplacedRiders, tripRiders, updateJourney, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
 import { SLOTS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId } from '~/common/motives'
 import { AGE_BANDS, type Answers, type Person } from '~/common/survey'
-import { communesOnOffer, filterCommunes, fold } from '~/common/config'
 import { Reveal } from './Reveal'
 import { choiceFill, fieldClass, idleClass, type ChoiceFill } from './fill'
+import { PlacePicker } from './PlacePicker'
 
 const SLOT_GROUPS: { label: string; slots: SlotId[] }[] = [
   { label: 'Très matinal', slots: ['4-6', '6-8'] },
@@ -25,16 +25,17 @@ const REPLACED = [
 export function MotivesStep({
   kind,
   answers,
-  communes,
+  initialOpen = -1,
   onChange,
 }: {
   kind: JourneyKind
   answers: Answers
-  communes: string[]
+  /** Trajet à ouvrir au montage, parmi ceux de ce genre. */
+  initialOpen?: number
   onChange: (journeys: Journey[]) => void
 }) {
-  const [open, setOpen] = useState(-1)
-  const pin = useRef(-1)
+  const [open, setOpen] = useState(initialOpen)
+  const pin = useRef(initialOpen)
   const listed = answers.journeys.flatMap((journey, index) => (journey.kind === kind ? [{ journey, index }] : []))
   const shown = listed.flatMap((item, listedIndex) => (journeyTouched(item.journey) || open === listedIndex ? [{ ...item, listedIndex }] : []))
 
@@ -74,7 +75,6 @@ export function MotivesStep({
               pin={pin}
               open={open === item.listedIndex}
               answers={answers}
-              communes={communes}
               onOpen={() => setOpen(open === item.listedIndex ? -1 : item.listedIndex)}
               onChange={(patch) => change(item.index, patch)}
               onRemove={() => remove(item.index)}
@@ -96,7 +96,6 @@ function TripCard({
   pin,
   open,
   answers,
-  communes,
   onOpen,
   onChange,
   onRemove,
@@ -107,7 +106,6 @@ function TripCard({
   pin: { current: number }
   open: boolean
   answers: Answers
-  communes: string[]
   onOpen: () => void
   onChange: (patch: Partial<Journey>) => void
   onRemove: () => void
@@ -124,7 +122,7 @@ function TripCard({
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (!node.isConnected) return
-        const topBar = document.querySelector('[data-test-banner]')?.getBoundingClientRect().height ?? 0
+        const topBar = document.querySelector('[data-top-banner]')?.getBoundingClientRect().height ?? 0
         window.scrollTo({ top: Math.max(0, window.scrollY + node.getBoundingClientRect().top - topBar), behavior })
       })
     })
@@ -182,7 +180,15 @@ function TripCard({
       </fieldset>
 
       {journey.kind === 'actuel' ? (
-        <People title="Qui fait ce trajet ?" rule="many" people={answers.people} selected={tripRiders(journey, answers.people.length)} onToggle={(riders) => onChange({ riders })} />
+        <People
+          title="Qui fait ce trajet ?"
+          rule="many"
+          people={answers.people}
+          selected={tripRiders(journey, answers.people.length)}
+          extras={journey.extraRiders}
+          onToggle={(riders) => onChange({ riders })}
+          onExtras={(extraRiders) => onChange({ extraRiders })}
+        />
       ) : null}
 
       {journey.kind === 'actuel' ? (
@@ -212,11 +218,7 @@ function TripCard({
         originPlace={journey.originPlace ?? ''}
         destination={journey.destination}
         place={journey.place}
-        communes={communes}
-        onOrigin={(origin) => onChange({ origin })}
-        onOriginPlace={(originPlace) => onChange({ originPlace })}
-        onDestination={(destination) => onChange({ destination })}
-        onPlace={(place) => onChange({ place })}
+        onChange={onChange}
       />
 
       {journey.kind === 'actuel' ? (
@@ -268,8 +270,6 @@ function TripCard({
   )
 }
 
-const PLACE_PRESETS = [{ commune: 'Pontarlier', places: ['Lycée Xavier Marmier', 'Gare SNCF', 'Hôpital', 'Zone industrielle', 'Zone commerciale Hyper U', 'Centre-ville'] }]
-
 function DeleteTrip({
   confirming,
   onAsk,
@@ -316,151 +316,41 @@ function TripHeading({ journey, position }: { journey: Journey; position: number
   )
 }
 
-function placesFor(commune: string): string[] {
-  const key = fold(commune.trim())
-  return PLACE_PRESETS.find((item) => fold(item.commune) === key)?.places ?? []
-}
-
 function RouteField({
   origin,
   originPlace,
   destination,
   place,
-  communes,
-  onOrigin,
-  onOriginPlace,
-  onDestination,
-  onPlace,
+  onChange,
 }: {
   origin: string
   originPlace: string
   destination: string
   place: string
-  communes: string[]
-  onOrigin: (origin: string) => void
-  onOriginPlace: (place: string) => void
-  onDestination: (destination: string) => void
-  onPlace: (place: string) => void
+  onChange: (patch: Partial<Journey>) => void
 }) {
-  const home = origin.trim() === DOMICILE
   return (
     <div className="mt-4 rounded-2xl border border-line p-3">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-2">
       <p className="text-base font-extrabold">De</p>
-      <p className="text-base font-extrabold text-muted" aria-hidden>
-        →
+      <PlacePicker
+        label="De"
+        value={origin}
+        place={originPlace}
+        detail
+        onChange={({ value, place: nextPlace }) => onChange({ origin: value, originPlace: nextPlace })}
+      />
+      <p className="flex justify-center py-3 text-4xl font-extrabold leading-none text-pine" aria-hidden>
+        ↓
       </p>
       <p className="text-base font-extrabold">À</p>
-      <div>
-        {home ? (
-          <span className="inline-flex h-8 items-center rounded-md bg-pine pl-1.5 text-sm font-extrabold text-white">
-            {DOMICILE}
-            <button type="button" aria-label="Retirer Domicile" className="px-1.5 text-base leading-none" onClick={() => onOrigin('')}>
-              ×
-            </button>
-          </span>
-        ) : (
-          <>
-            <CommuneInput label="De" value={origin} communes={communes} onChange={onOrigin} />
-            <button type="button" className={`mt-1 h-8 rounded-md px-1.5 text-sm font-extrabold ${idleClass('free')}`} onClick={() => onOrigin(DOMICILE)}>
-              Domicile
-            </button>
-          </>
-        )}
-        <PlaceField commune={home ? '' : origin} value={originPlace} onChange={onOriginPlace} />
-      </div>
-      <span />
-      <div>
-        <CommuneInput label="À" value={destination} communes={communes} onChange={onDestination} />
-        <PlaceField commune={destination} value={place} onChange={onPlace} />
-      </div>
-      </div>
-    </div>
-  )
-}
-
-function CommuneInput({ label, value, communes, onChange }: { label: string; value: string; communes: string[]; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const matches = filterCommunes(communesOnOffer(communes), value, 8)
-  const exact = matches.length === 1 && fold(matches[0]) === fold(value.trim())
-  const show = open && value.trim().length > 0 && !exact
-
-  return (
-    <div className="relative">
-      <input
-        value={value}
-        maxLength={120}
-        role="combobox"
-        aria-label={label}
-        aria-expanded={show}
-        aria-autocomplete="list"
-        autoComplete="off"
-        autoCorrect="off"
-        spellCheck={false}
-        className={`min-h-10 w-full rounded-xl px-2 text-sm font-medium ${fieldClass(Boolean(value.trim()), false)}`}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onChange={(event) => {
-          setOpen(true)
-          onChange(event.target.value)
-        }}
+      <PlacePicker
+        label="À"
+        value={destination}
+        place={place}
+        detail
+        onChange={({ value, place: nextPlace }) => onChange({ destination: value, place: nextPlace })}
       />
-      {show ? (
-        <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-line bg-card py-1 shadow-sm">
-          {matches.length ? (
-            matches.map((name) => (
-              <li key={name}>
-                <button
-                  type="button"
-                  className="min-h-10 w-full px-2 text-left text-sm font-bold"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    onChange(name)
-                    setOpen(false)
-                  }}
-                >
-                  {name}
-                </button>
-              </li>
-            ))
-          ) : (
-            <li className="px-2 py-2 text-sm font-semibold text-clay">Aucune commune ne commence ainsi.</li>
-          )}
-        </ul>
-      ) : null}
     </div>
-  )
-}
-
-function PlaceField({ commune, value, onChange }: { commune: string; value: string; onChange: (place: string) => void }) {
-  const places = placesFor(commune)
-  const chosen = places.some((item) => item === value.trim())
-  return (
-    <label className="mt-2 block text-sm font-extrabold leading-tight">
-      Préciser <span className="font-medium text-muted">(facultatif)</span>
-      {places.length ? (
-        <span className="mt-1 flex flex-wrap gap-0.5">
-          {places.map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={value.trim() === item}
-              className={`h-8 rounded-md px-1.5 text-sm font-extrabold ${value.trim() === item ? 'bg-pine text-white' : idleClass(choiceFill('free-one', chosen))}`}
-              onClick={() => onChange(value.trim() === item ? '' : item)}
-            >
-              {item}
-            </button>
-          ))}
-        </span>
-      ) : null}
-      <input
-        value={value}
-        maxLength={80}
-        aria-label="Préciser"
-        className={`mt-1 min-h-10 w-full rounded-xl px-2 text-sm font-medium ${fieldClass(Boolean(value.trim()), true)}`}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
   )
 }
 
@@ -657,16 +547,21 @@ function People({
   rule,
   people,
   selected,
+  extras = 0,
   onToggle,
+  onExtras,
 }: {
   title: string
   hint?: string
   rule: 'many' | 'free'
   people: Person[]
   selected: number[]
+  extras?: number
   onToggle: (indexes: number[]) => void
+  onExtras?: (count: number) => void
 }) {
-  const idle = choiceFill(rule, selected.length > 0)
+  const householdIdle = choiceFill(rule, selected.length > 0)
+  const extraIdle = choiceFill('free', extras > 0)
   return (
     <fieldset className="mt-4">
       <legend className="text-base font-extrabold">{title}</legend>
@@ -676,12 +571,24 @@ function People({
           <Chip
             key={index}
             pressed={selected.includes(index)}
-            idle={idle}
+            idle={householdIdle}
             onClick={() => onToggle(selected.includes(index) ? selected.filter((item) => item !== index) : [...selected, index])}
           >
             {personChip(person, index)}
           </Chip>
         ))}
+        {onExtras
+          ? Array.from({ length: extras + 1 }, (_, index) => (
+              <Chip
+                key={`extra-${index}`}
+                pressed={index < extras}
+                idle={extraIdle}
+                onClick={() => onExtras(index < extras ? extras - 1 : extras + 1)}
+              >
+                Autre passager
+              </Chip>
+            ))
+          : null}
       </div>
     </fieldset>
   )

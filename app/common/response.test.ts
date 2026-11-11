@@ -28,6 +28,7 @@ function record(patch: Parameters<typeof patchAnswers>[1] = {}): ResponseRecord 
 describe('fiche enregistrée', () => {
   test('retire nom, adresse, contact et position, et garde le reste', () => {
     const source = record({
+      civilite: 'madame',
       nom: 'Martin',
       prenom: 'Ada',
       adresse: '1 grande rue',
@@ -46,6 +47,7 @@ describe('fiche enregistrée', () => {
     expect(kept.answers.cars).toHaveLength(1)
     expect(kept.answers.recontact).toBe('oui')
     expect(kept.answers.collectif).toBe(true)
+    expect(kept.answers.civilite).toBe('')
     expect(kept.answers.nom).toBe('')
     expect(kept.answers.prenom).toBe('')
     expect(kept.answers.adresse).toBe('')
@@ -122,11 +124,13 @@ describe('ligne du tableur', () => {
     )
     expect(JSON.stringify(responseBody(source))).not.toContain('48.856600')
     const plain = mailBody(
-      record({ nom: 'Martin', prenom: 'Ada', adresse: '12 rue de la Gare', recontact: 'oui', phone: '+33 6 12 34 56 78' }),
+      record({ civilite: 'madame', nom: 'Martin', prenom: 'Ada', adresse: '12 rue de la Gare', recontact: 'oui', phone: '+33 6 12 34 56 78' }),
     )
     expect(plain.email).toBe('')
+    expect(plain.civilite).toBe('Madame')
     expect(plain.nom).toBe('Martin')
     expect(plain.prenom).toBe('Ada')
+    expect(JSON.stringify(responseBody(record({ civilite: 'madame', nom: 'Martin' })))).not.toContain('Madame')
     expect(plain.adresse).toBe('12 rue de la Gare')
     expect(plain.telephone).toBe('+33 6 12 34 56 78')
     expect(plain.texteRecontact).toBe(PHONE_CONSENT)

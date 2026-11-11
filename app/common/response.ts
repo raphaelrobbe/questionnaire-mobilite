@@ -55,6 +55,7 @@ export function holdsPersonal(record: PersonalCarrier): boolean {
   return (
     record.latitude != null ||
     record.longitude != null ||
+    filled(answers.civilite) ||
     filled(answers.nom) ||
     filled(answers.prenom) ||
     filled(answers.adresse) ||
@@ -72,6 +73,7 @@ export function forgetPersonal<T extends PersonalCarrier>(record: T): T {
     longitude: null,
     answers: {
       ...record.answers,
+      civilite: '',
       nom: '',
       prenom: '',
       adresse: '',
@@ -103,6 +105,7 @@ export type MailBody = {
   code: string
   appareil: string
   enqueteur: string
+  civilite: '' | 'Monsieur' | 'Madame'
   nom: string
   prenom: string
   commune: string
@@ -116,6 +119,7 @@ export type MailBody = {
   collectif: 'oui' | 'non'
   texteRecontact: string
   texteCollectif: string
+  devenirEnqueteur: 'oui' | 'non' | ''
 }
 
 export type SheetHeader = (typeof SHEET_HEADERS)[number]
@@ -163,6 +167,7 @@ export function mailBody(record: ResponseRecord): MailBody {
     code: clip(record.id, 80),
     appareil: clip(record.deviceId, 80),
     enqueteur: clip(record.interviewer, 80),
+    civilite: answers.civilite === 'monsieur' ? 'Monsieur' : answers.civilite === 'madame' ? 'Madame' : '',
     nom: clip(answers.nom, 80),
     prenom: clip(answers.prenom, 80),
     commune: clip(answers.commune, 120),
@@ -176,6 +181,7 @@ export function mailBody(record: ResponseRecord): MailBody {
     collectif: answers.collectif ? 'oui' : 'non',
     texteRecontact: answers.recontact === 'oui' ? clip(answers.recontactText || PHONE_CONSENT, 400) : '',
     texteCollectif: answers.collectif ? clip(answers.collectifText || COLLECTIF_CONSENT, 400) : '',
+    devenirEnqueteur: answers.enqueteur === 'oui' ? 'oui' : answers.enqueteur === 'non' ? 'non' : '',
   }
 }
 

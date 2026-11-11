@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import { draftMatchesMode } from '~/common/draft'
 import { classifyEndpoint } from '~/common/endpoint'
 import { canUseSurvey } from '~/common/settings'
-import { buildSteps, patchAnswers, stepIssue, summary, type Answers } from '~/common/survey'
+import { presetActualJourney } from '~/common/journeys'
+import { type ThemeId } from '~/common/motives'
+import { CIVILITY, buildSteps, patchAnswers, stepIssue, summary, type Answers } from '~/common/survey'
 import type { ResponseRecord } from '~/common/response'
 import { createDraft, loadDraft, removeDraft, saveDraft, type Draft } from '~/lib/draft.client'
 import { capturePosition } from '~/lib/geo.client'
@@ -14,11 +16,11 @@ import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { Button, buttonClass } from './Button'
-import { choiceFill, fieldClass, idleClass } from './fill'
+import { choiceClass, choiceFill, fieldClass, idleClass } from './fill'
 import { ConsentScript } from './ConsentScript'
 import { holdRevealScroll } from './Reveal'
 import { MapsLink } from './MapsLink'
-import { CommuneStep } from './CommuneStep'
+import { PlacePicker } from './PlacePicker'
 import { ContactStep } from './ContactStep'
 import { HouseholdStep } from './HouseholdStep'
 import { MotivesStep } from './MotivesStep'
@@ -40,6 +42,7 @@ export function Interview() {
   const [geoBusy, setGeoBusy] = useState(false)
   const [deviceId, setDeviceId] = useState('')
   const [missing, setMissing] = useState(false)
+  const [openedTrip, setOpenedTrip] = useState(-1)
 
   const named = settings ? canUseSurvey(settings) : false
 
@@ -165,13 +168,28 @@ export function Interview() {
 
   function goNext() {
     if (!draft || !step || issue) return
+    setOpenedTrip(-1)
     update({ step: stepIndex + 1 })
     window.scrollTo(0, 0)
   }
 
   function goBack() {
     if (!draft || !step) return
+    setOpenedTrip(-1)
     if (stepIndex > 0) update({ step: stepIndex - 1 })
+    window.scrollTo(0, 0)
+  }
+
+  function addReminder(item: OccasionalTrip) {
+    if (!draft) return
+    const created = presetActualJourney(draft.answers.journeys, { theme: item.theme, autre: item.autre })
+    if (!created) return
+    const motiveStep = steps.findIndex((entry) => entry.kind === 'motives')
+    if (motiveStep < 0) return
+    setOpenedTrip(created.listedIndex)
+    setDraft((current) =>
+      current ? { ...current, step: motiveStep, answers: patchAnswers(current.answers, { journeys: created.journeys }) } : current,
+    )
     window.scrollTo(0, 0)
   }
 
@@ -225,7 +243,7 @@ export function Interview() {
       ? draft.consent
         ? null
         : 'Cochez l’accord avant de continuer.'
-      : stepIssue(step, draft.answers, lists.communes)
+      : stepIssue(step, draft.answers)
   const issue = storedIssue
 
   async function notePosition() {
@@ -263,6 +281,22 @@ export function Interview() {
           </h1>
           <p className="mt-2 text-base text-muted">Facultatif. La fiche peut être préparée avant la rencontre.</p>
           <div className="mt-4 grid gap-3">
+            <fieldset className="grid gap-2">
+              <legend className="font-bold">Civilité</legend>
+              <div className="flex flex-wrap gap-2">
+                {CIVILITY.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    aria-pressed={draft.answers.civilite === item.value}
+                    className={`min-h-11 rounded-2xl px-4 text-sm font-extrabold ${choiceClass(draft.answers.civilite === item.value, 'free-one', Boolean(draft.answers.civilite))}`}
+                    onClick={() => updateAnswers({ civilite: draft.answers.civilite === item.value ? '' : item.value })}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <Field label="Prénom" value={draft.answers.prenom} autoComplete="given-name" onChange={(prenom) => updateAnswers({ prenom })} />
             <Field label="Nom" value={draft.answers.nom} autoComplete="family-name" onChange={(nom) => updateAnswers({ nom })} />
           </div>
@@ -296,11 +330,12 @@ export function Interview() {
             Dans quelle commune habitez-vous ?
           </h1>
           <p className="mt-2 text-base text-muted">Choisissez-la dans la liste.</p>
-          {lists.message ? <p className="mt-3 text-sm font-semibold text-clay">{lists.message}</p> : null}
-          <CommuneStep
-            communes={lists.communes}
-            commune={draft.answers.commune}
-            onSelect={(commune) => updateAnswers({ commune })}
+          <PlacePicker
+            label="Commune"
+            inputId="commune-filtre"
+            value={draft.answers.commune}
+            domicile={false}
+            onChange={({ value }) => updateAnswers({ commune: value })}
           />
         </section>
       ) : null}
@@ -360,7 +395,38 @@ export function Interview() {
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] leading-tight tracking-tight outline-none">
             <span className="font-extrabold">Trajets que le foyer fait déjà</span>, quel que soit le moyen.
           </h1>
-          <MotivesStep kind="actuel" answers={draft.answers} communes={lists.communes} onChange={(journeys) => updateAnswers({ journeys })} />
+          <MotivesStep
+            kind="actuel"
+            answers={draft.answers}
+            initialOpen={openedTrip}
+            onChange={(journeys) => updateAnswers({ journeys })}
+          />
+        </section>
+      ) : null}
+
+      {step.kind === 'reminders' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Avez-vous pensé à tout ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Les trajets occasionnels comptent aussi, même s’ils sont rares.</p>
+          <ul className="mt-4 grid gap-2">
+            {OCCASIONAL_TRIPS.map((item) => (
+              <li key={item.label} className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-2">
+                <span className="min-w-0 flex-1 text-base font-bold leading-snug">{item.label}</span>
+                <button
+                  type="button"
+                  aria-label={`Ajouter un trajet : ${item.label}`}
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line bg-paper text-pine"
+                  onClick={() => addReminder(item)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 
@@ -372,7 +438,7 @@ export function Interview() {
           <p className="mt-2 text-base text-muted">
             Ils ne sont pas faits aujourd’hui. Ils le seraient en transport en commun, si l’offre était efficace, fiable et financièrement intéressante.
           </p>
-          <MotivesStep kind="nouveau" answers={draft.answers} communes={lists.communes} onChange={(journeys) => updateAnswers({ journeys })} />
+          <MotivesStep kind="nouveau" answers={draft.answers} onChange={(journeys) => updateAnswers({ journeys })} />
         </section>
       ) : null}
 
@@ -470,6 +536,20 @@ export function Interview() {
     </div>
   )
 }
+
+type OccasionalTrip = { label: string; theme: ThemeId | ''; autre: string }
+
+const OCCASIONAL_TRIPS: OccasionalTrip[] = [
+  { label: 'Démarche administrative', theme: 'administratif', autre: '' },
+  { label: 'Banque', theme: 'administratif', autre: '' },
+  { label: 'Coiffeur', theme: 'loisirs', autre: 'Coiffeur' },
+  { label: 'Cinéma', theme: 'loisirs', autre: 'Cinéma' },
+  { label: 'Soirée', theme: 'loisirs', autre: 'Soirée' },
+  { label: 'Gare', theme: '', autre: '' },
+  { label: 'Activité sportive, pour vous ou les enfants', theme: 'loisirs', autre: 'Sport' },
+  { label: 'Rendez-vous médical, pour vous ou pour quelqu’un d’autre', theme: 'sante', autre: '' },
+  { label: 'Autre', theme: '', autre: '' },
+]
 
 function sendHint(online: boolean, endpointReady: boolean): string | null {
   if (!online) return 'Pas de réseau. La réponse restera sur ce téléphone.'

@@ -19,7 +19,7 @@ describe('réglages', () => {
     expect(canUseSurvey({ interviewer: '', testMode: true })).toBe(true)
     expect(canUseSurvey({ interviewer: 'Ada', testMode: false })).toBe(true)
     expect(listsRequest({ interviewer: '', testMode: false })).toBe('none')
-    expect(listsRequest({ interviewer: '', testMode: true })).toBe('communes')
+    expect(listsRequest({ interviewer: '', testMode: true })).toBe('none')
     expect(listsRequest({ interviewer: 'Ada', testMode: true })).toBe('full')
     expect(canRetrySends({ interviewer: '' })).toBe(false)
     expect(canRetrySends({ interviewer: 'Ada' })).toBe(true)

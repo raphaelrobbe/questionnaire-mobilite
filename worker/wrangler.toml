@@ -1,0 +1,9 @@
+name = "enquete-mobilite-contact"
+main = "index.ts"
+compatibility_date = "2026-03-01"
+
+[vars]
+SMTP_HOST = "smtp.ionos.fr"
+SMTP_PORT = "465"
+SMTP_USER = "noreply@enquete-mobilite-haut-doubs.fr"
+SMTP_TO = "contact@enquete-mobilite-haut-doubs.fr"

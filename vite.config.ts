@@ -2,8 +2,10 @@
 import { vitePlugin as remix } from '@remix-run/dev'
 import { installGlobals } from '@remix-run/node'
 import tailwindcss from '@tailwindcss/vite'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import tsconfigPaths from 'vite-tsconfig-paths'
+import { contactDevApi } from './app/server/contactPlugin'
+import type { SmtpEnv } from './app/server/contact.server'
 
 installGlobals()
 
@@ -17,12 +19,16 @@ function pagesBase(value: string | undefined): string {
   return withSlash.endsWith('/') ? withSlash : `${withSlash}/`
 }
 
-export default defineConfig({
-  base,
-  plugins: [
+export default defineConfig(({ mode }) => {
+  const fileEnv = loadEnv(mode, process.cwd(), '')
+  const siteKey = process.env.TURNSTILE_SITE_KEY || fileEnv.TURNSTILE_SITE_KEY || ''
+  const contactUrl = process.env.VITE_CONTACT_URL || fileEnv.VITE_CONTACT_URL || ''
+  const smtp = smtpEnv(process.env, fileEnv)
+  const plugins = [
     ...(process.env.VITEST
       ? []
       : [
+          contactDevApi(smtp),
           remix({
             basename: base,
             ssr: false,
@@ -36,7 +42,14 @@ export default defineConfig({
         ]),
     tailwindcss(),
     tsconfigPaths(),
-  ],
+  ].flat()
+  return {
+  base,
+  define: {
+    __TURNSTILE_SITE_KEY__: JSON.stringify(siteKey),
+    __CONTACT_URL__: JSON.stringify(contactUrl),
+  },
+  plugins,
   server: {
     port: 4317,
     strictPort: true,
@@ -55,4 +68,17 @@ export default defineConfig({
     environment: 'node',
     include: process.env.DEPLOY_GATE === '1' ? ['scripts/reponse-non-autorisee.test.ts'] : ['app/**/*.test.ts'],
   },
+  }
 })
+
+function smtpEnv(processEnv: NodeJS.ProcessEnv, fileEnv: Record<string, string>): SmtpEnv {
+  const pick = (name: keyof SmtpEnv) => processEnv[name] || fileEnv[name] || ''
+  return {
+    SMTP_HOST: pick('SMTP_HOST'),
+    SMTP_PORT: pick('SMTP_PORT'),
+    SMTP_USER: pick('SMTP_USER'),
+    SMTP_PASSWORD: pick('SMTP_PASSWORD'),
+    SMTP_TO: pick('SMTP_TO'),
+    TURNSTILE_SECRET_KEY: pick('TURNSTILE_SECRET_KEY'),
+  }
+}

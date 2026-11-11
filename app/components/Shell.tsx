@@ -1,13 +1,14 @@
-import { Link, useLocation, useNavigate } from '@remix-run/react'
-import type { MouseEvent, ReactNode } from 'react'
+import { Link, useLocation } from '@remix-run/react'
+import type { ReactNode } from 'react'
 import { isAdminSession } from '~/common/config'
+import { canUseSurvey } from '~/common/settings'
 import { useOnline } from '~/hooks/useOnline'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
 import { Mark } from './Mark'
 import { TestBanner } from './TestMark'
 
-const links = [{ to: '/', label: 'Accueil' }]
+const links = [{ to: '/', label: 'Accueil enquêteur' }]
 
 export function Shell({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -17,42 +18,53 @@ export function Shell({ children }: { children: ReactNode }) {
   const nav = settings && isAdminSession(lists.interviewers, settings.interviewer) ? [...links, { to: '/admin', label: 'Admin' }] : []
   const interviewing = location.pathname === '/entretien'
   const onSettings = location.pathname === '/reglages'
-  const returnsHome = onSettings || location.pathname === '/protection'
-  const navigate = useNavigate()
-
-  function leaveToHome(event: MouseEvent<HTMLElement>) {
-    if (!returnsHome) return
-    const link = (event.target as HTMLElement).closest('a')
-    if (link && !(onSettings && link.hasAttribute('data-settings'))) return
-    event.preventDefault()
-    navigate('/')
-  }
+  const onSite = location.pathname === '/site'
+  const survey = Boolean(settings && canUseSurvey(settings))
 
   return (
     <div className="flex min-h-dvh flex-col bg-paper text-ink">
       <a
         href="#contenu"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-20 focus:rounded-full focus:bg-card focus:px-4 focus:py-2 focus:font-bold"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-card focus:px-4 focus:py-2 focus:font-bold"
       >
         Aller au contenu
       </a>
-      {settings?.testMode ? <TestBanner /> : null}
+      <div data-top-banner className="sticky top-0 z-40">
+        <p className="bg-clay px-3 py-1 text-center text-xs font-bold leading-tight text-paper">
+          Site en cours de construction - Ne pas diffuser
+        </p>
+        {settings?.testMode ? <TestBanner /> : null}
+      </div>
       {interviewing ? null : (
-        <header className={`border-b border-line bg-card/90 backdrop-blur ${returnsHome ? 'cursor-pointer' : ''}`} onClick={leaveToHome}>
+        <header className="border-b border-line bg-card/90 backdrop-blur">
           <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 py-3">
-            <Mark />
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-extrabold leading-tight tracking-tight">
-                Transports en commun dans le Haut-Doubs
-              </p>
-              <p className="mt-1 text-sm font-semibold text-muted">Enquête de terrain</p>
-            </div>
+            <Link to="/" className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl">
+              <Mark />
+              <span className="min-w-0">
+                <span className="block text-base font-extrabold leading-tight tracking-tight text-ink">
+                  Transports en commun dans le Haut-Doubs
+                </span>
+                <span className="mt-1 block text-sm font-semibold text-muted">Enquête de terrain</span>
+              </span>
+            </Link>
             {!online ? (
               <p className="rounded-full bg-clay-bg px-3 py-1 text-sm font-bold text-clay">Hors réseau</p>
             ) : null}
+            {survey ? (
+              <Link
+                to="/site"
+                prefetch="intent"
+                aria-label="Accueil du site"
+                aria-current={onSite ? 'page' : undefined}
+                className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full ${
+                  onSite ? 'bg-pine text-paper' : 'text-pine hover:bg-mist'
+                }`}
+              >
+                <House />
+              </Link>
+            ) : null}
             <Link
               to={onSettings ? '/' : '/reglages'}
-              data-settings=""
               prefetch="intent"
               aria-label={onSettings ? 'Retour à l’accueil' : 'Réglages'}
               aria-current={onSettings ? 'page' : undefined}
@@ -89,6 +101,14 @@ export function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
     </div>
+  )
+}
+
+function House() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-6" aria-hidden="true" fill="currentColor">
+      <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z" />
+    </svg>
   )
 }
 

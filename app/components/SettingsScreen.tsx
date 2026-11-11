@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { isAdminSession } from '~/common/config'
+import { DeviceUnknown, isAdminSession } from '~/common/config'
 import { classifyEndpoint, endpointMessage, type EndpointIssue } from '~/common/endpoint'
 import { MAP_APPS } from '~/common/settings'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
+import { flushOutbox } from '~/lib/outbox.client'
 import { getDeviceId, updateSettings } from '~/lib/settings.client'
-import { probeEndpoint } from '~/lib/sheets.client'
+import { confirmInterviewer, probeEndpoint } from '~/lib/sheets.client'
 import { Button } from './Button'
 import { DeviceIdPanel } from './DeviceId'
+import { InstallOffer } from './InstallOffer'
 import { TestModeCard } from './TestMark'
 
 export function SettingsScreen() {
@@ -17,6 +19,8 @@ export function SettingsScreen() {
   const [probe, setProbe] = useState<'idle' | 'loading' | 'confirmed' | 'sent' | 'error'>('idle')
   const [probeMessage, setProbeMessage] = useState<string | null>(null)
   const [signedOut, setSignedOut] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const [connectError, setConnectError] = useState<string | null>(null)
 
   useEffect(() => {
     setDeviceId(getDeviceId())
@@ -28,6 +32,29 @@ export function SettingsScreen() {
 
   const admin = isAdminSession(lists.interviewers, settings.interviewer)
   const hint = connectionHint(settings.endpoint, settings.adminEndpoint)
+
+  async function connect() {
+    if (!settings || !deviceId || connecting) return
+    setConnecting(true)
+    setConnectError(null)
+    setSignedOut(false)
+    try {
+      if (!navigator.onLine) {
+        setConnectError('La première vérification a besoin du réseau.')
+        return
+      }
+      await confirmInterviewer(settings.adminEndpoint, deviceId)
+      await flushOutbox()
+    } catch (error) {
+      setConnectError(
+        error instanceof DeviceUnknown
+          ? 'Cet appareil n’est pas autorisé. Contactez l’administrateur.'
+          : 'La première vérification a besoin du réseau.',
+      )
+    } finally {
+      setConnecting(false)
+    }
+  }
 
   async function testConnection() {
     setProbe('loading')
@@ -50,6 +77,19 @@ export function SettingsScreen() {
 
   return (
     <div className="grid gap-4">
+      {settings.interviewer.trim() ? null : (
+        <>
+          <Button disabled={connecting || !deviceId} onClick={() => void connect()}>
+            {connecting ? 'Connexion…' : 'Connexion'}
+          </Button>
+          {connectError ? (
+            <p role="status" className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">
+              {connectError}
+            </p>
+          ) : null}
+        </>
+      )}
+      <InstallOffer />
       <TestModeCard />
 
       <h2 className="text-3xl font-extrabold tracking-tight">Réglages</h2>

@@ -23,7 +23,7 @@ function queueReveal(node: HTMLElement) {
     queued = false
     const nodes = pending.splice(0).filter((item) => item.isConnected)
     if (skipFrames > 0) return
-    const topBar = document.querySelector('[data-test-banner]')?.getBoundingClientRect().height ?? 0
+    const topBar = document.querySelector('[data-top-banner]')?.getBoundingClientRect().height ?? 0
     const dock = document.querySelector('[data-dock]')?.getBoundingClientRect().height ?? 0
     const viewTop = topBar
     const viewBottom = window.innerHeight - dock

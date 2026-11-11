@@ -1,6 +1,6 @@
 import { Link, useNavigate } from '@remix-run/react'
 import { useEffect, useState } from 'react'
-import { DeviceUnknown, isAdminSession } from '~/common/config'
+import { isAdminSession } from '~/common/config'
 import { canRetryRow, canUseSurvey } from '~/common/settings'
 import { classifyEndpoint } from '~/common/endpoint'
 import { answerPreview, draftTitle, mapsDestination } from '~/common/survey'
@@ -9,84 +9,38 @@ import { createDraft, listDrafts, removeDraft, type Draft } from '~/lib/draft.cl
 import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
-import { useInstall } from '~/lib/install.client'
-import { getDeviceId } from '~/lib/settings.client'
-import { confirmInterviewer } from '~/lib/sheets.client'
-import { Button, buttonClass } from './Button'
-import { TestChip, TestModeCard } from './TestMark'
+import { buttonClass } from './Button'
+import { InstallOffer } from './InstallOffer'
+import { PrivacyLink, PublicHome } from './PublicHome'
+import { TestChip } from './TestMark'
 import { MapsLink } from './MapsLink'
-import { flushOutbox, removeConfirmedResponses, retryResponse, statusLabel, type LocalResponse } from '~/lib/outbox.client'
+import { removeConfirmedResponses, retryResponse, statusLabel, type LocalResponse } from '~/lib/outbox.client'
 
 export function HomeScreen() {
   const settings = useSettings()
   const lists = useSheetLists()
   const { rows, error } = useOutbox()
-  const installOffer = useInstall()
   const navigate = useNavigate()
   const [drafts, setDrafts] = useState<Draft[]>([])
-  const [deviceId, setDeviceId] = useState('')
   const [ready, setReady] = useState(false)
   const [abandonCode, setAbandonCode] = useState<string | null>(null)
-  const [connecting, setConnecting] = useState(false)
-  const [connectError, setConnectError] = useState<string | null>(null)
-  const [unauthorized, setUnauthorized] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
 
   useEffect(() => {
     setDrafts(listDrafts())
-    setDeviceId(getDeviceId())
     setReady(true)
   }, [])
 
-  async function connect() {
-    if (!settings || !deviceId || connecting) return
-    setConnecting(true)
-    setConnectError(null)
-    setUnauthorized(false)
-    try {
-      if (!navigator.onLine) {
-        setConnectError('La première vérification a besoin du réseau.')
-        return
-      }
-      await confirmInterviewer(settings.adminEndpoint, deviceId)
-      await flushOutbox()
-    } catch (error) {
-      const refused = error instanceof DeviceUnknown
-      setUnauthorized(refused)
-      setConnectError(
-        refused
-          ? 'Cet appareil n’est pas autorisé. Contactez l’administrateur.'
-          : 'La première vérification a besoin du réseau.',
-      )
-    } finally {
-      setConnecting(false)
-    }
-  }
-
-  if (!settings || !ready || !rows) {
+  if (!settings || !ready) {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’enquête…</p>
   }
 
-  if (!canUseSurvey(settings)) {
-    return (
-      <div className="flex flex-1 flex-col">
-      <div className="grid gap-4">
-        <Button disabled={connecting || !deviceId} onClick={() => void connect()}>
-          {connecting ? 'Connexion…' : 'Connexion'}
-        </Button>
-        {connectError ? (
-          <p role="status" className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">
-            {connectError}
-          </p>
-        ) : null}
-        {unauthorized ? <TestModeCard /> : null}
-        <InstallOffer offer={installOffer} />
-      </div>
-      <PrivacyLink />
-      </div>
-    )
+  if (!canUseSurvey(settings)) return <PublicHome />
+
+  if (!rows) {
+    return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’enquête…</p>
   }
 
   const endpoint = classifyEndpoint(settings.endpoint)
@@ -96,7 +50,7 @@ export function HomeScreen() {
   return (
     <div className="flex flex-1 flex-col">
     <div className="grid gap-4">
-      <InstallOffer offer={installOffer} />
+      <InstallOffer />
 
       <section className="rounded-[28px] border border-line bg-card px-5 py-5 shadow-[0_12px_40px_rgba(28,25,21,0.06)]">
         <p className="text-sm font-bold text-muted">Enquêteur</p>
@@ -221,14 +175,6 @@ export function HomeScreen() {
   )
 }
 
-function PrivacyLink() {
-  return (
-    <Link to="/protection" prefetch="intent" className="mt-auto flex min-h-11 items-end justify-center pb-1 pt-8 text-sm font-bold text-leaf">
-      Protection des données
-    </Link>
-  )
-}
-
 function StoredFiche({
   row,
   open,
@@ -289,35 +235,4 @@ function homeOrder(left: LocalResponse, right: LocalResponse): number {
   const group = Number(left.status === 'confirmed') - Number(right.status === 'confirmed')
   if (group !== 0) return group
   return left.createdAt < right.createdAt ? 1 : -1
-}
-
-function InstallIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-4 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v11" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M5 21h14" />
-    </svg>
-  )
-}
-
-function InstallOffer({ offer }: { offer: ReturnType<typeof useInstall> }) {
-  if (!offer.show) return null
-  return (
-    <div className="grid gap-2">
-      <button
-        type="button"
-        onClick={() => void offer.install()}
-        className="inline-flex min-h-9 w-fit items-center justify-center justify-self-end gap-1.5 rounded-full border border-line bg-card px-3 text-sm font-bold leading-tight text-ink hover:bg-mist"
-      >
-        <InstallIcon />
-        Installer l’application
-      </button>
-      {offer.hint ? (
-        <p role="status" className="text-sm font-semibold leading-relaxed text-muted">
-          {offer.hint}
-        </p>
-      ) : null}
-    </div>
-  )
 }

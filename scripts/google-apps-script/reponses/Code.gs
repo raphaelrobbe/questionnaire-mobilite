@@ -146,6 +146,7 @@ function isPrivateHeader(header) {
     name === 'adresse_mail' ||
     name === 'nom' ||
     name === 'prenom' ||
+    name === 'civilite' ||
     name === 'complement' ||
     name === "complement d'adresse" ||
     name === 'latitude' ||

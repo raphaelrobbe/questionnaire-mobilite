@@ -185,7 +185,7 @@ function HouseholdFiche() {
       <p>Foyers sélectionnés pour l’enquête et personnes contactées dans ce cadre.</p>
       <h3 className="font-extrabold">Données traitées</h3>
       <p>
-        Nom, prénom, adresse du foyer, numéro de téléphone lorsqu’il est communiqué, code du foyer, informations de
+        Civilité, nom, prénom, adresse du foyer, numéro de téléphone lorsqu’il est communiqué, code du foyer, informations de
         suivi des visites et coordonnées géographiques du lieu de l’enquête.
       </p>
       <h3 className="font-extrabold">Destinataires</h3>

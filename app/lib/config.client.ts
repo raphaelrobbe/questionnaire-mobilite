@@ -9,7 +9,7 @@ let inflight: Promise<SheetLists> | null = null
 export type ConfigQuery = {
   device?: string
   who?: string
-  action?: 'add' | 'remove' | 'create' | 'communes'
+  action?: 'add' | 'remove' | 'create'
   interviewer?: string
   target?: string
   phone?: string
@@ -29,7 +29,10 @@ export function loadCachedLists(): SheetLists | null {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return null
-    return readListsPayload(JSON.parse(raw))
+    const parsed = JSON.parse(raw) as unknown
+    const lists = readListsPayload(parsed)
+    if (parsed && typeof parsed === 'object' && 'communes' in parsed) saveCachedLists(lists)
+    return lists
   } catch {
     return null
   }
@@ -55,7 +58,7 @@ export function fetchSheetLists(endpoint: string, query: ConfigQuery = {}): Prom
   return inflight
 }
 
-const LISTS_SILENCE = 'Les feuilles Enquêteurs et Communes ne répondent pas.'
+const LISTS_SILENCE = 'La feuille Enquêteurs ne répond pas.'
 
 async function requestSheetLists(endpoint: string, query: ConfigQuery): Promise<SheetLists> {
   const target = classifyEndpoint(endpoint)

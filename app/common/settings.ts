@@ -40,10 +40,9 @@ export function canRetryRow(settings: Pick<Settings, 'interviewer' | 'testMode'>
   return canRetrySends(settings) || (settings.testMode && test)
 }
 
-/** Hors connexion et hors mode test, aucune liste n’est demandée. */
-export function listsRequest(settings: Pick<Settings, 'interviewer' | 'testMode'>): 'full' | 'communes' | 'none' {
+/** Les enquêteurs ne sont demandés qu’une fois le nom reconnu. Le mode test ne demande rien : les communes sont dans le code. */
+export function listsRequest(settings: Pick<Settings, 'interviewer' | 'testMode'>): 'full' | 'none' {
   if (settings.interviewer.trim()) return 'full'
-  if (settings.testMode) return 'communes'
   return 'none'
 }
 

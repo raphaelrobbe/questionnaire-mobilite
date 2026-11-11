@@ -45,6 +45,8 @@ export type Journey = {
   place: string
   replaced: Replaced
   riders: number[]
+  /** Passagers qui ne vivent pas dans le foyer. Chaque sélection en propose un de plus. */
+  extraRiders: number
   /** Vrai si « qui fait ce trajet » a été modifié à la main. Sinon, l’unique personne du foyer est sélectionnée. */
   ridersCustom: boolean
   replacedRiders: number[]
@@ -77,6 +79,7 @@ export function emptyJourney(kind: JourneyKind): Journey {
     place: '',
     replaced: kind === 'nouveau' ? 'offre' : '',
     riders: [],
+    extraRiders: 0,
     ridersCustom: false,
     replacedRiders: [],
     replacedRidersCustom: false,
@@ -101,6 +104,7 @@ export function journeyTouched(journey: Journey): boolean {
       journey.destination.trim() ||
       journey.place.trim() ||
       journey.riders.length ||
+      journey.extraRiders > 0 ||
       journey.replacedRiders.length ||
       journey.comment.trim() ||
       (journey.kind === 'actuel' && journey.replaced),
@@ -178,6 +182,31 @@ export function addJourney(journeys: Journey[], kind: JourneyKind): Journey[] {
   return [...journeys, emptyJourney(kind)]
 }
 
+/** Ouvre un trajet actuel déjà commencé, ou en ajoute un, avec le motif indiqué. */
+export function presetActualJourney(
+  journeys: Journey[],
+  patch: Pick<Journey, 'theme' | 'autre'>,
+): { journeys: Journey[]; listedIndex: number } | null {
+  const listed = journeys.flatMap((journey, index) => (journey.kind === 'actuel' ? [{ journey, index }] : []))
+  const blank = listed.findIndex((item) => !journeyTouched(item.journey))
+  if (blank >= 0) {
+    return { journeys: updateJourney(journeys, listed[blank].index, patch), listedIndex: blank }
+  }
+  const added = addJourney(journeys, 'actuel')
+  if (added === journeys) return null
+  let index = -1
+  for (let item = added.length - 1; item >= 0; item -= 1) {
+    if (added[item]?.kind === 'actuel') {
+      index = item
+      break
+    }
+  }
+  return {
+    journeys: updateJourney(added, index, patch),
+    listedIndex: added.filter((journey) => journey.kind === 'actuel').length - 1,
+  }
+}
+
 export function updateJourney(journeys: Journey[], index: number, patch: Partial<Journey>): Journey[] {
   return journeys.map((journey, item) => {
     if (item !== index) return journey
@@ -237,6 +266,7 @@ function cleanJourney(input: unknown, peopleCount: number, allowed: Set<string>)
     place: clip(source.place, 80),
     replaced: replacedOf(source.replaced, kind),
     riders: kind === 'actuel' ? indexesOf(source.riders, peopleCount) : [],
+    extraRiders: kind === 'actuel' ? extraRidersOf(source.extraRiders) : 0,
     ridersCustom: source.ridersCustom === true,
     replacedRiders: indexesOf(source.replacedRiders, peopleCount),
     replacedRidersCustom: ridersCustom(source, kind === 'actuel' ? indexesOf(source.riders, peopleCount) : [], indexesOf(source.replacedRiders, peopleCount)),
@@ -262,6 +292,7 @@ function normalizeJourney(journey: Journey, peopleCount = 0): Journey {
   if (next.pace !== 'intervalle') next.everyWeeks = ''
   if (next.kind === 'nouveau') {
     next.riders = []
+    next.extraRiders = 0
     next.mode = ''
   }
   if (peopleCount === 1 && contentTouched(next)) {
@@ -329,6 +360,12 @@ function ridersCustom(source: Record<string, unknown>, riders: number[], replace
 
 function sameIndexes(left: number[], right: number[]): boolean {
   return left.length === right.length && left.every((item, index) => item === right[index])
+}
+
+function extraRidersOf(value: unknown): number {
+  const count = typeof value === 'number' ? value : Number(value)
+  if (!Number.isInteger(count) || count < 1) return 0
+  return Math.min(count, 30)
 }
 
 function indexesOf(value: unknown, peopleCount: number): number[] {

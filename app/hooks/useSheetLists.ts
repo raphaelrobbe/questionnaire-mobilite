@@ -11,7 +11,7 @@ export type SheetListsState = SheetLists & {
   message: string | null
 }
 
-const empty: SheetLists = { interviewers: [], communes: [] }
+const empty: SheetLists = { interviewers: [] }
 
 export function useSheetLists(): SheetListsState {
   const settings = useSettings()
@@ -55,16 +55,13 @@ export function useSheetLists(): SheetListsState {
       return
     }
     let cancelled = false
-    void fetchSheetLists(
-      classified.url,
-      request === 'communes' ? { action: 'communes' } : { device: getDeviceId(), who: interviewer },
-    )
+    void fetchSheetLists(classified.url, { device: getDeviceId(), who: interviewer })
       .then((next) => {
         if (cancelled) return
         saveCachedLists(next)
         setLists(next)
         setStatus('ready')
-        setMessage(next.interviewers.length && !next.communes.length ? 'La colonne « Nom commune » est vide.' : null)
+        setMessage(null)
       })
       .catch((error: unknown) => {
         if (cancelled || cached) return

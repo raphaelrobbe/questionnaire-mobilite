@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { addJourney, emptyJourney, journeyComplete, journeyIssue, journeyTouched, removeJourney, sanitizeJourneys, updateJourney, DOMICILE, type Journey } from './journeys'
+import { addJourney, emptyJourney, journeyComplete, journeyIssue, journeyTouched, presetActualJourney, removeJourney, sanitizeJourneys, updateJourney, DOMICILE, type Journey } from './journeys'
 
 function filled(patch: Partial<Journey> = {}): Journey {
   return {
@@ -100,5 +100,24 @@ describe('trajets du foyer', () => {
     const legacy = sanitizeJourneys([{ ...filled(), replacedRiders: [1], replacedRidersCustom: undefined }], 2, [], [])
     expect(legacy[0]?.replacedRiders).toEqual([1])
     expect(legacy[0]?.replacedRidersCustom).toBe(true)
+    expect(sanitizeJourneys([filled({ extraRiders: 2 })], 2, [], [])[0]?.extraRiders).toBe(2)
+    expect(journeyComplete(filled({ riders: [], ridersCustom: true, extraRiders: 1, replaced: 'jamais' }), 2)).toBe(false)
+    expect(journeyComplete(filled({ extraRiders: 1, replaced: 'jamais' }), 2)).toBe(true)
+    const offered = sanitizeJourneys([filled({ extraRiders: 4, kind: 'nouveau' })], 2, [], [])
+    expect(offered.find((journey) => journey.kind === 'nouveau')?.extraRiders).toBe(0)
+  })
+
+  test('prépare un trajet actuel avec le motif, et en ajoute un si le précédent est déjà commencé', () => {
+    const first = presetActualJourney([emptyJourney('actuel'), emptyJourney('nouveau')], { theme: 'loisirs', autre: 'Coiffeur' })
+    expect(first?.listedIndex).toBe(0)
+    expect(first?.journeys[0]).toMatchObject({ theme: 'loisirs', autre: 'Coiffeur' })
+    const second = presetActualJourney(first?.journeys ?? [], { theme: 'sante', autre: '' })
+    expect(second?.listedIndex).toBe(1)
+    expect(second?.journeys.filter((journey) => journey.kind === 'actuel')).toHaveLength(2)
+    expect(second?.journeys.find((journey) => journey.theme === 'sante')?.autre).toBe('')
+    const blank = presetActualJourney([emptyJourney('actuel')], { theme: '', autre: '' })
+    expect(blank?.listedIndex).toBe(0)
+    expect(blank?.journeys).toHaveLength(1)
+    expect(journeyTouched(blank?.journeys[0] ?? emptyJourney('actuel'))).toBe(false)
   })
 })

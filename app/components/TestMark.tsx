@@ -37,12 +37,9 @@ export function TestBanner() {
   }
 
   return (
-    <>
-      <BannerRow />
-      <div data-test-banner className="fixed inset-x-0 top-0 z-30 bg-test text-test-ink">
-        <BannerRow onDisable={disable} />
-      </div>
-    </>
+    <div data-test-banner className="bg-test text-test-ink">
+      <BannerRow onDisable={disable} />
+    </div>
   )
 }
 

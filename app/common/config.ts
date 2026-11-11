@@ -11,7 +11,6 @@ export type Interviewer = {
 
 export type SheetLists = {
   interviewers: Interviewer[]
-  communes: string[]
 }
 
 const LIST_MAX = 400
@@ -26,12 +25,12 @@ export function fold(value: string): string {
 
 export const PONTARLIER = 'Pontarlier'
 
-export function communesOnOffer(communes: string[]): string[] {
+export function communesOnOffer(communes: readonly string[]): string[] {
   const rest = communes.filter((name) => fold(name) !== fold(PONTARLIER))
   return [PONTARLIER, ...rest]
 }
 
-export function filterCommunes(communes: string[], query: string, limit = Number.POSITIVE_INFINITY): string[] {
+export function filterCommunes(communes: readonly string[], query: string, limit = Number.POSITIVE_INFINITY): string[] {
   const needle = fold(query.trim())
   if (!needle) return communes.slice(0, limit)
   const matches: string[] = []
@@ -131,13 +130,8 @@ export function readListsPayload(input: unknown): SheetLists {
     const reason = typeof source.error === 'string' ? source.error.replace(/\s+/g, ' ').trim() : ''
     throw new Error(reason || 'Liste refusée.')
   }
-  if (!Array.isArray(source.interviewers) || !Array.isArray(source.communes)) {
-    throw new Error(SCRIPT_UPDATE)
-  }
-  return {
-    interviewers: cleanInterviewers(source.interviewers),
-    communes: cleanList(source.communes),
-  }
+  if (!Array.isArray(source.interviewers)) throw new Error(SCRIPT_UPDATE)
+  return { interviewers: cleanInterviewers(source.interviewers) }
 }
 
 function cleanInterviewers(values: unknown[]): Interviewer[] {
@@ -174,17 +168,3 @@ function cleanDevices(value: unknown): string[] {
   return list
 }
 
-function cleanList(values: unknown[]): string[] {
-  const seen = new Set<string>()
-  const list: string[] = []
-  for (const value of values) {
-    if (typeof value !== 'string') continue
-    const text = value.trim().slice(0, ITEM_MAX)
-    const key = fold(text)
-    if (!text || seen.has(key)) continue
-    seen.add(key)
-    list.push(text)
-    if (list.length >= LIST_MAX) break
-  }
-  return list
-}

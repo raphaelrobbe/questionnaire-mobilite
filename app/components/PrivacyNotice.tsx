@@ -20,7 +20,7 @@ export function PrivacyNotice() {
       <h3 className="font-extrabold">Quelles données sont utilisées ?</h3>
       <p>
         L’enquête peut recueillir des informations sur la composition du foyer, les tranches d’âge, les activités, les
-        habitudes et les besoins de déplacement. Pour organiser les visites et assurer le suivi de l’enquête, le nom,
+        habitudes et les besoins de déplacement. Pour organiser les visites et assurer le suivi de l’enquête, la civilité, le nom,
         l’adresse et, lorsqu’il est communiqué, le numéro de téléphone peuvent également être conservés séparément des
         réponses. Le numéro de téléphone est utilisé uniquement pour les besoins de l’enquête.
       </p>
@@ -44,11 +44,13 @@ export function PrivacyNotice() {
       </p>
       <h3 className="font-extrabold">Cookies</h3>
       <p>
-        L’application ne dépose aucun cookie. Le brouillon, la file d’envoi et les réglages sont conservés dans la
-        mémoire du téléphone uniquement parce que l’enquête en a besoin pour fonctionner. Aucune bannière d’acceptation
-        n’est donc affichée. Si un lien ouvre une page Google, par exemple pour situer une adresse, Google peut déposer
-        ses propres cookies sur son site. Ces cookies ne sont pas ceux de l’enquête et ne sont pas nécessaires pour y
-        répondre.
+        L’application d’enquête ne dépose aucun cookie. Le formulaire de contact utilise Cloudflare Turnstile, qui peut
+        en déposer un pour vérifier que le message n’est pas envoyé par un robot. Le brouillon, la file d’envoi et les
+        réglages sont conservés dans la mémoire du téléphone uniquement parce que l’enquête en a besoin pour
+        fonctionner. Aucune bannière d’acceptation n’est donc affichée. L’adresse et le message du formulaire sont
+        transmis au collectif uniquement pour y répondre. Ils ne sont pas ajoutés aux réponses de l’enquête. Si un lien
+        ouvre une page Google, par exemple pour situer une adresse, Google peut déposer ses propres cookies sur son
+        site. Ces cookies ne sont pas ceux de l’enquête et ne sont pas nécessaires pour y répondre.
       </p>
       <h3 className="font-extrabold">Combien de temps les données sont-elles conservées ?</h3>
       <p>

@@ -13,9 +13,9 @@ import {
   issueForHousehold,
   issueForVehicles,
   patchAnswers,
+  sanitizeAnswers,
   personLine,
   mapsDestination,
-  sanitizeAnswers,
   summary,
 } from './survey'
 
@@ -29,6 +29,7 @@ describe('questionnaire', () => {
       'household',
       'vehicles',
       'motives',
+      'reminders',
       'offers',
       'contact',
       'review',
@@ -37,11 +38,14 @@ describe('questionnaire', () => {
 
   test('exige une commune de la liste, puis l’âge et la conduite de chaque personne', () => {
     const answers = emptyAnswers()
-    expect(issueForCommune(answers, [])).toMatch(/pas sur cet appareil/)
-    expect(issueForCommune(answers, ['Lyon'])).toMatch(/Choisissez/)
-    expect(issueForCommune(patchAnswers(answers, { commune: 'Paris' }), ['Lyon'])).toMatch(/pas dans la liste/)
-    expect(issueForCommune(patchAnswers(answers, { commune: 'Lyon' }), ['Lyon'])).toBeNull()
-    expect(issueForCommune(patchAnswers(answers, { commune: 'Pontarlier' }), ['Lyon'])).toBeNull()
+    expect(issueForCommune(answers)).toMatch(/Choisissez/)
+    expect(issueForCommune(patchAnswers(answers, { commune: 'Paris' }))).toMatch(/pas dans la liste/)
+    expect(issueForCommune(patchAnswers(answers, { commune: 'Métabief' }))).toBeNull()
+    expect(issueForCommune(patchAnswers(answers, { commune: 'Pontarlier' }))).toBeNull()
+    expect(issueForCommune(patchAnswers(answers, { commune: 'Vallorbe' }))).toBeNull()
+    expect(issueForCommune(patchAnswers(answers, { commune: 'Domicile' }))).toMatch(/Choisissez/)
+    expect(patchAnswers(emptyAnswers(), { civilite: 'madame', prenom: 'Ada', nom: 'Martin' }).civilite).toBe('madame')
+    expect(sanitizeAnswers({ civilite: 'mademoiselle' }).civilite).toBe('')
     expect(questionSide('Pontarlier')).toBe('de')
     expect(questionSide('pontarlier')).toBe('de')
     expect(questionSide('Jougne')).toBe('vers')
@@ -95,12 +99,14 @@ describe('questionnaire', () => {
 
   test('demande le téléphone pour un rappel, et l’adresse mail seulement pour le collectif', () => {
     const answers = emptyAnswers()
-    expect(issueForContact(answers)).toBeNull()
-    const refused = patchAnswers(answers, { recontact: 'non', phone: '06 12 34 56 78', email: 'Ada@Exemple.fr' })
+    expect(issueForContact(answers)).toMatch(/devenir enquêteur/)
+    const declined = patchAnswers(answers, { enqueteur: 'non' })
+    expect(issueForContact(declined)).toBeNull()
+    const refused = patchAnswers(declined, { recontact: 'non', phone: '06 12 34 56 78', email: 'Ada@Exemple.fr' })
     expect(issueForContact(refused)).toBeNull()
     expect(refused.phone).toBe('')
     expect(refused.email).toBe('')
-    const called = patchAnswers(answers, { recontact: 'oui' })
+    const called = patchAnswers(declined, { recontact: 'oui' })
     expect(issueForContact(called)).toMatch(/téléphone/)
     expect(issueForContact(patchAnswers(called, { phone: 'bureau' }))).toMatch(/chiffre/)
     const reached = patchAnswers(called, { phone: '+33 6 12 34 56 78', email: 'Ada@Exemple.fr' })
@@ -116,6 +122,16 @@ describe('questionnaire', () => {
     expect(dropped.phone).toBe('+33 6 12 34 56 78')
     const hungUp = patchAnswers(dropped, { recontact: 'non' })
     expect(hungUp.phone).toBe('')
+    const recruit = patchAnswers(hungUp, { enqueteur: 'oui' })
+    expect(issueForContact(recruit)).toMatch(/téléphone/)
+    const recruitPhone = patchAnswers(recruit, { phone: '06 12 34 56 78' })
+    expect(issueForContact(recruitPhone)).toMatch(/adresse mail/)
+    const recruitReady = patchAnswers(recruitPhone, { email: 'Ada@Exemple.fr' })
+    expect(issueForContact(recruitReady)).toBeNull()
+    expect(recruitReady.phone).toBe('06 12 34 56 78')
+    expect(recruitReady.email).toBe('ada@exemple.fr')
+    expect(patchAnswers(recruitReady, { enqueteur: 'non' }).phone).toBe('')
+    expect(patchAnswers(recruitReady, { enqueteur: 'non' }).email).toBe('')
     const remembered = patchAnswers(emptyAnswers(), {
       recontact: 'oui',
       recontactText: 'Phrase cochée pour le téléphone',

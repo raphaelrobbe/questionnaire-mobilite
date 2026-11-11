@@ -1,13 +1,13 @@
 /**
- * Script du tableur PRIVÉ. Feuilles : Enquêteurs, Communes, Enquêtés.
+ * Script du tableur PRIVÉ. Feuilles : Enquêteurs, Enquêtés.
  * Collez ce fichier dans Extensions → Apps Script, ouvert depuis CE tableur.
  * Déployer → Application Web → Exécuter en tant que : Moi → Qui a accès : Tout le monde.
  * L'URL /exec va dans VITE_ADMIN_WEBAPP_URL.
  *
  * Ce script n'ouvre aucun autre fichier. Il ne reçoit pas les réponses du questionnaire.
- * Une lecture sans identifiant reconnu ne renvoie ni enquêteur ni commune.
- * action=communes, pour le mode test, ne renvoie que les noms de communes.
- * Un identifiant reconnu renvoie le nom de sa ligne et les communes.
+ * Il ne renvoie aucune commune : elles sont dans l'application.
+ * Une lecture sans identifiant reconnu ne renvoie aucun enquêteur.
+ * Un identifiant reconnu renvoie le nom de sa ligne.
  * Un identifiant porté par un administrateur renvoie toute la liste, avec les identifiants et les numéros.
  * La feuille Enquêtés relie l'identité au code à 8 caractères.
  * Le même code n'ajoute pas une seconde adresse.
@@ -19,6 +19,7 @@ const ENQUETE_HEADERS = [
   'horodatage_utc',
   'Nom',
   'Prénom',
+  'Civilité',
   'Commune',
   'Adresse',
   "Complément d'adresse",
@@ -30,14 +31,13 @@ const ENQUETE_HEADERS = [
   'collectif',
   'Texte recontact',
   'Texte collectif',
+  'Devenir enquêteur',
 ]
 const INTERVIEWERS_TAB = 'Enquêteurs'
-const COMMUNES_TAB = 'Communes'
 const INTERVIEWER_HEADER = 'Prénom Nom'
 const DEVICE_HEADER = 'Identifiants appareils autorisés'
 const ADMIN_HEADER = 'Admin'
 const PHONE_HEADER = 'Numéro de téléphone'
-const COMMUNE_HEADER = 'Nom commune'
 
 function doGet(e) {
   var params = e && e.parameter ? e.parameter : {}
@@ -45,8 +45,7 @@ function doGet(e) {
   var payload
   try {
     var action = String(params.action || '')
-    if (action === 'communes') payload = readCommunes()
-    else if (action === 'add' || action === 'remove') payload = changeDevices(params, action)
+    if (action === 'add' || action === 'remove') payload = changeDevices(params, action)
     else if (action === 'create') payload = addInterviewer(params)
     else payload = readConfig(params.device, params.who)
   } catch (error) {
@@ -85,30 +84,13 @@ function spreadsheet() {
   return book
 }
 
-function readCommunes() {
-  var communesSheet = spreadsheet().getSheetByName(COMMUNES_TAB)
-  if (!communesSheet) return { ok: false, error: 'Feuille Communes introuvable.' }
-  return {
-    ok: true,
-    service: 'questionnaire-mobilite',
-    interviewers: [],
-    communes: columnByHeader(communesSheet, COMMUNE_HEADER),
-  }
-}
-
 function readConfig(device, who) {
   const loaded = loadInterviewers()
   const interviewers = presentInterviewers(loaded.people, normalizeDevice(device), String(who || '').trim())
-  if (!interviewers.length) {
-    return { ok: true, service: 'questionnaire-mobilite', interviewers: [], communes: [] }
-  }
-  const communesSheet = spreadsheet().getSheetByName(COMMUNES_TAB)
-  if (!communesSheet) return { ok: false, error: 'Feuille Communes introuvable.' }
   return {
     ok: true,
     service: 'questionnaire-mobilite',
     interviewers: interviewers,
-    communes: columnByHeader(communesSheet, COMMUNE_HEADER),
   }
 }
 
@@ -316,29 +298,6 @@ function normalizeDevice(value) {
   return text
 }
 
-function columnByHeader(sheet, header) {
-  const lastRow = sheet.getLastRow()
-  const lastCol = sheet.getLastColumn()
-  if (!lastRow || !lastCol) return []
-  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
-  let index = -1
-  for (let i = 0; i < headers.length; i++) {
-    if (String(headers[i] || '').trim() === header) index = i
-  }
-  if (index === -1 || lastRow < 2) return []
-  const values = sheet.getRange(2, index + 1, lastRow - 1, 1).getValues()
-  const seen = {}
-  const list = []
-  for (let row = 0; row < values.length; row++) {
-    const text = String(values[row][0] || '').trim().slice(0, 120)
-    if (!text || seen[text]) continue
-    seen[text] = true
-    list.push(text)
-    if (list.length >= 400) break
-  }
-  return list
-}
-
 function writeMail(body) {
   const code = clipText(body && body.code, 80)
   if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) throw new Error('Code illisible.')
@@ -351,6 +310,7 @@ function writeMail(body) {
     horodatage_utc: new Date().toISOString(),
     Nom: clipText(body.nom, 80),
     Prénom: clipText(body.prenom, 80),
+    Civilité: body.civilite === 'Monsieur' || body.civilite === 'Madame' ? body.civilite : '',
     Commune: clipText(body.commune, 120),
     Adresse: clipText(body.adresse, 160),
     "Complément d'adresse": clipText(body.complement, 160),
@@ -362,6 +322,7 @@ function writeMail(body) {
     collectif: body.collectif === 'oui' ? 'oui' : 'non',
     'Texte recontact': body.recontact === 'oui' ? clipText(body.texteRecontact, 400) : '',
     'Texte collectif': body.collectif === 'oui' ? clipText(body.texteCollectif, 400) : '',
+    'Devenir enquêteur': body.devenirEnqueteur === 'oui' ? 'oui' : body.devenirEnqueteur === 'non' ? 'non' : '',
   }
   const values = headers.map(function (header) {
     return record[header] || ''

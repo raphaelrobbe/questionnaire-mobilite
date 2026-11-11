@@ -1,6 +1,6 @@
 import { COLLECTIF_CONSENT, PHONE_CONSENT } from '~/common/consent'
 import type { Answers } from '~/common/survey'
-import { fieldClass } from './fill'
+import { choiceClass, fieldClass } from './fill'
 import { Reveal } from './Reveal'
 
 export function ContactStep({
@@ -31,22 +31,7 @@ export function ContactStep({
         </label>
         {answers.recontact === 'oui' ? (
           <Reveal>
-            <label className="grid gap-2">
-              <span className="font-bold">Numéro de téléphone</span>
-              <input
-                value={answers.phone}
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                maxLength={40}
-                placeholder="06 12 34 56 78"
-                onChange={(event) => onChange({ phone: event.target.value })}
-                className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(answers.phone.trim()), false)}`}
-              />
-            </label>
+            <PhoneField value={answers.phone} onChange={(phone) => onChange({ phone })} />
           </Reveal>
         ) : null}
       </div>
@@ -69,25 +54,84 @@ export function ContactStep({
         </label>
         {answers.collectif ? (
           <Reveal>
-            <label className="grid gap-2">
-              <span className="font-bold">Adresse mail</span>
-              <input
-                value={answers.email}
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                maxLength={120}
-                placeholder="prenom@exemple.fr"
-                onChange={(event) => onChange({ email: event.target.value })}
-                className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(answers.email.trim()), false)}`}
-              />
-            </label>
+            <EmailField value={answers.email} onChange={(email) => onChange({ email })} />
           </Reveal>
         ) : null}
       </div>
+      <fieldset className="grid gap-3">
+        <legend className="text-base font-extrabold">Souhaitez-vous devenir enquêteur à votre tour ?</legend>
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ['oui', 'Oui'],
+              ['non', 'Non'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={answers.enqueteur === id}
+              className={`min-h-11 rounded-2xl px-4 text-sm font-extrabold ${choiceClass(answers.enqueteur === id, 'one', answers.enqueteur !== '')}`}
+              onClick={() => onChange({ enqueteur: id })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {answers.enqueteur === 'oui' ? (
+          <Reveal>
+            <div className="grid gap-4">
+              <p className="text-base leading-relaxed">
+                Vous serez recontacté très prochainement pour en discuter et vous mettre en route, en particulier pour une très courte formation.
+              </p>
+              {answers.recontact !== 'oui' ? <PhoneField value={answers.phone} onChange={(phone) => onChange({ phone })} /> : null}
+              {!answers.collectif ? <EmailField value={answers.email} onChange={(email) => onChange({ email })} /> : null}
+            </div>
+          </Reveal>
+        ) : null}
+      </fieldset>
     </div>
+  )
+}
+
+function PhoneField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-2">
+      <span className="font-bold">Numéro de téléphone</span>
+      <input
+        value={value}
+        type="tel"
+        inputMode="tel"
+        autoComplete="tel"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        maxLength={40}
+        placeholder="06 12 34 56 78"
+        onChange={(event) => onChange(event.target.value)}
+        className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(value.trim()), false)}`}
+      />
+    </label>
+  )
+}
+
+function EmailField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-2">
+      <span className="font-bold">Adresse mail</span>
+      <input
+        value={value}
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        maxLength={120}
+        placeholder="prenom@exemple.fr"
+        onChange={(event) => onChange(event.target.value)}
+        className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(value.trim()), false)}`}
+      />
+    </label>
   )
 }

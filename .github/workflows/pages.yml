@@ -31,11 +31,21 @@ jobs:
         env:
           DEPLOY_GATE: '1'
           VITE_SHEETS_WEBAPP_URL: ${{ secrets.VITE_SHEETS_WEBAPP_URL }}
+      - id: contact
+        run: bash scripts/deploy-contact.sh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+          VITE_CONTACT_URL: ${{ secrets.VITE_CONTACT_URL }}
       - run: bun run build
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           VITE_SHEETS_WEBAPP_URL: ${{ secrets.VITE_SHEETS_WEBAPP_URL }}
           VITE_ADMIN_WEBAPP_URL: ${{ secrets.VITE_ADMIN_WEBAPP_URL }}
+          TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+          VITE_CONTACT_URL: ${{ steps.contact.outputs.url }}
       - run: cp build/client/index.html build/client/404.html
       - uses: actions/upload-pages-artifact@v3
         with:

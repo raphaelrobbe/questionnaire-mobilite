@@ -33,9 +33,8 @@ describe('listes du tableur', () => {
         { name: 'Ada', admin: true, authorized: true, devices: null, phone: '' },
         { name: 'Camille', admin: false, authorized: false, devices: ['abc'], phone: '' },
       ],
-      communes: ['Lyon'],
     })
-    expect(() => readListsPayload({ ok: true, interviewers: [{ name: 'Ada', devices: ['abc'] }], communes: ['Lyon'] })).toThrow(/redéployez/)
+    expect(() => readListsPayload({ ok: true, interviewers: [{ name: 'Ada', devices: ['abc'] }] })).toThrow(/redéployez/)
     expect(() => readListsPayload({ ok: true, interviewers: ['Ada'], communes: ['Lyon'] })).toThrow(/redéployez/)
     expect(() => readListsPayload({ ok: true, service: 'questionnaire-mobilite' })).toThrow(/redéployez/)
     expect(() => readListsPayload({ ok: false, error: 'Colonne introuvable.' })).toThrow('Colonne introuvable.')
@@ -97,7 +96,6 @@ describe('listes du tableur', () => {
       readListsPayload({
         ok: true,
         interviewers: [{ name: 'Ada', admin: false, authorized: false, phone: ' 06 12 34 56 78 ' }],
-        communes: ['Lyon'],
       }).interviewers[0]?.phone,
     ).toBe('06 12 34 56 78')
   })
