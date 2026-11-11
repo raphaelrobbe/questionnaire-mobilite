@@ -71,6 +71,8 @@ export function sanitizeDraft(input: unknown): Draft | null {
   if (!('walkDistance' in rawAnswers) && step >= 13) step += 1
   // Les fiches d’avant les conditions pour laisser la voiture gardent l’écran où elles étaient.
   if (!('modeConditions' in rawAnswers) && step >= 12) step += 1
+  // Les fiches d’avant la remarque libre gardent la relecture.
+  if (!('closingNote' in rawAnswers) && step >= 18) step += 1
   const code = typeof source.code === 'string' ? source.code.trim().toUpperCase() : ''
   return {
     code: isResponseCode(code) ? code : responseCode(),

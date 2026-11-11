@@ -86,19 +86,25 @@ export function ContactStep({
               <p className="text-base leading-relaxed">
                 Vous serez recontacté très prochainement pour en discuter et vous mettre en route, en particulier pour une très courte formation.
               </p>
-              {answers.recontact !== 'oui' && !answers.collectif ? (
+              {answers.recontact !== 'oui' || !answers.collectif ? (
                 <>
-                  <p className="text-base text-muted">Un seul contact suffit, le téléphone ou l’adresse mail.</p>
-                  <PhoneField
-                    value={answers.phone}
-                    optional={hasContact(answers)}
-                    onChange={(phone) => onChange({ phone })}
-                  />
-                  <EmailField
-                    value={answers.email}
-                    optional={hasContact(answers)}
-                    onChange={(email) => onChange({ email })}
-                  />
+                  {answers.recontact !== 'oui' && !answers.collectif ? (
+                    <p className="text-base text-muted">Un seul contact suffit, le téléphone ou l’adresse mail.</p>
+                  ) : null}
+                  {answers.recontact !== 'oui' ? (
+                    <PhoneField
+                      value={answers.phone}
+                      optional={contactOptional(answers)}
+                      onChange={(phone) => onChange({ phone })}
+                    />
+                  ) : null}
+                  {!answers.collectif ? (
+                    <EmailField
+                      value={answers.email}
+                      optional={contactOptional(answers)}
+                      onChange={(email) => onChange({ email })}
+                    />
+                  ) : null}
                 </>
               ) : null}
             </div>
@@ -109,8 +115,8 @@ export function ContactStep({
   )
 }
 
-function hasContact(answers: Answers): boolean {
-  return Boolean(respondentPhone(answers.phone)) || isEmail(answers.email)
+function contactOptional(answers: Answers): boolean {
+  return answers.recontact === 'oui' || answers.collectif || Boolean(respondentPhone(answers.phone)) || isEmail(answers.email)
 }
 
 function PhoneField({ value, onChange, optional = false }: { value: string; onChange: (value: string) => void; optional?: boolean }) {

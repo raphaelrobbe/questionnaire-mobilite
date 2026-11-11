@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import {
   DIFFICULTY_GROUPS,
   DIFFICULTY_ITEMS,
   DIFFICULTY_PACES,
+  applySoleTrip,
   setDifficultyNote,
   setDifficultyTripPace,
   toggleDifficultyGroup,
@@ -25,6 +27,16 @@ export function TripDifficulties({
   const chosen = difficulties.groups.length > 0
   const none = difficulties.groups.includes('aucune')
   const some = difficulties.groups.some((id) => id !== 'aucune')
+  const tripIds = trips.map((trip) => trip.id)
+
+  useEffect(() => {
+    const next = applySoleTrip(difficulties, tripIds)
+    if (next !== difficulties) onChange(next)
+  }, [difficulties, onChange, tripIds])
+
+  function emit(next: JourneyDifficulties) {
+    onChange(applySoleTrip(next, tripIds))
+  }
 
   return (
     <fieldset className="mt-4">
@@ -40,7 +52,7 @@ export function TripDifficulties({
                 pressed={selected}
                 disabled={disabled}
                 idle={choiceFill('many', chosen)}
-                onClick={() => onChange(toggleDifficultyGroup(difficulties, group.id))}
+                onClick={() => emit(toggleDifficultyGroup(difficulties, group.id))}
               >
                 {group.label}
               </Choice>
@@ -55,19 +67,19 @@ export function TripDifficulties({
                         aria-label="Pouvez-vous préciser ?"
                         placeholder="Pouvez-vous préciser ?"
                         className={`w-full rounded-xl px-3 py-2 text-sm font-medium ${fieldClass(Boolean(difficulties.notes.autres.trim()), false)}`}
-                        onChange={(event) => onChange(setDifficultyNote(difficulties, 'autres', event.target.value))}
+                        onChange={(event) => emit(setDifficultyNote(difficulties, 'autres', event.target.value))}
                       />
                       {difficulties.notes.autres.trim() ? (
                         <TripPaces
                           trips={trips}
                           selected={difficulties.trips.autres ?? []}
-                          onToggle={(tripId) => onChange(toggleDifficultyTrip(difficulties, 'autres', tripId))}
-                          onPace={(tripId, pace) => onChange(setDifficultyTripPace(difficulties, 'autres', tripId, pace))}
+                          onToggle={(tripId) => emit(toggleDifficultyTrip(difficulties, 'autres', tripId))}
+                          onPace={(tripId, pace) => emit(setDifficultyTripPace(difficulties, 'autres', tripId, pace))}
                         />
                       ) : null}
                     </>
                   ) : (
-                    <Items group={group.id} trips={trips} difficulties={difficulties} onChange={onChange} />
+                    <Items group={group.id} trips={trips} difficulties={difficulties} onChange={emit} />
                   )}
                 </div>
               ) : null}
@@ -155,7 +167,15 @@ function TripPaces({
           const link = selected.find((item) => item.id === trip.id)
           return (
             <div key={trip.id}>
-              <Choice compact pressed={Boolean(link)} idle={choiceFill('many', picked)} onClick={() => onToggle(trip.id)}>
+              <Choice
+                compact
+                pressed={Boolean(link)}
+                idle={choiceFill('many', picked)}
+                onClick={() => {
+                  if (trips.length === 1 && link) return
+                  onToggle(trip.id)
+                }}
+              >
                 {trip.label}
               </Choice>
               {link ? (

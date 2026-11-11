@@ -41,3 +41,40 @@ a:hover {
 ::selection {
   background: #cfe5dc;
 }
+
+.leaflet-container {
+  z-index: 0;
+  font-family: inherit;
+}
+
+.leaflet-container img {
+  max-width: none;
+}
+
+.stop-marker {
+  background: transparent;
+  border: 0;
+}
+
+.stop-dot {
+  display: block;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fffcf7;
+  border-radius: 999px;
+  background: #143d36;
+  box-shadow: 0 1px 3px rgb(28 25 21 / 35%);
+}
+
+.stop-dot.is-home {
+  width: 14px;
+  height: 14px;
+  background: #1f7a62;
+}
+
+.stop-dot.is-selected {
+  width: 22px;
+  height: 22px;
+  background: #8a4b08;
+}

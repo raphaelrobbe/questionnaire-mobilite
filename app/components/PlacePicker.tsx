@@ -7,6 +7,7 @@ import { choiceClass, fieldClass } from './fill'
 
 const PLACE_PRESETS = [{ commune: 'Pontarlier', places: ['Lycée Xavier Marmier', 'Gare SNCF', 'Hôpital', 'Zone industrielle', 'Zone commerciale Hyper U', 'Centre-ville'] }]
 const PLACE_COMMUNES = communesOnOffer(uniquePlaceNames([...FRENCH_COMMUNITIES, ...SWISS_SECTORS]))
+const FRENCH_PLACE_COMMUNES = communesOnOffer(uniquePlaceNames(FRENCH_COMMUNITIES))
 
 function uniquePlaceNames(groups: readonly { communes: readonly string[] }[]): string[] {
   const seen = new Set<string>()
@@ -54,6 +55,7 @@ export function PlacePicker({
   value,
   place = '',
   domicile = true,
+  suisse = true,
   detail = false,
   inputId,
   onChange,
@@ -63,6 +65,8 @@ export function PlacePicker({
   place?: string
   /** Le bouton Domicile n’existe que pour un trajet. */
   domicile?: boolean
+  /** Les secteurs suisses. Inutile pour une commune d’inscription électorale. */
+  suisse?: boolean
   /** Lieux connus et champ Préciser : seulement sur un trajet. */
   detail?: boolean
   inputId?: string
@@ -74,7 +78,8 @@ export function PlacePicker({
   const pendingFocus = useRef(false)
   const committed = branchOf(value)
   const branch = committed ?? opened
-  const roots = domicile ? PLACE_ROOTS : PLACE_ROOTS.filter((item) => item.id !== 'domicile')
+  const roots = PLACE_ROOTS.filter((item) => (domicile || item.id !== 'domicile') && (suisse || item.id !== 'suisse'))
+  const suggestions = suisse ? PLACE_COMMUNES : FRENCH_PLACE_COMMUNES
   const groups =
     branch === 'france'
       ? FRENCH_COMMUNITIES.map((item) => ({ id: item.label, label: item.label, communes: item.communes, note: undefined as string | undefined }))
@@ -153,6 +158,7 @@ export function PlacePicker({
           inputRef={inputRef}
           id={inputId}
           label={label}
+          communes={suggestions}
           value={value}
           onChange={(next) => {
             if (group !== OTHER_GROUP || branchOf(next)) remember(null, null)
@@ -219,17 +225,19 @@ function CommuneInput({
   inputRef,
   id,
   label,
+  communes,
   value,
   onChange,
 }: {
   inputRef: RefObject<HTMLInputElement | null>
   id?: string
   label: string
+  communes: readonly string[]
   value: string
   onChange: (value: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const matches = filterCommunes(PLACE_COMMUNES, value, 8)
+  const matches = filterCommunes(communes, value, 8)
   const exact = matches.length === 1 && fold(matches[0]) === fold(value.trim())
   const show = open && value.trim().length > 0 && !exact
 

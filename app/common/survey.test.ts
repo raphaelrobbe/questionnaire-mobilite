@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { FRENCH_COMMUNITIES, frenchPostalCode } from './frenchCommunes'
 import {
   addVehicle,
   answerPreview,
@@ -13,7 +14,10 @@ import {
   issueForLifeChoices,
   issueForWalkDistance,
   setWalkDistance,
+  setWalkNearby,
   setWalkNote,
+  setWalkPoint,
+  MODE_CONDITION_GROUPS,
   issueForModeConditions,
   setModeConditionNote,
   toggleModeCondition,
@@ -59,6 +63,7 @@ describe('questionnaire', () => {
       'life',
       'handicap',
       'contact',
+      'closing',
       'review',
     ])
   })
@@ -77,18 +82,38 @@ describe('questionnaire', () => {
     expect(questionSide('pontarlier')).toBe('de')
     expect(questionSide('Jougne')).toBe('vers')
     expect(issueForHousehold(answers)).toMatch(/chaque personne/)
-    const ready = patchAnswers(answers, { people: [{ age: '15-17', drive: 'accompagnee', manqueAutonomie: false }] })
+    const ready = patchAnswers(answers, { people: [{ age: '15-17', drive: 'accompagnee', manqueAutonomie: false, electoral: '', electoralCommune: '' }] })
     expect(issueForHousehold(ready)).toBeNull()
     expect(personLine(ready.people[0])).toBe('15–17 ans, conduite accompagnée')
-    const blocked = patchAnswers(answers, { people: [{ age: '65+', drive: 'non', manqueAutonomie: true }] })
+    const blocked = patchAnswers(answers, { people: [{ age: '65+', drive: 'non', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
     expect(blocked.people[0]?.manqueAutonomie).toBe(true)
     expect(personLine(blocked.people[0])).toBe('65 ans et plus, ne conduit pas, manque d’autonomie')
-    const child = patchAnswers(answers, { people: [{ age: '0-14', drive: 'non', manqueAutonomie: true }] })
-    expect(child.people[0]).toEqual({ age: '0-14', drive: '', manqueAutonomie: false })
+    const child = patchAnswers(answers, { people: [{ age: '0-14', drive: 'non', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
+    expect(child.people[0]).toEqual({ age: '0-14', drive: '', manqueAutonomie: false, electoral: '', electoralCommune: '' })
+    const adult = patchAnswers(answers, {
+      commune: 'Pontarlier',
+      people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: '' }],
+    })
+    expect(issueForHousehold(adult)).toMatch(/commune/)
+    const listed = patchAnswers(adult, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
+    expect(issueForHousehold(listed)).toBeNull()
+    expect(personLine(listed.people[0])).toBe('40–64 ans, conduit, inscrit à Pontarlier')
+    const declined = patchAnswers(listed, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: 'non', electoralCommune: 'Pontarlier' }] })
+    expect(declined.people[0]?.electoralCommune).toBe('')
+    expect(personLine(declined.people[0])).toBe('40–64 ans, conduit, non inscrit')
+    const swiss = patchAnswers(answers, {
+      commune: 'Vallorbe',
+      people: [{ age: '65+', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Vallorbe' }],
+    })
+    expect(issueForHousehold(swiss)).toBeNull()
+    expect(issueForHousehold(patchAnswers(swiss, { people: [{ age: '65+', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Paris' }] }))).toMatch(/liste/)
+    const minor = patchAnswers(answers, { people: [{ age: '15-17', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
+    expect(minor.people[0]?.electoral).toBe('')
+    expect(minor.people[0]?.electoralCommune).toBe('')
     expect(issueForHousehold(child)).toBeNull()
     expect(personLine(child.people[0])).toBe('0–14 ans')
-    expect(issueForHousehold(patchAnswers(answers, { people: [{ age: '15-17', drive: '', manqueAutonomie: false }] }))).toMatch(/conduite/)
-    const driver = patchAnswers(answers, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: true }] })
+    expect(issueForHousehold(patchAnswers(answers, { people: [{ age: '15-17', drive: '', manqueAutonomie: false, electoral: '', electoralCommune: '' }] }))).toMatch(/conduite/)
+    const driver = patchAnswers(answers, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
     expect(driver.people[0]?.manqueAutonomie).toBe(false)
   })
 
@@ -114,8 +139,8 @@ describe('questionnaire', () => {
       twoWheelers: [{ motor: 'fusee', sansPermis: true }],
     })
     expect(clean.commune).toBe('Lyon')
-    expect(clean.people[0]).toEqual({ age: '', drive: 'oui', manqueAutonomie: false })
-    expect(clean.people[1]).toEqual({ age: '65+', drive: 'non', manqueAutonomie: false })
+    expect(clean.people[0]).toEqual({ age: '', drive: 'oui', manqueAutonomie: false, electoral: '', electoralCommune: '' })
+    expect(clean.people[1]).toEqual({ age: '65+', drive: 'non', manqueAutonomie: false, electoral: '', electoralCommune: '' })
     expect(clean.cars).toHaveLength(8)
     expect(clean.cars[0]?.sansPermis).toBe(false)
     expect(clean.twoWheelers[0]?.motor).toBe('')
@@ -181,7 +206,7 @@ describe('questionnaire', () => {
     expect(patchAnswers(remembered, { collectif: false }).collectifText).toBe('')
     expect(patchAnswers(emptyAnswers(), { adresse: '11 ' }).adresse).toBe('11 ')
     expect(patchAnswers(emptyAnswers(), { adresse: '11 rue de la gare' }).adresse).toBe('11 rue de la gare')
-    const place = '11%20rue%20de%20la%20gare%2C%20Chaux-Neuve'
+    const place = '11%20rue%20de%20la%20gare%2C%2025240%20Chaux-Neuve'
     expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' })).toBe(
       `https://www.google.com/maps/search/?api=1&query=${place}`,
     )
@@ -198,6 +223,11 @@ describe('questionnaire', () => {
     expect(mapsDestination({ adresse: '11 rue de la gare', commune: 'Chaux-Neuve' }, 'waze')).toBe(`https://www.waze.com/ul?q=${place}`)
     expect(mapsDestination({ adresse: '  ', commune: 'Chaux-Neuve' })).toBeNull()
     expect(mapsDestination({ adresse: '11 rue de la gare', commune: '' })).toBeNull()
+    expect(mapsDestination({ adresse: '1 rue du Lac', commune: 'Vallorbe' })).toBe(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('1 rue du Lac, Vallorbe')}`,
+    )
+    expect(frenchPostalCode('pontarlier')).toBe('25300')
+    expect(FRENCH_COMMUNITIES.every((community) => community.communes.every((name) => /^25\d{3}$/.test(frenchPostalCode(name))))).toBe(true)
     expect(patchAnswers(emptyAnswers(), { recontact: 'oui', phone: '+33 ' }).phone).toBe('+33 ')
     expect(respondentPhone('  +33 6 12 34 56 78  ')).toBe('+33 6 12 34 56 78')
     expect(respondentPhone('')).toBe('')
@@ -281,6 +311,7 @@ describe('questionnaire', () => {
     const empty = emptyAnswers()
     expect(issueForModeConditions(empty.modeConditions)).toMatch(/condition/)
     expect(stepIssue({ kind: 'conditions' }, empty)).toMatch(/condition/)
+    expect(MODE_CONDITION_GROUPS[0]?.ids[0]).toBe('court')
     const one = toggleModeCondition(empty.modeConditions, 'min15')
     const both = toggleModeCondition(one, 'horaires')
     expect(both.selected).toEqual(['min15', 'horaires'])
@@ -301,6 +332,11 @@ describe('questionnaire', () => {
     expect(lines.Conditions).toContain('15 minutes')
     expect(lines.Conditions).toContain('horaires adaptés')
     expect(lines.Conditions).toContain('la neige')
+    const closing = patchAnswers(emptyAnswers(), { closingNote: '  une idée  ' })
+    expect(closing.closingNote).toBe('  une idée  ')
+    expect(stepIssue({ kind: 'closing' }, emptyAnswers())).toBeNull()
+    expect(summary(closing).find((line) => line.label === 'Ajout')?.value).toBe('une idée')
+    expect(summary(emptyAnswers()).some((line) => line.label === 'Ajout')).toBe(false)
   })
 
   test('un frein est demandé, et « aucun » reste à part', () => {
@@ -332,15 +368,23 @@ describe('questionnaire', () => {
     expect(stepIssue({ kind: 'walk' }, empty)).toMatch(/distance/)
     const one = setWalkDistance(empty.walkDistance, 'm500')
     expect(one.choice).toBe('m500')
-    expect(issueForWalkDistance(one)).toBeNull()
+    expect(issueForWalkDistance(one)).toMatch(/arrêt/)
+    const wished = setWalkNearby(one, 'non')
+    expect(issueForWalkDistance(wished)).toMatch(/carte/)
+    const point = setWalkPoint(wished, 46.9, 6.35)
+    expect(point.latitude).toBe(46.9)
+    expect(point.longitude).toBe(6.35)
+    expect(issueForWalkDistance(point)).toBeNull()
+    expect(setWalkNearby(point, 'oui').latitude).toBeNull()
+    expect(setWalkDistance(point, 'km1').latitude).toBe(46.9)
     const other = setWalkDistance(one, 'jamais')
     expect(other.choice).toBe('jamais')
     expect(setWalkDistance(other, 'jamais').choice).toBe('')
     const noted = setWalkNote(other, '  s’il pleut  ')
     expect(noted.note).toBe('  s’il pleut  ')
     expect(noted.choice).toBe('jamais')
-    const kept = sanitizeAnswers({ walkDistance: { choice: 'inconnu', note: '  la côte  ' } })
-    expect(kept.walkDistance).toEqual({ choice: '', note: '  la côte  ' })
+    const kept = sanitizeAnswers({ walkDistance: { choice: 'inconnu', nearby: 'peut-etre', latitude: 400, longitude: 6, note: '  la côte  ' } })
+    expect(kept.walkDistance).toEqual({ choice: '', note: '  la côte  ', nearby: '', latitude: null, longitude: null })
     const lines = Object.fromEntries(summary(patchAnswers(empty, { walkDistance: setWalkNote(one, 'la côte') })).map((line) => [line.label, line.value]))
     expect(lines['Distance à l’arrêt']).toBe('Entre 200 et 500 mètres · la côte')
   })

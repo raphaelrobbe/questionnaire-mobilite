@@ -194,14 +194,19 @@ function TripCard({
 
       {journey.kind === 'actuel' ? (
         <fieldset className="mt-4">
-          <legend className="text-base font-extrabold">Avec quel véhicule ?</legend>
+          <legend className="text-base font-extrabold">Par quel moyen ?</legend>
+          <p className="mt-1 text-sm text-muted">Plusieurs réponses possibles.</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {modes.map((mode) => (
               <Chip
                 key={mode.id}
-                pressed={journey.mode === mode.id}
-                idle={choiceFill('one', Boolean(journey.mode))}
-                onClick={() => onChange({ mode: journey.mode === mode.id ? '' : mode.id })}
+                pressed={journey.modes.includes(mode.id)}
+                idle={choiceFill('many', journey.modes.length > 0)}
+                onClick={() =>
+                  onChange({
+                    modes: journey.modes.includes(mode.id) ? journey.modes.filter((id) => id !== mode.id) : [...journey.modes, mode.id],
+                  })
+                }
               >
                 {mode.label}
               </Chip>

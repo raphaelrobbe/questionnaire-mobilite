@@ -88,6 +88,35 @@ describe('brouillon', () => {
     expect(offers?.step).toBe(10)
     const same = sanitizeDraft({ step: 9, answers: { commune: 'Pontarlier', visits: [], handicap: '', difficulties: { groups: [] } } })
     expect(same?.step).toBe(9)
+    const review = sanitizeDraft({
+      step: 18,
+      answers: {
+        visits: [],
+        handicap: '',
+        difficulties: {},
+        lifeChoices: { selected: [] },
+        modeReasons: { selected: [], note: '' },
+        modeConditions: { selected: [], note: '' },
+        modeBarriers: { selected: [], note: '' },
+        walkDistance: { choice: '', note: '' },
+      },
+    })
+    expect(review?.step).toBe(19)
+    const closing = sanitizeDraft({
+      step: 18,
+      answers: {
+        visits: [],
+        handicap: '',
+        difficulties: {},
+        lifeChoices: { selected: [] },
+        modeReasons: { selected: [], note: '' },
+        modeConditions: { selected: [], note: '' },
+        modeBarriers: { selected: [], note: '' },
+        walkDistance: { choice: '', note: '' },
+        closingNote: '',
+      },
+    })
+    expect(closing?.step).toBe(18)
     const samples = testSampleDrafts(['PAUL-0001', 'JEAN-0002', 'LEAS-0003', 'GERA-0004'])
     expect(samples.map((draft) => `${draft.answers.civilite} ${draft.answers.prenom} ${draft.answers.nom}`)).toEqual([
       'madame Paule Auchon',

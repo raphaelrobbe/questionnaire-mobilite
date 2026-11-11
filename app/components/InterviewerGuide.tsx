@@ -74,7 +74,7 @@ export function InterviewerGuide() {
             </div>
           ))}
           <p className="mt-5 leading-relaxed">
-            Chaque visite fait l’objet d’une saisie dans l’interface « L’enquête n’a pas pu avoir lieu : pourquoi ? »
+            Chaque visite sans enquête se note avec le bouton « L’enquête n’a pas pu avoir lieu », puis « Pourquoi ? »
             (personne absente, adresse introuvable, etc.).
           </p>
         </section>

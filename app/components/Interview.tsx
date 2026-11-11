@@ -18,7 +18,7 @@ import { useSheetLists } from '~/hooks/useSheetLists'
 import { Button, buttonClass } from './Button'
 import { choiceClass, choiceFill, fieldClass, idleClass } from './fill'
 import { ConsentScript } from './ConsentScript'
-import { holdRevealScroll } from './Reveal'
+import { Reveal, holdRevealScroll } from './Reveal'
 import { MapsLink } from './MapsLink'
 import { PlacePicker } from './PlacePicker'
 import { ContactStep } from './ContactStep'
@@ -51,6 +51,7 @@ export function Interview() {
   const [missing, setMissing] = useState(false)
   const [openedTrip, setOpenedTrip] = useState(-1)
   const [visitNote, setVisitNote] = useState<string | null>(null)
+  const [visitWhy, setVisitWhy] = useState(false)
 
   const named = settings ? canUseSurvey(settings) : false
 
@@ -316,13 +317,14 @@ export function Interview() {
     }
   }
 
+  const visitOpen = visitWhy || Boolean(draft.answers.visitPick)
   const storedIssue =
     step.kind === 'consent'
       ? draft.consent
         ? null
         : 'Cochez l’accord avant de continuer.'
       : stepIssue(step, draft.answers)
-  const issue = storedIssue
+  const issue = step.kind === 'visit' && !visitOpen ? null : storedIssue
 
   async function notePosition() {
     setGeoBusy(true)
@@ -392,29 +394,36 @@ export function Interview() {
           >
             Commencer l’enquête
           </Button>
-          <h1 ref={headingRef} tabIndex={-1} className="mt-6 text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            L’enquête n’a pas pu avoir lieu : pourquoi ?
-          </h1>
-          <p className="mt-2 text-base text-muted">Chaque visite est conservée, avec l’heure.</p>
-          <div className="mt-4 grid gap-2">
-            {VISITS.filter((item) => !item.starts).map((item) => {
-              const selected = draft.answers.visitPick === item.value
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  aria-pressed={selected}
-                  className={`min-h-14 rounded-2xl px-4 py-3 text-left text-base font-bold leading-snug ${choiceClass(selected, 'one', Boolean(draft.answers.visitPick))}`}
-                  onClick={() => {
-                    setVisitNote(null)
-                    updateAnswers({ visitPick: selected ? '' : item.value })
-                  }}
-                >
-                  {item.label}
-                </button>
-              )
-            })}
-          </div>
+          <Button variant="secondary" className="mt-3" aria-expanded={visitOpen} onClick={() => setVisitWhy(true)}>
+            L’enquête n’a pas pu avoir lieu
+          </Button>
+          {visitOpen ? (
+            <Reveal>
+              <h1 ref={headingRef} tabIndex={-1} className="mt-6 text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+                Pourquoi ?
+              </h1>
+              <p className="mt-2 text-base text-muted">Chaque visite est conservée, avec l’heure.</p>
+              <div className="mt-4 grid gap-2">
+                {VISITS.filter((item) => !item.starts).map((item) => {
+                  const selected = draft.answers.visitPick === item.value
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      aria-pressed={selected}
+                      className={`min-h-14 rounded-2xl px-4 py-3 text-left text-base font-bold leading-snug ${choiceClass(selected, 'one', Boolean(draft.answers.visitPick))}`}
+                      onClick={() => {
+                        setVisitNote(null)
+                        updateAnswers({ visitPick: selected ? '' : item.value })
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </Reveal>
+          ) : null}
           {draft.answers.visits.length ? (
             <div className="mt-4 rounded-2xl bg-card px-4 py-3">
               <p className="text-sm font-extrabold text-muted">Visites déjà notées</p>
@@ -504,7 +513,11 @@ export function Interview() {
             Qui vit dans le foyer ?
           </h1>
           <p className="mt-2 text-base text-muted">Pour chaque personne : la tranche d’âge, et si elle conduit.</p>
-          <HouseholdStep people={draft.answers.people} onChange={(people) => updateAnswers({ people })} />
+          <HouseholdStep
+            people={draft.answers.people}
+            commune={draft.answers.commune}
+            onChange={(people) => updateAnswers({ people })}
+          />
         </section>
       ) : null}
 
@@ -624,10 +637,8 @@ export function Interview() {
       {step.kind === 'walk' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Quelle distance seriez-vous prêt(e) à parcourir à pied entre votre domicile (ou le lieu où vous vous rendez) et un
-            arrêt de transport en commun ?
+            Arrêt de transport en commun
           </h1>
-          <p className="mt-2 text-base text-muted">Une seule réponse.</p>
           <WalkDistanceStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
@@ -657,6 +668,25 @@ export function Interview() {
           </h1>
           <p className="mt-2 text-base text-muted">Les informations personnelles ne seront jamais diffusées.</p>
           <ContactStep answers={draft.answers} onChange={updateAnswers} />
+        </section>
+      ) : null}
+
+      {step.kind === 'closing' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Souhaitez-vous ajouter quelque chose ?
+          </h1>
+          <p className="mt-2 text-base text-muted">
+            Vous pouvez partager toute remarque, difficulté, idée ou proposition qui n’aurait pas été abordée dans ce questionnaire.
+          </p>
+          <textarea
+            value={draft.answers.closingNote}
+            maxLength={2000}
+            rows={10}
+            aria-label="Souhaitez-vous ajouter quelque chose ?"
+            className={`mt-4 min-h-64 w-full rounded-2xl px-4 py-3 text-base font-medium outline-none focus:border-leaf ${fieldClass(Boolean(draft.answers.closingNote.trim()), true)}`}
+            onChange={(event) => updateAnswers({ closingNote: event.target.value })}
+          />
         </section>
       ) : null}
 
@@ -739,7 +769,7 @@ export function Interview() {
             ) : (
               <Button
                 className="w-auto min-w-0 flex-1 disabled:bg-line disabled:text-muted disabled:opacity-100 disabled:hover:bg-line"
-                disabled={Boolean(issue) || saving}
+                disabled={Boolean(storedIssue) || saving}
                 onClick={goNext}
               >
                 {saving ? 'Enregistrement…' : step.kind === 'visit' ? 'Valider' : 'Suivant'}

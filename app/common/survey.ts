@@ -1,5 +1,5 @@
 import { fold, PONTARLIER } from './config'
-import { frenchCommunityFor } from './frenchCommunes'
+import { communePlace, frenchCommunityFor } from './frenchCommunes'
 import { swissSectorFor } from './swissCommunes'
 import { type MapApp } from './settings'
 import { emptyMotives, motivesStarted, sanitizeMotives, type Motives } from './motives'
@@ -12,7 +12,15 @@ export type AgeBand = '0-14' | '15-17' | '18-24' | '25-39' | '40-64' | '65+'
 export type Drive = 'non' | 'accompagnee' | 'oui'
 export type Motor = 'electrique' | 'hybride' | 'thermique'
 
-export type Person = { age: AgeBand | ''; drive: Drive | ''; manqueAutonomie: boolean }
+export type Person = {
+  age: AgeBand | ''
+  drive: Drive | ''
+  manqueAutonomie: boolean
+  /** Inscription sur les listes électorales, à partir de 18 ans. */
+  electoral: 'oui' | 'non' | ''
+  /** Commune d’inscription. Vide si la personne n’est pas inscrite. */
+  electoralCommune: string
+}
 export type Vehicle = { motor: Motor | ''; sansPermis: boolean }
 
 export type Recontact = 'oui' | 'non'
@@ -37,6 +45,7 @@ export type ModeReasonId =
   | 'autre'
   | 'aucune'
 export type ModeConditionId =
+  | 'court'
   | 'identique'
   | 'min15'
   | 'min30'
@@ -142,6 +151,7 @@ export const MODE_REASONS: Labeled<ModeReasonId>[] = [
 ]
 
 export const MODE_CONDITIONS: Labeled<ModeConditionId>[] = [
+  { value: 'court', label: 'Un temps plus court qu’en voiture' },
   { value: 'identique', label: 'Un temps de trajet identique à celui en voiture' },
   { value: 'min15', label: 'Jusqu’à 15 minutes supplémentaires' },
   { value: 'min30', label: 'Jusqu’à 30 minutes supplémentaires' },
@@ -157,13 +167,13 @@ export const MODE_CONDITIONS: Labeled<ModeConditionId>[] = [
   { value: 'correspondances', label: 'Peu ou pas de correspondances' },
   { value: 'fiabilite', label: 'Une bonne fiabilité (ponctualité, maintien des trajets…)' },
   { value: 'bagages', label: 'La possibilité de transporter des bagages, des courses ou du matériel' },
-  { value: 'enfants', label: 'La possibilité de voyager avec des enfants ou des personnes à charge' },
+  { value: 'enfants', label: 'La possibilité de voyager avec des enfants, une poussette ou des personnes à charge' },
   { value: 'autre', label: 'Autres conditions (à préciser)' },
   { value: 'aucune', label: 'Aucune condition ne me permettrait de remplacer ces trajets en voiture' },
 ]
 
 export const MODE_CONDITION_GROUPS: { title: string; ids: ModeConditionId[] }[] = [
-  { title: 'Durée du trajet', ids: ['identique', 'min15', 'min30', 'min45', 'long'] },
+  { title: 'Durée du trajet', ids: ['court', 'identique', 'min15', 'min30', 'min45', 'long'] },
   { title: 'Coût', ids: ['inferieur', 'equivalent', 'superieur', 'abonnement'] },
   { title: 'Conditions pratiques', ids: ['arret', 'horaires', 'frequence', 'correspondances', 'fiabilite', 'bagages', 'enfants'] },
 ]
@@ -177,7 +187,7 @@ export const MODE_BARRIERS: Labeled<ModeBarrierId>[] = [
   { value: 'frequence', label: 'Manque de fréquence des passages ou absence de transports en soirée, le week-end ou pendant les vacances' },
   { value: 'cout', label: 'Coût des billets ou des abonnements' },
   { value: 'bagages', label: 'Difficulté de transporter des courses, des bagages ou du matériel' },
-  { value: 'enfants', label: 'Contraintes liées aux enfants ou à l’accompagnement de proches' },
+  { value: 'enfants', label: 'Contraintes liées aux enfants, à une poussette ou à l’accompagnement de proches' },
   { value: 'confort', label: 'Manque de confort' },
   { value: 'securite', label: 'Manque de sécurité' },
   { value: 'fiabilite', label: 'Manque de fiabilité (retards, annulation…)' },
@@ -221,9 +231,15 @@ export type ModeBarriers = {
   note: string
 }
 
+export type WalkNearby = 'oui' | 'non'
+
 export type WalkDistance = {
   choice: WalkDistanceId | ''
   note: string
+  /** Un arrêt satisfaisant existe déjà près du domicile. */
+  nearby: WalkNearby | ''
+  latitude: number | null
+  longitude: number | null
 }
 
 export function emptyModeReasons(): ModeReasons {
@@ -344,33 +360,64 @@ export function modeBarriersLine(value: ModeBarriers): string {
 }
 
 export function emptyWalkDistance(): WalkDistance {
-  return { choice: '', note: '' }
+  return { choice: '', note: '', nearby: '', latitude: null, longitude: null }
 }
 
 export function sanitizeWalkDistance(input: unknown): WalkDistance {
   const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const note = typeof source.note === 'string' ? clip(source.note, 160) : ''
-  return { choice: known(WALK_DISTANCES, source.choice), note }
+  const nearby = source.nearby === 'oui' || source.nearby === 'non' ? source.nearby : ''
+  const latitude = nearby ? axis(source.latitude, 90) : null
+  const longitude = nearby ? axis(source.longitude, 180) : null
+  const placed = latitude !== null && longitude !== null
+  return {
+    choice: known(WALK_DISTANCES, source.choice),
+    note,
+    nearby,
+    latitude: placed ? latitude : null,
+    longitude: placed ? longitude : null,
+  }
 }
 
 export function setWalkDistance(current: WalkDistance, id: WalkDistanceId): WalkDistance {
-  return sanitizeWalkDistance({ choice: current.choice === id ? '' : id, note: current.note })
+  return sanitizeWalkDistance({ ...current, choice: current.choice === id ? '' : id })
 }
 
 export function setWalkNote(current: WalkDistance, note: string): WalkDistance {
   return sanitizeWalkDistance({ ...current, note })
 }
 
+export function setWalkNearby(current: WalkDistance, nearby: WalkNearby): WalkDistance {
+  const next = current.nearby === nearby ? '' : nearby
+  if (next === current.nearby) return current
+  return sanitizeWalkDistance({ ...current, nearby: next, latitude: null, longitude: null })
+}
+
+export function setWalkPoint(current: WalkDistance, latitude: number, longitude: number): WalkDistance {
+  if (!current.nearby) return current
+  return sanitizeWalkDistance({ ...current, latitude, longitude })
+}
+
 export function issueForWalkDistance(value: WalkDistance): string | null {
   if (!value.choice) return 'Choisissez une distance.'
+  if (!value.nearby) return 'Indiquez s’il existe déjà un arrêt satisfaisant.'
+  if (value.latitude === null || value.longitude === null) return 'Indiquez l’arrêt sur la carte.'
   return null
 }
 
 export function walkDistanceLine(value: WalkDistance): string {
   const label = labelOf(WALK_DISTANCES, value.choice)
   const note = value.note.trim()
-  if (label && note) return `${label} · ${note}`
-  return label || note
+  const place = value.nearby === 'oui' ? 'Arrêt existant' : value.nearby === 'non' ? 'Arrêt souhaité' : ''
+  const coords =
+    value.latitude !== null && value.longitude !== null ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : ''
+  return [label, note, place, coords].filter(Boolean).join(' · ')
+}
+
+function axis(value: unknown, limit: number): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  if (value < -limit || value > limit) return null
+  return value
 }
 
 export function emptyLifeChoices(): LifeChoices {
@@ -433,6 +480,8 @@ export type Answers = {
   handicapConcern: HandicapConcern | ''
   handicapWho: HandicapWho[]
   handicapComment: string
+  /** Remarque libre, juste avant la relecture. */
+  closingNote: string
 }
 
 type Labeled<T extends string> = { value: T; label: string }
@@ -477,10 +526,16 @@ export type Step =
   | { kind: 'life' }
   | { kind: 'handicap' }
   | { kind: 'contact' }
+  | { kind: 'closing' }
   | { kind: 'review' }
 
 export function emptyPerson(): Person {
-  return { age: '', drive: '', manqueAutonomie: false }
+  return { age: '', drive: '', manqueAutonomie: false, electoral: '', electoralCommune: '' }
+}
+
+/** 18 ans ou plus : l’inscription électorale est demandée. */
+export function asksElectoral(person: Pick<Person, 'age'>): boolean {
+  return person.age === '18-24' || person.age === '25-39' || person.age === '40-64' || person.age === '65+'
 }
 
 /** 15 ans ou plus, et ne conduit pas. */
@@ -528,6 +583,7 @@ export function emptyAnswers(): Answers {
     handicapConcern: '',
     handicapWho: [],
     handicapComment: '',
+    closingNote: '',
   }
 }
 
@@ -551,6 +607,7 @@ export function buildSteps(_answers: Answers): Step[] {
     { kind: 'life' },
     { kind: 'handicap' },
     { kind: 'contact' },
+    { kind: 'closing' },
     { kind: 'review' },
   ]
 }
@@ -634,6 +691,7 @@ export function sanitizeAnswers(input: unknown): Answers {
     modeConditions: sanitizeModeConditions(source.modeConditions),
     modeBarriers: sanitizeModeBarriers(source.modeBarriers),
     walkDistance: sanitizeWalkDistance(source.walkDistance),
+    closingNote: typeof source.closingNote === 'string' ? clip(source.closingNote, 2000) : '',
     ...handicapFields(source),
   }
 }
@@ -712,7 +770,14 @@ function sanitizePeople(input: unknown): Person[] {
     const source = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
     const age = known(AGE_BANDS, source.age)
     const drive = age === '0-14' ? '' : known(DRIVE_OPTIONS, source.drive)
-    return { age, drive, manqueAutonomie: asksAutonomie({ age, drive }) && source.manqueAutonomie === true }
+    const electoral = asksElectoral({ age }) && (source.electoral === 'oui' || source.electoral === 'non') ? source.electoral : ''
+    return {
+      age,
+      drive,
+      manqueAutonomie: asksAutonomie({ age, drive }) && source.manqueAutonomie === true,
+      electoral,
+      electoralCommune: electoral === 'oui' ? text(source.electoralCommune, 120) : '',
+    }
   })
 }
 
@@ -732,6 +797,7 @@ const editableText = {
   phone: 40,
   handicapAutre: 160,
   handicapComment: 400,
+  closingNote: 2000,
 } as const
 
 export function patchAnswers(answers: Answers, patch: Partial<Answers>): Answers {
@@ -796,7 +862,22 @@ export function issueForHousehold(answers: Answers): string | null {
   if (answers.people.some((person) => !person.age || (person.age !== '0-14' && !person.drive))) {
     return 'Indiquez l’âge et la conduite de chaque personne.'
   }
+  if (answers.people.some((person) => asksElectoral(person) && !person.electoral)) {
+    return 'Indiquez si chaque personne de 18 ans ou plus est inscrite sur les listes électorales.'
+  }
+  for (const person of answers.people) {
+    if (person.electoral !== 'oui') continue
+    const commune = person.electoralCommune.trim()
+    if (!commune) return 'Indiquez la commune d’inscription sur les listes électorales.'
+    if (!electoralCommuneOk(commune, answers.commune)) return 'Cette commune n’est pas dans la liste.'
+  }
   return null
+}
+
+function electoralCommuneOk(commune: string, home: string): boolean {
+  if (fold(commune) === fold(DOMICILE)) return false
+  if (home.trim() && fold(commune) === fold(home)) return true
+  return Boolean(frenchCommunityFor(commune))
 }
 
 export function issueForVehicles(answers: Answers): string | null {
@@ -947,7 +1028,11 @@ export function personLine(person: Person): string {
   const drive = labelOf(DRIVE_OPTIONS, person.drive)
   if (!age || !drive) return ''
   const driving = `${drive.charAt(0).toLocaleLowerCase('fr')}${drive.slice(1)}`
-  return person.manqueAutonomie ? `${age}, ${driving}, manque d’autonomie` : `${age}, ${driving}`
+  const parts = [age, driving]
+  if (person.manqueAutonomie) parts.push('manque d’autonomie')
+  if (person.electoral === 'oui' && person.electoralCommune.trim()) parts.push(`inscrit à ${person.electoralCommune.trim()}`)
+  if (person.electoral === 'non') parts.push('non inscrit')
+  return parts.join(', ')
 }
 
 export function vehicleLine(vehicle: Vehicle): string {
@@ -986,6 +1071,7 @@ export function summary(input: Answers): { label: string; value: string }[] {
     { label: 'Devenir enquêteur', value: answers.enqueteur === 'oui' ? 'Oui' : answers.enqueteur === 'non' ? 'Non' : '' },
     { label: 'Adresse mail', value: answers.email },
     { label: 'Téléphone', value: answers.phone },
+    { label: 'Ajout', value: answers.closingNote.trim() },
   ].filter((line) => line.value !== '')
 }
 
@@ -994,7 +1080,7 @@ export function mapsDestination(answers: Pick<Answers, 'adresse' | 'commune'>, a
   const street = answers.adresse.trim()
   const commune = answers.commune.trim()
   if (!street || !commune) return null
-  const query = encodeURIComponent(`${street}, ${commune}`)
+  const query = encodeURIComponent(`${street}, ${communePlace(commune)}`)
   if (app === 'apple') return `https://maps.apple.com/?q=${query}`
   if (app === 'osm') return `https://www.openstreetmap.org/search?query=${query}`
   if (app === 'mappy') return `https://fr.mappy.com/plan#/search/${query}`
@@ -1051,6 +1137,8 @@ export function hasAnyAnswer(input: Answers): boolean {
       answers.modeBarriers.note.trim() !== '' ||
       answers.walkDistance.choice !== '' ||
       answers.walkDistance.note.trim() !== '' ||
+      answers.walkDistance.nearby !== '' ||
+      answers.walkDistance.latitude !== null ||
       answers.recontact !== '' ||
       answers.enqueteur !== '' ||
       answers.collectif ||
@@ -1059,6 +1147,7 @@ export function hasAnyAnswer(input: Answers): boolean {
       answers.visits.length > 0 ||
       answers.startedAt !== '' ||
       answers.handicap !== '' ||
-      answers.handicapComment !== '',
+      answers.handicapComment !== '' ||
+      answers.closingNote.trim() !== '',
   )
 }

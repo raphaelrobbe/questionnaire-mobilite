@@ -117,7 +117,8 @@ export type Journey = {
   pace: RegularPace
   everyWeeks: string
   days: Weekday[]
-  mode: string
+  /** Moyens utilisés pour un trajet déjà fait. Plusieurs possibles. */
+  modes: string[]
   origin: string
   originPlace: string
   destination: string
@@ -153,7 +154,7 @@ export function emptyJourney(kind: JourneyKind): Journey {
     pace: '',
     everyWeeks: '',
     days: [],
-    mode: '',
+    modes: [],
     origin: DOMICILE,
     originPlace: '',
     destination: '',
@@ -197,7 +198,7 @@ export function journeyTouched(journey: Journey): boolean {
       journey.aller ||
       journey.retour ||
       journey.regularity ||
-      journey.mode ||
+      journey.modes.length > 0 ||
       (journey.origin ?? DOMICILE).trim() !== DOMICILE ||
       (journey.originPlace ?? '').trim() ||
       journey.destination.trim() ||
@@ -214,7 +215,7 @@ export function journeyComplete(journey: Journey, peopleCount = 0): boolean {
   if (!journey.theme) return false
   if (!journey.aller) return false
   if (!frequencyComplete(journey)) return false
-  if (journey.kind === 'actuel' && !journey.mode) return false
+  if (journey.kind === 'actuel' && journey.modes.length === 0) return false
   if (!(journey.origin ?? DOMICILE).trim() || !journey.destination.trim()) return false
   if (journey.kind === 'actuel') {
     if (!tripRiders(journey, peopleCount).length) return false
@@ -340,6 +341,11 @@ export function sanitizeJourneys(input: unknown, peopleCount: number, cars: { mo
   return [...(actual.length ? actual : [emptyJourney('actuel')]), ...(fresh.length ? fresh : [emptyJourney('nouveau')])]
 }
 
+function journeyModes(source: Record<string, unknown>, allowed: Set<string>): string[] {
+  const asked = Array.isArray(source.modes) ? source.modes : typeof source.mode === 'string' && source.mode ? [source.mode] : []
+  return [...allowed].filter((id) => asked.includes(id))
+}
+
 function cleanJourney(input: unknown, peopleCount: number, allowed: Set<string>): Journey | null {
   if (!input || typeof input !== 'object') return null
   const source = input as Record<string, unknown>
@@ -358,7 +364,7 @@ function cleanJourney(input: unknown, peopleCount: number, allowed: Set<string>)
     pace: source.pace === 'hebdo' || source.pace === 'intervalle' ? source.pace : '',
     everyWeeks: weeksOf(source.everyWeeks),
     days: weekdaysOf(source.days),
-    mode: typeof source.mode === 'string' && allowed.has(source.mode) ? source.mode : '',
+    modes: journeyModes(source, allowed),
     origin: 'origin' in source ? clip(source.origin, 120) : DOMICILE,
     originPlace: clip(source.originPlace, 80),
     destination: clip(source.destination, 120),
@@ -393,7 +399,7 @@ function normalizeJourney(journey: Journey, peopleCount = 0): Journey {
   if (next.kind === 'nouveau') {
     next.riders = []
     next.extraRiders = 0
-    next.mode = ''
+    next.modes = []
   }
   if (peopleCount === 1 && contentTouched(next)) {
     if (next.kind === 'actuel' && !next.ridersCustom && next.riders.length === 0) next.riders = [0]
@@ -415,7 +421,7 @@ function contentTouched(journey: Journey): boolean {
       journey.aller ||
       journey.retour ||
       journey.regularity ||
-      journey.mode ||
+      journey.modes.length > 0 ||
       (journey.origin ?? DOMICILE).trim() !== DOMICILE ||
       (journey.originPlace ?? '').trim() ||
       journey.destination.trim() ||
@@ -506,6 +512,33 @@ export function toggleDifficultyGroup(current: JourneyDifficulties, group: Diffi
 export function toggleDifficultyItem(current: JourneyDifficulties, id: DifficultyItemId): JourneyDifficulties {
   const items = current.items.includes(id) ? current.items.filter((item) => item !== id) : [...current.items, id]
   return cleanDifficulties({ ...current, items })
+}
+
+/** Un seul trajet déjà noté est concerné d’office par chaque difficulté précisée. */
+export function applySoleTrip(current: JourneyDifficulties, tripIds: readonly string[]): JourneyDifficulties {
+  if (tripIds.length !== 1 || current.groups.includes('aucune')) return current
+  const id = tripIds[0] ?? ''
+  if (!/^[a-z0-9]{8}$/.test(id)) return current
+  let trips = current.trips
+  let changed = false
+  for (const key of readyDifficultyKeys(current)) {
+    const list = trips[key] ?? []
+    if (list.some((trip) => trip.id === id)) continue
+    trips = { ...trips, [key]: [...list, { id, pace: '' }] }
+    changed = true
+  }
+  return changed ? cleanDifficulties({ ...current, trips }) : current
+}
+
+function readyDifficultyKeys(current: JourneyDifficulties): DifficultyKey[] {
+  const keys: DifficultyKey[] = []
+  for (const item of DIFFICULTY_ITEMS) {
+    if (!current.groups.includes(item.group) || !current.items.includes(item.id)) continue
+    if (item.autre && !current.notes[item.group].trim()) continue
+    keys.push(item.id)
+  }
+  if (current.groups.includes('autres') && current.notes.autres.trim()) keys.push('autres')
+  return keys
 }
 
 export function toggleDifficultyTrip(current: JourneyDifficulties, key: DifficultyKey, tripId: string): JourneyDifficulties {

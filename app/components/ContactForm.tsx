@@ -87,7 +87,7 @@ export function ContactForm({ box = 'enquete' }: { box?: 'enquete' | 'collectif'
 
   return (
     <form className="mt-6 grid gap-3 rounded-2xl bg-card px-4 py-4 text-ink" onSubmit={(event) => void submit(event)}>
-      <h3 className="text-lg font-extrabold">Écrire au collectif</h3>
+      <h3 className="text-lg font-extrabold">{box === 'collectif' ? 'Écrire au collectif' : 'Écrire au responsable de l’enquête'}</h3>
       <label className="block text-base font-extrabold">
         Adresse mail
         <input

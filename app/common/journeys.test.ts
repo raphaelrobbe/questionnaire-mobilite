@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { addJourney, difficultiesIssue, emptyDifficulties, emptyJourney, journeyComplete, journeyIssue, journeyTouched, presetActualJourney, removeJourney, sanitizeDifficulties, sanitizeJourneys, setDifficultyNote, setDifficultyTripPace, toggleDifficultyGroup, toggleDifficultyItem, toggleDifficultyTrip, updateJourney, DOMICILE, type Journey } from './journeys'
+import { addJourney, applySoleTrip, difficultiesIssue, emptyDifficulties, emptyJourney, journeyComplete, journeyIssue, journeyTouched, presetActualJourney, removeJourney, sanitizeDifficulties, sanitizeJourneys, setDifficultyNote, setDifficultyTripPace, toggleDifficultyGroup, toggleDifficultyItem, toggleDifficultyTrip, updateJourney, DOMICILE, type Journey } from './journeys'
 
 function filled(patch: Partial<Journey> = {}): Journey {
   return {
@@ -10,7 +10,7 @@ function filled(patch: Partial<Journey> = {}): Journey {
     regularity: 'regulier',
     pace: 'hebdo',
     days: ['lun', 'mar'],
-    mode: 'taxi',
+    modes: ['taxi'],
     destination: 'Besançon',
     replaced: 'parfois',
     riders: [0],
@@ -47,7 +47,12 @@ describe('trajets du foyer', () => {
     expect(clean[1]?.replaced).toBe('offre')
     expect(clean[1]?.replacedRiders).toEqual([0])
     expect(clean[1]?.riders).toEqual([])
-    expect(clean[1]?.mode).toBe('')
+    expect(clean[1]?.modes).toEqual([])
+    expect(sanitizeJourneys([filled({ modes: ['taxi', 'velo', 'inconnu'] })], 1, [], [])[0]?.modes).toEqual(['velo', 'taxi'])
+    const legacyMode = filled()
+    delete (legacyMode as { modes?: string[] }).modes
+    ;(legacyMode as { mode?: string }).mode = 'taxi'
+    expect(sanitizeJourneys([legacyMode], 1, [], [])[0]?.modes).toEqual(['taxi'])
     const blankTrips = sanitizeJourneys(null, 1, [], [])
     expect(blankTrips.map((journey) => journey.kind)).toEqual(['actuel', 'nouveau'])
     expect(blankTrips[0]?.id).toMatch(/^[a-z0-9]{8}$/)
@@ -146,6 +151,14 @@ describe('trajets du foyer', () => {
     const kept = sanitizeDifficulties(often, [trip])
     expect(kept.trips.bouchons).toEqual([{ id: trip, pace: 'souvent' }])
     expect(sanitizeDifficulties(often, []).trips.bouchons).toBeUndefined()
+    const sole = applySoleTrip(circulation, [trip])
+    expect(sole.trips.bouchons).toEqual([{ id: trip, pace: '' }])
+    expect(applySoleTrip(sole, [trip])).toBe(sole)
+    expect(applySoleTrip(often, [trip])).toBe(often)
+    expect(applySoleTrip(circulation, [trip, 'zzzz9999'])).toBe(circulation)
+    const autre = toggleDifficultyItem(circulation, 'circulation-autre')
+    expect(applySoleTrip(autre, [trip]).trips['circulation-autre']).toBeUndefined()
+    expect(applySoleTrip(setDifficultyNote(autre, 'circulation', 'travaux'), [trip]).trips['circulation-autre']).toEqual([{ id: trip, pace: '' }])
     const noted = setDifficultyNote(toggleDifficultyItem(often, 'circulation-autre'), 'circulation', 'travaux')
     expect(noted.notes.circulation).toBe('travaux')
     expect(difficultiesIssue(noted)).toMatch(/Précisez|trajets/)

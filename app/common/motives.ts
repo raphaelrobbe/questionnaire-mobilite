@@ -102,6 +102,7 @@ export const WHY_NOT: { id: string; label: string }[] = [
 ]
 
 export const EXTRA_MODES: { id: string; label: string }[] = [
+  { id: 'velo', label: 'Vélo' },
   { id: 'proche', label: 'Véhiculé par un proche' },
   { id: 'covoiturage', label: 'Covoiturage' },
   { id: 'taxi', label: 'Taxi / VTC' },

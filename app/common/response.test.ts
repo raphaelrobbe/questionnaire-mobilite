@@ -15,8 +15,8 @@ function record(patch: Parameters<typeof patchAnswers>[1] = {}): ResponseRecord 
     answers: patchAnswers(emptyAnswers(), {
       commune: 'Lyon',
       people: [
-        { age: '40-64', drive: 'oui', manqueAutonomie: false },
-        { age: '0-14', drive: 'non', manqueAutonomie: false },
+        { age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: '', electoralCommune: '' },
+        { age: '0-14', drive: 'non', manqueAutonomie: false, electoral: '', electoralCommune: '' },
       ],
       cars: [{ motor: 'hybride', sansPermis: false }],
       twoWheelers: [{ motor: 'electrique', sansPermis: true }],

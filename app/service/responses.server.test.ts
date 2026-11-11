@@ -17,7 +17,7 @@ function record(): ResponseRecord {
     longitude: null,
     answers: patchAnswers(emptyAnswers(), {
       commune: 'Lyon',
-      people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false }],
+      people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: '', electoralCommune: '' }],
     }),
   }
 }
