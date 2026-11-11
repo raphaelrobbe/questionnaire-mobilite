@@ -1,5 +1,5 @@
 import { COLLECTIF_CONSENT, PHONE_CONSENT } from './consent'
-import { isEmail, personLine, sanitizeAnswers, vehicleLine, type Answers } from './survey'
+import { formatVisits, handicapSheet, isEmail, personLine, sanitizeAnswers, vehicleLine, type Answers } from './survey'
 
 const CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
@@ -87,6 +87,9 @@ export function forgetPersonal<T extends PersonalCarrier>(record: T): T {
 export const SHEET_HEADERS = [
   'id',
   'horodatage_utc',
+  'horodatage_debut',
+  'horodatage_fin',
+  'visites',
   'appareil',
   'enqueteur',
   'commune',
@@ -98,6 +101,10 @@ export const SHEET_HEADERS = [
   'detail_deux_trois_roues',
   'recontact',
   'collectif',
+  'handicap',
+  'handicap_adaptations',
+  'handicap_qui',
+  'handicap_commentaire',
 ] as const
 
 export type MailBody = {
@@ -143,9 +150,13 @@ export function toSheetRow(record: ResponseRecord): SheetRow {
   const people = answers.people.map(personLine)
   const cars = answers.cars.map(vehicleLine)
   const twoWheelers = answers.twoWheelers.map(vehicleLine)
+  const handicap = handicapSheet(answers)
   return {
     id: clip(record.id, 80),
     horodatage_utc: clip(record.createdAt, 40),
+    horodatage_debut: clip(answers.startedAt, 40),
+    horodatage_fin: clip(answers.finishedAt, 40),
+    visites: clip(formatVisits(answers.visits), 4000),
     appareil: clip(record.deviceId, 80),
     enqueteur: clip(record.interviewer, 80),
     commune: clip(answers.commune, 120),
@@ -157,6 +168,10 @@ export function toSheetRow(record: ResponseRecord): SheetRow {
     detail_deux_trois_roues: joined(twoWheelers),
     recontact: answers.recontact === 'oui' ? 'oui' : answers.recontact === 'non' ? 'non' : '',
     collectif: answers.collectif ? 'oui' : 'non',
+    handicap: handicap.handicap,
+    handicap_adaptations: clip(handicap.adaptations, 2000),
+    handicap_qui: clip(handicap.qui, 500),
+    handicap_commentaire: clip(answers.handicapComment, 400),
   }
 }
 

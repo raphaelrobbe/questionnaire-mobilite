@@ -1,4 +1,6 @@
 import { Link } from '@remix-run/react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { CollectifLink } from './CollectifLink'
 import { ContactForm } from './ContactForm'
 
 const METHOD = [
@@ -28,7 +30,9 @@ export function PublicHome() {
   return (
     <div className="-mx-4 -mt-4 flex flex-1 flex-col">
       <section className="bg-pine px-5 py-10 text-paper">
-        <p className="text-sm font-extrabold uppercase tracking-[0.14em] text-mist">Collectif Mobilité Haut-Doubs</p>
+        <p className="text-sm font-extrabold uppercase tracking-[0.14em] text-mist">
+          <CollectifLink className="underline decoration-mist underline-offset-[0.25em]" />
+        </p>
         <h1 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight">
           Enquête sur les besoins de mobilité dans le Haut-Doubs
         </h1>
@@ -48,7 +52,7 @@ export function PublicHome() {
             déplacer facilement.
           </p>
           <p>
-            Le <strong className="font-extrabold">Collectif Mobilité Haut-Doubs</strong> lance une enquête auprès des habitants pour mieux
+            Le <CollectifLink /> lance une enquête auprès des habitants pour mieux
             connaître ces besoins, dans l’ensemble du territoire.
           </p>
         </div>
@@ -69,6 +73,7 @@ export function PublicHome() {
             <li key={item.title} className="rounded-2xl bg-card px-4 py-4">
               <h3 className="font-extrabold leading-snug">{item.title}</h3>
               <p className="mt-1 text-base leading-relaxed text-ink">{item.text}</p>
+              {item.title === 'Un tirage au sort' ? <SamplingNote /> : null}
             </li>
           ))}
         </ul>
@@ -79,7 +84,8 @@ export function PublicHome() {
       </section>
 
       <section className="bg-leaf px-5 py-10 text-paper">
-        <h2 className="text-2xl font-extrabold leading-tight tracking-tight">Une enquête citoyenne, qui a besoin de vous !</h2>
+        <h2 className="text-4xl font-extrabold leading-tight tracking-tight">On cherche des enquêteurs !</h2>
+        <p className="mt-3 text-2xl font-extrabold leading-tight tracking-tight">Une enquête citoyenne, qui a besoin de vous !</p>
         <div className="mt-4 grid gap-4 text-base leading-relaxed">
           <p>Pour aller à la rencontre des habitants, nous avons besoin de bénévoles prêts à participer aux enquêtes en porte-à-porte.</p>
           <p>
@@ -99,10 +105,81 @@ export function PublicHome() {
   )
 }
 
+const REPRESENTATIVITY = [
+  'Le tirage au sort sera organisé pour garantir une présence suffisante des différentes communes, en tenant compte de leur taille. Un nombre minimal de foyers pourra ainsi être sélectionné dans les petites communes, puis les autres tirages seront répartis en fonction de la population.',
+  'Comme les foyers ne comportent pas tous le même nombre d’électeurs inscrits, leurs chances d’être sélectionnés ne sont pas identiques. Les calculs statistiques en tiendront compte afin que chaque personne soit représentée à sa juste proportion.',
+  'Enfin, les listes électorales ne couvrent pas toute la population : les mineurs, les personnes non inscrites et celles qui ne disposent pas du droit de vote en sont notamment absents. Le fait d’interroger tous les membres des foyers sélectionnés permettra d’inclure une partie de ces personnes. Des ajustements statistiques, à partir des données démographiques disponibles, contribueront à mieux représenter l’ensemble de la population.',
+]
+
+function SamplingNote() {
+  const [open, setOpen] = useState(false)
+  const [trigger, setTrigger] = useState<'rules' | 'stats' | null>(null)
+  const noteId = useId()
+  const box = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    function onPointer(event: PointerEvent) {
+      if (!box.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onPointer)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onPointer)
+    }
+  }, [open])
+
+  function show(which: 'rules' | 'stats') {
+    setOpen((current) => (trigger === which ? !current : true))
+    setTrigger(which)
+  }
+
+  const zoneClass = 'inline font-extrabold text-pine underline decoration-leaf decoration-2 underline-offset-[0.2em]'
+
+  return (
+    <div ref={box} className="mt-3">
+      <p className="text-base leading-relaxed text-ink">
+        Le tirage au sort suivra des{' '}
+        <button type="button" aria-expanded={open} aria-controls={noteId} className={zoneClass} onClick={() => show('rules')}>
+          règles adaptées
+        </button>{' '}
+        aux différentes communes, et les résultats feront l’objet de{' '}
+        <button type="button" aria-expanded={open} aria-controls={noteId} className={zoneClass} onClick={() => show('stats')}>
+          corrections statistiques
+        </button>{' '}
+        afin de mieux représenter l’ensemble de la population.
+      </p>
+      {open ? (
+        <div
+          id={noteId}
+          role="note"
+          className="relative z-20 mt-3 rounded-2xl border border-line bg-paper px-4 py-3 text-left text-base font-medium leading-relaxed text-ink shadow-lg before:absolute before:-top-2 before:left-8 before:size-4 before:rotate-45 before:border-l before:border-t before:border-line before:bg-paper"
+        >
+          <p className="font-extrabold">Comment assurer la représentativité de l’enquête ?</p>
+          {REPRESENTATIVITY.map((paragraph) => (
+            <p key={paragraph.slice(0, 24)} className="mt-3">
+              {paragraph}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function PrivacyLink() {
   return (
-    <Link to="/protection" prefetch="intent" className="mt-auto flex min-h-11 items-end justify-center bg-paper pb-1 pt-8 text-sm font-bold text-leaf">
-      Protection des données
-    </Link>
+    <footer className="mt-auto flex min-h-11 flex-wrap items-end justify-center gap-x-5 gap-y-1 bg-paper pb-1 pt-8 text-sm font-bold">
+      <Link to="/collectif" prefetch="intent" className="inline-flex min-h-11 items-center text-leaf">
+        Collectif Mobilité Haut-Doubs
+      </Link>
+      <Link to="/protection" prefetch="intent" className="inline-flex min-h-11 items-center text-leaf">
+        Protection des données
+      </Link>
+    </footer>
   )
 }

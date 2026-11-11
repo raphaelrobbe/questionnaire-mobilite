@@ -1,5 +1,6 @@
 import { COLLECTIF_CONSENT, PHONE_CONSENT } from '~/common/consent'
-import type { Answers } from '~/common/survey'
+import { CollectifLink } from './CollectifLink'
+import { isEmail, respondentPhone, type Answers } from '~/common/survey'
 import { choiceClass, fieldClass } from './fill'
 import { Reveal } from './Reveal'
 
@@ -49,7 +50,8 @@ export function ContactStep({
             className="mt-1 size-5 accent-pine"
           />
           <span className="min-w-0 font-bold">
-            {answers.collectif && answers.collectifText ? answers.collectifText : COLLECTIF_CONSENT}
+            J’accepte de recevoir occasionnellement par courrier électronique des informations du <CollectifLink /> concernant
+            ses actions, les avancées du projet de mobilité et les éventuelles réunions publiques
           </span>
         </label>
         {answers.collectif ? (
@@ -84,8 +86,21 @@ export function ContactStep({
               <p className="text-base leading-relaxed">
                 Vous serez recontacté très prochainement pour en discuter et vous mettre en route, en particulier pour une très courte formation.
               </p>
-              {answers.recontact !== 'oui' ? <PhoneField value={answers.phone} onChange={(phone) => onChange({ phone })} /> : null}
-              {!answers.collectif ? <EmailField value={answers.email} onChange={(email) => onChange({ email })} /> : null}
+              {answers.recontact !== 'oui' && !answers.collectif ? (
+                <>
+                  <p className="text-base text-muted">Un seul contact suffit, le téléphone ou l’adresse mail.</p>
+                  <PhoneField
+                    value={answers.phone}
+                    optional={hasContact(answers)}
+                    onChange={(phone) => onChange({ phone })}
+                  />
+                  <EmailField
+                    value={answers.email}
+                    optional={hasContact(answers)}
+                    onChange={(email) => onChange({ email })}
+                  />
+                </>
+              ) : null}
             </div>
           </Reveal>
         ) : null}
@@ -94,7 +109,11 @@ export function ContactStep({
   )
 }
 
-function PhoneField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function hasContact(answers: Answers): boolean {
+  return Boolean(respondentPhone(answers.phone)) || isEmail(answers.email)
+}
+
+function PhoneField({ value, onChange, optional = false }: { value: string; onChange: (value: string) => void; optional?: boolean }) {
   return (
     <label className="grid gap-2">
       <span className="font-bold">Numéro de téléphone</span>
@@ -109,13 +128,13 @@ function PhoneField({ value, onChange }: { value: string; onChange: (value: stri
         maxLength={40}
         placeholder="06 12 34 56 78"
         onChange={(event) => onChange(event.target.value)}
-        className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(value.trim()), false)}`}
+        className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(value.trim()), optional)}`}
       />
     </label>
   )
 }
 
-function EmailField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function EmailField({ value, onChange, optional = false }: { value: string; onChange: (value: string) => void; optional?: boolean }) {
   return (
     <label className="grid gap-2">
       <span className="font-bold">Adresse mail</span>
@@ -130,7 +149,7 @@ function EmailField({ value, onChange }: { value: string; onChange: (value: stri
         maxLength={120}
         placeholder="prenom@exemple.fr"
         onChange={(event) => onChange(event.target.value)}
-        className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(value.trim()), false)}`}
+        className={`min-h-14 rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(value.trim()), optional)}`}
       />
     </label>
   )

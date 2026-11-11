@@ -2,35 +2,62 @@ import { describe, expect, test } from 'vitest'
 import {
   addVehicle,
   answerPreview,
+  appendVisit,
   buildSteps,
   changePerson,
   emptyAnswers,
+  formatVisits,
   hasAnyAnswer,
   issueForCommune,
   issueForContact,
+  issueForLifeChoices,
+  issueForWalkDistance,
+  setWalkDistance,
+  setWalkNote,
+  issueForModeConditions,
+  setModeConditionNote,
+  toggleModeCondition,
+  issueForModeBarriers,
+  issueForModeReasons,
+  setModeBarrierNote,
+  toggleModeBarrier,
+  setModeNote,
+  toggleLifeChoice,
+  toggleLifePerson,
+  toggleModeReason,
   questionSide,
   respondentPhone,
+  issueForHandicap,
   issueForHousehold,
   issueForVehicles,
   patchAnswers,
   sanitizeAnswers,
+  stepIssue,
   personLine,
   mapsDestination,
   summary,
 } from './survey'
 
 describe('questionnaire', () => {
-  test('commence par le nom, la commune et l’adresse, puis l’accord', () => {
+  test('commence par le nom, la commune et l’adresse, puis la visite et l’accord', () => {
     expect(buildSteps(emptyAnswers()).map((step) => step.kind)).toEqual([
       'name',
       'commune',
       'address',
+      'visit',
       'consent',
       'household',
       'vehicles',
       'motives',
       'reminders',
+      'difficulties',
       'offers',
+      'reasons',
+      'conditions',
+      'barriers',
+      'walk',
+      'life',
+      'handicap',
       'contact',
       'review',
     ])
@@ -123,15 +150,23 @@ describe('questionnaire', () => {
     const hungUp = patchAnswers(dropped, { recontact: 'non' })
     expect(hungUp.phone).toBe('')
     const recruit = patchAnswers(hungUp, { enqueteur: 'oui' })
-    expect(issueForContact(recruit)).toMatch(/téléphone/)
+    expect(issueForContact(recruit)).toMatch(/téléphone ou une adresse mail/)
     const recruitPhone = patchAnswers(recruit, { phone: '06 12 34 56 78' })
-    expect(issueForContact(recruitPhone)).toMatch(/adresse mail/)
+    expect(issueForContact(recruitPhone)).toBeNull()
+    expect(recruitPhone.email).toBe('')
+    const recruitMail = patchAnswers(recruit, { email: 'Ada@Exemple.fr' })
+    expect(issueForContact(recruitMail)).toBeNull()
+    expect(recruitMail.phone).toBe('')
+    expect(issueForContact(patchAnswers(recruit, { phone: 'bureau' }))).toMatch(/chiffre/)
+    expect(issueForContact(patchAnswers(recruit, { email: 'PasUnMail' }))).toMatch(/adresse mail/)
     const recruitReady = patchAnswers(recruitPhone, { email: 'Ada@Exemple.fr' })
     expect(issueForContact(recruitReady)).toBeNull()
     expect(recruitReady.phone).toBe('06 12 34 56 78')
     expect(recruitReady.email).toBe('ada@exemple.fr')
     expect(patchAnswers(recruitReady, { enqueteur: 'non' }).phone).toBe('')
     expect(patchAnswers(recruitReady, { enqueteur: 'non' }).email).toBe('')
+    expect(issueForContact(patchAnswers(reached, { enqueteur: 'oui' }))).toBeNull()
+    expect(issueForContact(patchAnswers(ready, { enqueteur: 'oui', email: '' }))).toMatch(/adresse mail/)
     const remembered = patchAnswers(emptyAnswers(), {
       recontact: 'oui',
       recontactText: 'Phrase cochée pour le téléphone',
@@ -166,6 +201,179 @@ describe('questionnaire', () => {
     expect(patchAnswers(emptyAnswers(), { recontact: 'oui', phone: '+33 ' }).phone).toBe('+33 ')
     expect(respondentPhone('  +33 6 12 34 56 78  ')).toBe('+33 6 12 34 56 78')
     expect(respondentPhone('')).toBe('')
+  })
+
+  test('garde chaque visite, avec son heure, et demande un choix avant de valider', () => {
+    const at = '2026-11-11T12:00:00.000Z'
+    const later = '2026-11-11T15:30:00.123Z'
+    expect(stepIssue({ kind: 'visit' }, emptyAnswers())).toMatch(/Choisissez/)
+    const once = appendVisit([], 'absente', at)
+    const twice = appendVisit(once, 'commencer', later)
+    expect(twice).toEqual([
+      { outcome: 'absente', at },
+      { outcome: 'commencer', at: later },
+    ])
+    expect(formatVisits(twice)).toBe(
+      `${at} — La personne était absente\n${later} — Commencer l’enquête`,
+    )
+    const kept = sanitizeAnswers({ visits: [...twice, { outcome: 'ailleurs', at: 'hier' }, { outcome: 'inconnu', at }] })
+    expect(kept.visits).toEqual(twice)
+    expect(kept.startedAt).toBe('')
+    expect(sanitizeAnswers({ startedAt: at, finishedAt: later }).finishedAt).toBe(later)
+    expect(hasAnyAnswer(patchAnswers(emptyAnswers(), { visits: once }))).toBe(true)
+  })
+
+  test('un choix de vie désigne des personnes, et « non » reste à part', () => {
+    const empty = emptyAnswers()
+    expect(issueForLifeChoices(empty.lifeChoices)).toMatch(/changer/)
+    const home = toggleLifeChoice(empty.lifeChoices, 'residence')
+    expect(issueForLifeChoices(home)).toMatch(/personnes/)
+    const named = toggleLifePerson(home, 'residence', 0)
+    expect(issueForLifeChoices(named)).toBeNull()
+    expect(named.people.residence).toEqual([0])
+    const blocked = toggleLifeChoice(named, 'non')
+    expect(blocked).toBe(named)
+    const none = toggleLifeChoice(empty.lifeChoices, 'non')
+    expect(issueForLifeChoices(none)).toBeNull()
+    expect(toggleLifeChoice(none, 'emploi')).toBe(none)
+    const kept = sanitizeAnswers({
+      people: [{ age: '40-64', drive: 'oui' }, { age: '0-14' }],
+      lifeChoices: { selected: ['achats', 'non', 'inconnu'], people: { achats: [1, 4, 1] }, notes: { achats: '  le marché  ' } },
+    })
+    expect(kept.lifeChoices.selected).toEqual(['non'])
+    expect(kept.lifeChoices.people.achats).toBeUndefined()
+    const noted = sanitizeAnswers({
+      people: kept.people,
+      lifeChoices: { selected: ['achats'], people: { achats: [1, 4] }, notes: { achats: '  le marché  ' } },
+    })
+    expect(noted.lifeChoices.selected).toEqual(['achats'])
+    expect(noted.lifeChoices.people.achats).toEqual([1])
+    expect(noted.lifeChoices.notes.achats).toBe('  le marché  ')
+  })
+
+  test('une raison de changer de mode est demandée, et « aucune » reste à part', () => {
+    const empty = emptyAnswers()
+    expect(issueForModeReasons(empty.modeReasons)).toMatch(/raison/)
+    expect(stepIssue({ kind: 'reasons' }, empty)).toMatch(/raison/)
+    const one = toggleModeReason(empty.modeReasons, 'stress')
+    expect(issueForModeReasons(one)).toBeNull()
+    expect(toggleModeReason(one, 'aucune')).toBe(one)
+    const none = toggleModeReason(empty.modeReasons, 'aucune')
+    expect(none.selected).toEqual(['aucune'])
+    expect(issueForModeReasons(none)).toBeNull()
+    expect(toggleModeReason(none, 'repos')).toBe(none)
+    const noted = setModeNote(none, '  le soir  ')
+    expect(noted.note).toBe('  le soir  ')
+    expect(noted.selected).toEqual(['aucune'])
+    const kept = sanitizeAnswers({
+      modeReasons: { selected: ['autre', 'aucune', 'inconnu'], note: '  trop loin  ' },
+    })
+    expect(kept.modeReasons).toEqual({ selected: ['aucune'], note: '  trop loin  ' })
+    const lines = Object.fromEntries(summary(patchAnswers(empty, { modeReasons: setModeNote(one, 'la neige') })).map((line) => [line.label, line.value]))
+    expect(lines['Raisons de changer']).toContain('stress de la conduite')
+    expect(lines['Raisons de changer']).toContain('la neige')
+    expect(summary(patchAnswers(empty, { modeReasons: none })).find((line) => line.label === 'Raisons de changer')?.value).toBe(
+      'Je ne changerais pas de mode de transport',
+    )
+  })
+
+  test('une condition pour laisser la voiture est demandée, et « aucune » reste à part', () => {
+    const empty = emptyAnswers()
+    expect(issueForModeConditions(empty.modeConditions)).toMatch(/condition/)
+    expect(stepIssue({ kind: 'conditions' }, empty)).toMatch(/condition/)
+    const one = toggleModeCondition(empty.modeConditions, 'min15')
+    const both = toggleModeCondition(one, 'horaires')
+    expect(both.selected).toEqual(['min15', 'horaires'])
+    expect(issueForModeConditions(both)).toBeNull()
+    expect(toggleModeCondition(both, 'aucune')).toBe(both)
+    const none = toggleModeCondition(empty.modeConditions, 'aucune')
+    expect(none.selected).toEqual(['aucune'])
+    expect(toggleModeCondition(none, 'abonnement')).toBe(none)
+    const noted = setModeConditionNote(none, '  le soir  ')
+    expect(noted.note).toBe('  le soir  ')
+    const kept = sanitizeAnswers({
+      modeConditions: { selected: ['autre', 'aucune', 'inconnu'], note: '  trop loin  ' },
+    })
+    expect(kept.modeConditions).toEqual({ selected: ['aucune'], note: '  trop loin  ' })
+    const lines = Object.fromEntries(
+      summary(patchAnswers(empty, { modeConditions: setModeConditionNote(both, 'la neige') })).map((line) => [line.label, line.value]),
+    )
+    expect(lines.Conditions).toContain('15 minutes')
+    expect(lines.Conditions).toContain('horaires adaptés')
+    expect(lines.Conditions).toContain('la neige')
+  })
+
+  test('un frein est demandé, et « aucun » reste à part', () => {
+    const empty = emptyAnswers()
+    expect(issueForModeBarriers(empty.modeBarriers)).toMatch(/frein/)
+    expect(stepIssue({ kind: 'barriers' }, empty)).toMatch(/frein/)
+    const one = toggleModeBarrier(empty.modeBarriers, 'fiabilite')
+    expect(issueForModeBarriers(one)).toBeNull()
+    expect(toggleModeBarrier(one, 'aucun')).toBe(one)
+    const none = toggleModeBarrier(empty.modeBarriers, 'aucun')
+    expect(none.selected).toEqual(['aucun'])
+    expect(issueForModeBarriers(none)).toBeNull()
+    expect(toggleModeBarrier(none, 'cout')).toBe(none)
+    const noted = setModeBarrierNote(none, '  le soir  ')
+    expect(noted.note).toBe('  le soir  ')
+    expect(noted.selected).toEqual(['aucun'])
+    const kept = sanitizeAnswers({
+      modeBarriers: { selected: ['autre', 'aucun', 'inconnu'], note: '  trop loin  ' },
+    })
+    expect(kept.modeBarriers).toEqual({ selected: ['aucun'], note: '  trop loin  ' })
+    const lines = Object.fromEntries(summary(patchAnswers(empty, { modeBarriers: setModeBarrierNote(one, 'la neige') })).map((line) => [line.label, line.value]))
+    expect(lines.Freins).toContain('fiabilité')
+    expect(lines.Freins).toContain('la neige')
+  })
+
+  test('la distance à l’arrêt est un choix unique, et la précision reste libre', () => {
+    const empty = emptyAnswers()
+    expect(issueForWalkDistance(empty.walkDistance)).toMatch(/distance/)
+    expect(stepIssue({ kind: 'walk' }, empty)).toMatch(/distance/)
+    const one = setWalkDistance(empty.walkDistance, 'm500')
+    expect(one.choice).toBe('m500')
+    expect(issueForWalkDistance(one)).toBeNull()
+    const other = setWalkDistance(one, 'jamais')
+    expect(other.choice).toBe('jamais')
+    expect(setWalkDistance(other, 'jamais').choice).toBe('')
+    const noted = setWalkNote(other, '  s’il pleut  ')
+    expect(noted.note).toBe('  s’il pleut  ')
+    expect(noted.choice).toBe('jamais')
+    const kept = sanitizeAnswers({ walkDistance: { choice: 'inconnu', note: '  la côte  ' } })
+    expect(kept.walkDistance).toEqual({ choice: '', note: '  la côte  ' })
+    const lines = Object.fromEntries(summary(patchAnswers(empty, { walkDistance: setWalkNote(one, 'la côte') })).map((line) => [line.label, line.value]))
+    expect(lines['Distance à l’arrêt']).toBe('Entre 200 et 500 mètres · la côte')
+  })
+
+  test('le handicap est obligatoire, et les précisions seulement si la réponse est oui', () => {
+    expect(issueForHandicap(emptyAnswers())).toMatch(/oui, non/)
+    expect(issueForHandicap(patchAnswers(emptyAnswers(), { handicap: 'non' }))).toBeNull()
+    expect(issueForHandicap(patchAnswers(emptyAnswers(), { handicap: 'nsp' }))).toBeNull()
+    const oui = patchAnswers(emptyAnswers(), { handicap: 'oui' })
+    expect(issueForHandicap(oui)).toMatch(/adaptation/)
+    const typed = patchAnswers(oui, { handicapTypes: ['vue', 'autre'], handicapAutre: '  rampe  ' })
+    expect(typed.handicapTypes).toEqual(['vue', 'autre'])
+    expect(typed.handicapAutre).toBe('  rampe  ')
+    expect(issueForHandicap(patchAnswers(typed, { handicapAutre: '   ' }))).toMatch(/Précisez/)
+    expect(issueForHandicap(typed)).toMatch(/concerne/)
+    const aside = patchAnswers(typed, { handicapConcern: 'non', handicapWho: ['moi'] })
+    expect(aside.handicapWho).toEqual([])
+    expect(issueForHandicap(aside)).toBeNull()
+    const dropped = sanitizeAnswers({ handicap: 'non', handicapTypes: ['vue'], handicapConcern: 'oui', handicapWho: ['moi'], handicapAutre: 'rampe' })
+    expect(dropped.handicapTypes).toEqual([])
+    expect(dropped.handicapConcern).toBe('')
+    expect(dropped.handicapWho).toEqual([])
+    expect(dropped.handicapAutre).toBe('')
+    const lines = Object.fromEntries(summary(typed).map((line) => [line.label, line.value]))
+    expect(lines.Handicap).toBe('Oui')
+    expect(lines.Adaptations).toContain('malvoyantes')
+    expect(lines.Adaptations).toContain('Autre : rampe')
+    expect(lines['Qui est concerné']).toBeUndefined()
+    const concerned = sanitizeAnswers({ ...typed, handicapConcern: 'oui', handicapWho: ['proche', 'moi', 'inconnu'] })
+    expect(concerned.handicapConcern).toBe('oui')
+    expect(concerned.handicapWho).toEqual(['moi', 'proche'])
+    expect(issueForHandicap(concerned)).toBeNull()
+    expect(hasAnyAnswer(patchAnswers(emptyAnswers(), { handicap: 'nsp' }))).toBe(true)
   })
 
   test('une fiche de l’ancien questionnaire ne fait pas planter l’accueil', () => {

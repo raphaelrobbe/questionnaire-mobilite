@@ -1,10 +1,12 @@
+import { CollectifLink } from './CollectifLink'
+
 export function PrivacyNotice() {
   return (
     <article className="grid gap-3 text-base leading-relaxed">
       <h2 className="text-2xl font-extrabold leading-tight tracking-tight">Protection des données personnelles</h2>
       <h3 className="font-extrabold">Responsable du traitement</h3>
       <p>
-        L’enquête est organisée par le Collectif Mobilité Haut-Doubs, représenté par Raphaël Robbe. Pour toute question
+        L’enquête est organisée par le <CollectifLink />, représenté par Raphaël Robbe. Pour toute question
         relative à vos données personnelles ou pour exercer vos droits, vous pouvez écrire à :{' '}
         <a href="mailto:contact@enquete-mobilite-haut-doubs.fr" className="font-bold text-leaf">
           contact@enquete-mobilite-haut-doubs.fr

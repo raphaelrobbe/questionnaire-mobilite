@@ -28,8 +28,14 @@ export async function confirmInterviewer(adminEndpoint: string, deviceId: string
   return person.name
 }
 
-export async function submitRecord(record: ResponseRecord, endpoint: string, adminEndpoint: string): Promise<SendStatus> {
+export async function submitRecord(
+  record: ResponseRecord,
+  endpoint: string,
+  adminEndpoint: string,
+  mail = true,
+): Promise<SendStatus> {
   if (record.test) return post(endpoint, JSON.stringify(responseBody(record)))
+  if (!mail) return post(endpoint, JSON.stringify(responseBody(record)))
   const mailed = await post(adminEndpoint, JSON.stringify(mailBody(record)))
   const responses = await post(endpoint, JSON.stringify(responseBody(record)))
   return mailed === 'confirmed' && responses === 'confirmed' ? 'confirmed' : responses

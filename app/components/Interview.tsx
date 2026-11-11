@@ -1,15 +1,15 @@
 import { Link, useNavigate, useSearchParams } from '@remix-run/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { draftMatchesMode } from '~/common/draft'
 import { classifyEndpoint } from '~/common/endpoint'
 import { canUseSurvey } from '~/common/settings'
-import { presetActualJourney } from '~/common/journeys'
+import { listedActualTrips, presetActualJourney } from '~/common/journeys'
 import { type ThemeId } from '~/common/motives'
-import { CIVILITY, buildSteps, patchAnswers, stepIssue, summary, type Answers } from '~/common/survey'
+import { CIVILITY, VISITS, appendVisit, buildSteps, patchAnswers, stepIssue, summary, visitLabel, visitStarts, type Answers } from '~/common/survey'
 import type { ResponseRecord } from '~/common/response'
 import { createDraft, loadDraft, removeDraft, saveDraft, type Draft } from '~/lib/draft.client'
 import { capturePosition } from '~/lib/geo.client'
-import { flushOne, keepResponse, readableError, type LocalResponse } from '~/lib/outbox.client'
+import { commitResponse, readableError, type LocalResponse } from '~/lib/outbox.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { useOnline } from '~/hooks/useOnline'
 import { useOutbox } from '~/hooks/useOutbox'
@@ -22,6 +22,13 @@ import { holdRevealScroll } from './Reveal'
 import { MapsLink } from './MapsLink'
 import { PlacePicker } from './PlacePicker'
 import { ContactStep } from './ContactStep'
+import { LifeChoicesStep } from './LifeChoicesStep'
+import { ModeBarriersStep } from './ModeBarriersStep'
+import { ModeConditionsStep } from './ModeConditionsStep'
+import { WalkDistanceStep } from './WalkDistanceStep'
+import { ModeReasonsStep } from './ModeReasonsStep'
+import { TripDifficulties } from './TripDifficulties'
+import { HandicapStep } from './HandicapStep'
 import { HouseholdStep } from './HouseholdStep'
 import { MotivesStep } from './MotivesStep'
 import { VehiclesStep } from './VehiclesStep'
@@ -43,6 +50,7 @@ export function Interview() {
   const [deviceId, setDeviceId] = useState('')
   const [missing, setMissing] = useState(false)
   const [openedTrip, setOpenedTrip] = useState(-1)
+  const [visitNote, setVisitNote] = useState<string | null>(null)
 
   const named = settings ? canUseSurvey(settings) : false
 
@@ -167,10 +175,87 @@ export function Interview() {
   }
 
   function goNext() {
-    if (!draft || !step || issue) return
+    if (!draft || !step || issue || saving) return
+    if (step.kind === 'visit') {
+      void recordVisit()
+      return
+    }
+    if (step.kind === 'consent') {
+      void recordStart()
+      return
+    }
     setOpenedTrip(-1)
     update({ step: stepIndex + 1 })
     window.scrollTo(0, 0)
+  }
+
+  function toRecord(source: Draft, at: string): ResponseRecord {
+    const interviewer = settings?.interviewer.trim() ?? ''
+    return {
+      id: source.code,
+      createdAt: at,
+      deviceId: getDeviceId(),
+      interviewer: source.test ? interviewer || 'Test' : interviewer,
+      test: source.test,
+      latitude: source.latitude,
+      longitude: source.longitude,
+      answers: source.answers,
+    }
+  }
+
+  async function recordVisit() {
+    if (!draft || saving || !draft.answers.visitPick) return
+    const pick = draft.answers.visitPick
+    if (visitStarts(pick)) {
+      setSaveError(null)
+      setVisitNote(null)
+      update({ step: stepIndex + 1, answers: patchAnswers(draft.answers, { visitPick: '' }) })
+      window.scrollTo(0, 0)
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    setVisitNote(null)
+    const at = new Date().toISOString()
+    const next: Draft = {
+      ...draft,
+      answers: patchAnswers(draft.answers, { visits: appendVisit(draft.answers.visits, pick, at), visitPick: '' }),
+    }
+    try {
+      if (!draftMatchesMode(draft, settings?.testMode === true)) throw new Error('Cette fiche n’est pas dans le mode en cours.')
+      const row = await commitResponse(toRecord(next, at))
+      setDraft(next)
+      if (row?.status === 'error' && row.lastError) setSaveError(readableError(row.lastError))
+      else setVisitNote('Visite enregistrée.')
+      window.scrollTo(0, 0)
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Enregistrement impossible sur cet appareil.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function recordStart() {
+    if (!draft || saving) return
+    setSaving(true)
+    setSaveError(null)
+    const at = new Date().toISOString()
+    const next: Draft = {
+      ...draft,
+      step: stepIndex + 1,
+      answers: patchAnswers(draft.answers, { startedAt: draft.answers.startedAt || at }),
+    }
+    try {
+      if (!draftMatchesMode(draft, settings?.testMode === true)) throw new Error('Cette fiche n’est pas dans le mode en cours.')
+      const row = await commitResponse(toRecord(next, at))
+      setDraft(next)
+      if (row?.status === 'error' && row.lastError) setSaveError(readableError(row.lastError))
+      window.scrollTo(0, 0)
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Enregistrement impossible sur cet appareil.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function goBack() {
@@ -208,20 +293,12 @@ export function Interview() {
       setSaving(false)
       return
     }
-    const record: ResponseRecord = {
-      id: draft.code,
-      createdAt: new Date().toISOString(),
-      deviceId: getDeviceId(),
-      interviewer: draft.test ? interviewer || 'Test' : interviewer,
-      test: draft.test,
-      latitude: draft.latitude,
-      longitude: draft.longitude,
-      answers: draft.answers,
-    }
+    const at = new Date().toISOString()
+    const finished: Draft = { ...draft, answers: patchAnswers(draft.answers, { finishedAt: at }) }
+    const record = toRecord(finished, at)
     try {
-      await keepResponse(record)
+      const row = await commitResponse(record, true)
       removeDraft(record.id)
-      const row = await flushOne(record.id)
       setSaved(
         row ?? {
           ...record,
@@ -230,6 +307,7 @@ export function Interview() {
           attempts: 0,
           lookups: 0,
           updatedAt: record.createdAt,
+          includeMail: true,
         },
       )
     } catch (error) {
@@ -300,6 +378,61 @@ export function Interview() {
             <Field label="Prénom" value={draft.answers.prenom} autoComplete="given-name" onChange={(prenom) => updateAnswers({ prenom })} />
             <Field label="Nom" value={draft.answers.nom} autoComplete="family-name" onChange={(nom) => updateAnswers({ nom })} />
           </div>
+        </section>
+      ) : null}
+
+      {step.kind === 'visit' ? (
+        <section className="mt-6">
+          <Button
+            onClick={() => {
+              setVisitNote(null)
+              update({ step: stepIndex + 1, answers: patchAnswers(draft.answers, { visitPick: '' }) })
+              window.scrollTo(0, 0)
+            }}
+          >
+            Commencer l’enquête
+          </Button>
+          <h1 ref={headingRef} tabIndex={-1} className="mt-6 text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            L’enquête n’a pas pu avoir lieu : pourquoi ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Chaque visite est conservée, avec l’heure.</p>
+          <div className="mt-4 grid gap-2">
+            {VISITS.filter((item) => !item.starts).map((item) => {
+              const selected = draft.answers.visitPick === item.value
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  aria-pressed={selected}
+                  className={`min-h-14 rounded-2xl px-4 py-3 text-left text-base font-bold leading-snug ${choiceClass(selected, 'one', Boolean(draft.answers.visitPick))}`}
+                  onClick={() => {
+                    setVisitNote(null)
+                    updateAnswers({ visitPick: selected ? '' : item.value })
+                  }}
+                >
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
+          {draft.answers.visits.length ? (
+            <div className="mt-4 rounded-2xl bg-card px-4 py-3">
+              <p className="text-sm font-extrabold text-muted">Visites déjà notées</p>
+              <ul className="mt-2 grid gap-2">
+                {draft.answers.visits.map((visit) => (
+                  <li key={`${visit.at}-${visit.outcome}`} className="text-base leading-snug">
+                    <span className="font-bold">{visitWhen(visit.at)}</span>
+                    <span className="text-muted"> — {visitLabel(visit.outcome)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {visitNote ? (
+            <p role="status" className="mt-3 text-sm font-bold text-leaf">
+              {visitNote}
+            </p>
+          ) : null}
         </section>
       ) : null}
 
@@ -430,6 +563,20 @@ export function Interview() {
         </section>
       ) : null}
 
+      {step.kind === 'difficulties' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Quelles difficultés sur ces trajets ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Une seule fois, pour l’ensemble des trajets déjà notés.</p>
+          <TripDifficulties
+            trips={listedActualTrips(draft.answers.journeys)}
+            difficulties={draft.answers.difficulties}
+            onChange={(difficulties) => updateAnswers({ difficulties })}
+          />
+        </section>
+      ) : null}
+
       {step.kind === 'offers' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
@@ -439,6 +586,67 @@ export function Interview() {
             Ils ne sont pas faits aujourd’hui. Ils le seraient en transport en commun, si l’offre était efficace, fiable et financièrement intéressante.
           </p>
           <MotivesStep kind="nouveau" answers={draft.answers} onChange={(journeys) => updateAnswers({ journeys })} />
+        </section>
+      ) : null}
+
+      {step.kind === 'reasons' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Pour quelles raisons pourriez-vous envisager de changer de mode de transport ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Plusieurs réponses possibles.</p>
+          <ModeReasonsStep answers={draft.answers} onChange={updateAnswers} />
+        </section>
+      ) : null}
+
+      {step.kind === 'conditions' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            À quelles conditions pourriez-vous remplacer certains de vos trajets actuels en voiture par les transports en
+            commun ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Plusieurs réponses possibles.</p>
+          <ModeConditionsStep answers={draft.answers} onChange={updateAnswers} />
+        </section>
+      ) : null}
+
+      {step.kind === 'barriers' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Qu’est-ce qui pourrait au contraire vous freiner ou vous empêcher d’utiliser les transports en commun, même s’ils
+            desservaient les lieux où vous souhaitez vous rendre ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Plusieurs réponses possibles.</p>
+          <ModeBarriersStep answers={draft.answers} onChange={updateAnswers} />
+        </section>
+      ) : null}
+
+      {step.kind === 'walk' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Quelle distance seriez-vous prêt(e) à parcourir à pied entre votre domicile (ou le lieu où vous vous rendez) et un
+            arrêt de transport en commun ?
+          </h1>
+          <p className="mt-2 text-base text-muted">Une seule réponse.</p>
+          <WalkDistanceStep answers={draft.answers} onChange={updateAnswers} />
+        </section>
+      ) : null}
+
+      {step.kind === 'life' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Des choix de vie différents grâce aux transports
+          </h1>
+          <LifeChoicesStep answers={draft.answers} onChange={updateAnswers} />
+        </section>
+      ) : null}
+
+      {step.kind === 'handicap' ? (
+        <section className="mt-6">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            Adaptation aux situations de handicap
+          </h1>
+          <HandicapStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
 
@@ -464,7 +672,11 @@ export function Interview() {
           <dl className="mt-4 divide-y divide-line overflow-hidden rounded-[28px] border border-line bg-card">
             <Row label="Enquêteur" value={settings.interviewer.trim() || 'Non renseigné'} />
             {summary(draft.answers).map((line) => (
-              <Row key={line.label} label={line.label} value={line.value} />
+              <Row
+                key={line.label}
+                label={line.label}
+                value={line.value}
+              />
             ))}
             <Row
               label="Position"
@@ -478,9 +690,12 @@ export function Interview() {
           <MapsLink answers={draft.answers} className="mt-3" />
           <div className="mt-4 grid gap-2">
             {draft.latitude === null ? (
-              <Button variant="secondary" disabled={geoBusy} onClick={() => void notePosition()}>
-                {geoBusy ? 'Recherche de la position…' : 'Noter où a lieu l’entretien'}
-              </Button>
+              <>
+                <Button variant="secondary" disabled={geoBusy} onClick={() => void notePosition()}>
+                  {geoBusy ? 'Recherche de la position…' : 'Noter où a lieu l’entretien'}
+                </Button>
+                <p className="text-center text-sm text-muted">Utile si difficile à trouver</p>
+              </>
             ) : (
               <Button variant="ghost" onClick={() => update({ latitude: null, longitude: null })}>
                 Retirer la position
@@ -524,10 +739,10 @@ export function Interview() {
             ) : (
               <Button
                 className="w-auto min-w-0 flex-1 disabled:bg-line disabled:text-muted disabled:opacity-100 disabled:hover:bg-line"
-                disabled={Boolean(issue)}
+                disabled={Boolean(issue) || saving}
                 onClick={goNext}
               >
-                Suivant
+                {saving ? 'Enregistrement…' : step.kind === 'visit' ? 'Valider' : 'Suivant'}
               </Button>
             )}
           </div>
@@ -551,13 +766,19 @@ const OCCASIONAL_TRIPS: OccasionalTrip[] = [
   { label: 'Autre', theme: '', autre: '' },
 ]
 
+function visitWhen(at: string): string {
+  const date = new Date(at)
+  if (Number.isNaN(date.getTime())) return at
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }).format(date)
+}
+
 function sendHint(online: boolean, endpointReady: boolean): string | null {
   if (!online) return 'Pas de réseau. La réponse restera sur ce téléphone.'
   if (!endpointReady) return 'Le tableur n’est pas branché. La réponse restera sur ce téléphone.'
   return null
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="px-4 py-3">
       <dt className="text-sm font-semibold text-muted">{label}</dt>

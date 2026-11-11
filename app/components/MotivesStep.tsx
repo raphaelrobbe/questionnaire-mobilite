@@ -135,6 +135,7 @@ function TripCard({
           <TripHeading journey={journey} position={position} />
         </button>
         <DeleteTrip confirming={confirming} onAsk={() => setConfirming(true)} onCancel={() => setConfirming(false)} onConfirm={onRemove} />
+        <MissingReturn retour={journey.retour} inset />
       </div>
     )
   }
@@ -266,7 +267,17 @@ function TripCard({
           onChange={(event) => onChange({ comment: event.target.value })}
         />
       </label>
+      <MissingReturn retour={journey.retour} />
     </article>
+  )
+}
+
+function MissingReturn({ retour, inset = false }: { retour: string; inset?: boolean }) {
+  if (retour) return null
+  return (
+    <p role="status" className={`${inset ? 'mx-3 mb-3' : ''} mt-4 rounded-2xl bg-clay px-4 py-3 text-center text-base font-extrabold text-paper`}>
+      Pas de retour sur ce trajet ?
+    </p>
   )
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { addJourney, emptyJourney, journeyComplete, journeyIssue, journeyTouched, presetActualJourney, removeJourney, sanitizeJourneys, updateJourney, DOMICILE, type Journey } from './journeys'
+import { addJourney, difficultiesIssue, emptyDifficulties, emptyJourney, journeyComplete, journeyIssue, journeyTouched, presetActualJourney, removeJourney, sanitizeDifficulties, sanitizeJourneys, setDifficultyNote, setDifficultyTripPace, toggleDifficultyGroup, toggleDifficultyItem, toggleDifficultyTrip, updateJourney, DOMICILE, type Journey } from './journeys'
 
 function filled(patch: Partial<Journey> = {}): Journey {
   return {
@@ -48,7 +48,9 @@ describe('trajets du foyer', () => {
     expect(clean[1]?.replacedRiders).toEqual([0])
     expect(clean[1]?.riders).toEqual([])
     expect(clean[1]?.mode).toBe('')
-    expect(sanitizeJourneys(null, 1, [], [])).toEqual([emptyJourney('actuel'), emptyJourney('nouveau')])
+    const blankTrips = sanitizeJourneys(null, 1, [], [])
+    expect(blankTrips.map((journey) => journey.kind)).toEqual(['actuel', 'nouveau'])
+    expect(blankTrips[0]?.id).toMatch(/^[a-z0-9]{8}$/)
   })
 
   test('laisse passer un foyer sans trajet, et un trajet sans retour', () => {
@@ -119,5 +121,33 @@ describe('trajets du foyer', () => {
     expect(blank?.listedIndex).toBe(0)
     expect(blank?.journeys).toHaveLength(1)
     expect(journeyTouched(blank?.journeys[0] ?? emptyJourney('actuel'))).toBe(false)
+  })
+
+  test('relie chaque difficulté aux trajets, avec une fréquence, et « aucune » reste à part', () => {
+    const trip = 'abcd1234'
+    expect(difficultiesIssue(emptyDifficulties())).toMatch(/difficulté/)
+    const circulation = toggleDifficultyItem(toggleDifficultyGroup(emptyDifficulties(), 'circulation'), 'bouchons')
+    expect(difficultiesIssue(circulation)).toMatch(/trajets/)
+    const linked = toggleDifficultyTrip(circulation, 'bouchons', trip)
+    expect(difficultiesIssue(linked)).toMatch(/toujours/)
+    const often = setDifficultyTripPace(linked, 'bouchons', trip, 'souvent')
+    expect(difficultiesIssue(often)).toBeNull()
+    expect(often.trips.bouchons).toEqual([{ id: trip, pace: 'souvent' }])
+    const both = setDifficultyTripPace(toggleDifficultyTrip(toggleDifficultyItem(toggleDifficultyGroup(often, 'meteo'), 'neige'), 'neige', trip), 'neige', trip, 'parfois')
+    const dropped = toggleDifficultyGroup(both, 'circulation')
+    expect(dropped.groups).toEqual(['meteo'])
+    expect(dropped.items).toEqual(['neige'])
+    expect(dropped.trips.bouchons).toBeUndefined()
+    expect(dropped.trips.neige?.[0]?.pace).toBe('parfois')
+    expect(toggleDifficultyGroup(often, 'aucune')).toBe(often)
+    const none = toggleDifficultyGroup(emptyDifficulties(), 'aucune')
+    expect(difficultiesIssue(none)).toBeNull()
+    expect(toggleDifficultyGroup(none, 'meteo')).toBe(none)
+    const kept = sanitizeDifficulties(often, [trip])
+    expect(kept.trips.bouchons).toEqual([{ id: trip, pace: 'souvent' }])
+    expect(sanitizeDifficulties(often, []).trips.bouchons).toBeUndefined()
+    const noted = setDifficultyNote(toggleDifficultyItem(often, 'circulation-autre'), 'circulation', 'travaux')
+    expect(noted.notes.circulation).toBe('travaux')
+    expect(difficultiesIssue(noted)).toMatch(/Précisez|trajets/)
   })
 })

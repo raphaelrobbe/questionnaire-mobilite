@@ -1,3 +1,4 @@
+import { useNavigate } from '@remix-run/react'
 import { useEffect, useState } from 'react'
 import { DeviceUnknown, isAdminSession } from '~/common/config'
 import { classifyEndpoint, endpointMessage, type EndpointIssue } from '~/common/endpoint'
@@ -13,6 +14,7 @@ import { InstallOffer } from './InstallOffer'
 import { TestModeCard } from './TestMark'
 
 export function SettingsScreen() {
+  const navigate = useNavigate()
   const settings = useSettings()
   const lists = useSheetLists()
   const [deviceId, setDeviceId] = useState('')
@@ -45,6 +47,7 @@ export function SettingsScreen() {
       }
       await confirmInterviewer(settings.adminEndpoint, deviceId)
       await flushOutbox()
+      navigate('/')
     } catch (error) {
       setConnectError(
         error instanceof DeviceUnknown

@@ -80,12 +80,50 @@ describe('ligne du tableur', () => {
     expect(Object.keys(row)).toEqual([...SHEET_HEADERS])
     expect(new Set(SHEET_HEADERS).size).toBe(SHEET_HEADERS.length)
     expect(row.enqueteur).toBe('Camille')
+    expect(row.horodatage_utc).toBe('2026-11-06T12:00:00.000Z')
+    expect(row.horodatage_debut).toBe('')
+    expect(row.horodatage_fin).toBe('')
+    expect(row.visites).toBe('')
+    const stamped = toSheetRow({
+      ...record(),
+      createdAt: '2026-11-11T16:00:00.000Z',
+      answers: patchAnswers(record().answers, {
+        visits: [
+          { outcome: 'absente', at: '2026-11-11T12:00:00.000Z' },
+          { outcome: 'commencer', at: '2026-11-11T15:00:00.000Z' },
+        ],
+        startedAt: '2026-11-11T15:05:00.000Z',
+        finishedAt: '2026-11-11T16:00:00.000Z',
+      }),
+    })
+    expect(stamped.horodatage_utc).toBe('2026-11-11T16:00:00.000Z')
+    expect(stamped.horodatage_debut).toBe('2026-11-11T15:05:00.000Z')
+    expect(stamped.horodatage_fin).toBe('2026-11-11T16:00:00.000Z')
+    expect(stamped.visites).toContain('La personne était absente')
+    expect(stamped.visites).toContain('Commencer l’enquête')
     expect(row.commune).toBe('Lyon')
     expect('version' in row).toBe(false)
     expect(row.personnes).toBe('2')
     expect(row.detail_personnes).toBe('40–64 ans, conduit · 0–14 ans')
     expect(row.voitures).toBe('1')
     expect(row.detail_voitures).toBe('Hybride')
+    expect(row.handicap).toBe('')
+    expect(row.handicap_adaptations).toBe('')
+    expect(row.handicap_qui).toBe('')
+    const adapted = toSheetRow(
+      record({
+        handicap: 'oui',
+        handicapTypes: ['montee', 'autre'],
+        handicapAutre: 'siège enfant',
+        handicapConcern: 'oui',
+        handicapWho: ['foyer'],
+      }),
+    )
+    expect(adapted.handicap).toBe('Oui')
+    expect(adapted.handicap_adaptations).toContain('montée')
+    expect(adapted.handicap_adaptations).toContain('Autre : siège enfant')
+    expect(adapted.handicap_qui).toBe('une ou plusieurs personnes de mon foyer')
+    expect(adapted.handicap_commentaire).toBe('')
     expect(row.deux_trois_roues).toBe('1')
     expect(row.detail_deux_trois_roues).toBe('100 % électrique, sans permis')
     expect('latitude' in row).toBe(false)

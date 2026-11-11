@@ -26,6 +26,85 @@ export type RareUnit = '' | (typeof RARE_UNITS)[number]['id']
 /** Un trajet « nouveau » est un trajet jamais fait, déjà considéré comme remplacé par un transport en commun. */
 export type Replaced = '' | 'toujours' | 'souvent' | 'parfois' | 'jamais' | 'offre'
 
+export type DifficultyGroup = 'circulation' | 'meteo' | 'routes' | 'infra' | 'autres' | 'aucune'
+export type DifficultyItemId =
+  | 'bouchons'
+  | 'long'
+  | 'imprevisible'
+  | 'heures'
+  | 'circulation-autre'
+  | 'neige'
+  | 'verglas'
+  | 'pluie'
+  | 'brouillard'
+  | 'vent'
+  | 'meteo-autre'
+  | 'chaussee'
+  | 'sinueuses'
+  | 'visibilite'
+  | 'vitesse'
+  | 'routes-autre'
+  | 'trottoirs'
+  | 'velos'
+  | 'stationnement'
+  | 'arrets'
+  | 'travaux'
+  | 'infra-autre'
+export type DifficultyPace = 'toujours' | 'souvent' | 'parfois'
+export type DifficultyNoteKey = 'circulation' | 'meteo' | 'routes' | 'infra' | 'autres'
+
+export type DifficultyKey = DifficultyItemId | 'autres'
+
+export type DifficultyTrip = { id: string; pace: DifficultyPace | '' }
+
+export type JourneyDifficulties = {
+  groups: DifficultyGroup[]
+  items: DifficultyItemId[]
+  notes: Record<DifficultyNoteKey, string>
+  /** Trajets concernés, pour chaque précision. */
+  trips: Partial<Record<DifficultyKey, DifficultyTrip[]>>
+}
+
+export const DIFFICULTY_GROUPS: { id: DifficultyGroup; label: string }[] = [
+  { id: 'circulation', label: 'Circulation ou temps de trajet' },
+  { id: 'meteo', label: 'Conditions météorologiques' },
+  { id: 'routes', label: 'État ou sécurité des routes' },
+  { id: 'infra', label: 'Infrastructures et aménagements' },
+  { id: 'autres', label: 'Autres difficultés' },
+  { id: 'aucune', label: 'Aucune difficulté particulière' },
+]
+
+export const DIFFICULTY_ITEMS: { id: DifficultyItemId; group: Exclude<DifficultyGroup, 'autres' | 'aucune'>; label: string; autre?: boolean }[] = [
+  { id: 'bouchons', group: 'circulation', label: 'Embouteillages ou circulation dense' },
+  { id: 'long', group: 'circulation', label: 'Temps de trajet trop long' },
+  { id: 'imprevisible', group: 'circulation', label: 'Temps de trajet imprévisible' },
+  { id: 'heures', group: 'circulation', label: 'Difficultés de circulation à certaines heures' },
+  { id: 'circulation-autre', group: 'circulation', label: 'Autre (à préciser)', autre: true },
+  { id: 'neige', group: 'meteo', label: 'Neige ou routes enneigées' },
+  { id: 'verglas', group: 'meteo', label: 'Verglas' },
+  { id: 'pluie', group: 'meteo', label: 'Pluie importante ou inondations' },
+  { id: 'brouillard', group: 'meteo', label: 'Brouillard ou mauvaise visibilité' },
+  { id: 'vent', group: 'meteo', label: 'Vent ou intempéries' },
+  { id: 'meteo-autre', group: 'meteo', label: 'Autre (à préciser)', autre: true },
+  { id: 'chaussee', group: 'routes', label: 'Chaussées dégradées (nids-de-poule, revêtement…)' },
+  { id: 'sinueuses', group: 'routes', label: 'Routes dangereuses ou sinueuses' },
+  { id: 'visibilite', group: 'routes', label: 'Manque de visibilité' },
+  { id: 'vitesse', group: 'routes', label: 'Vitesse excessive des autres véhicules' },
+  { id: 'routes-autre', group: 'routes', label: 'Autre (à préciser)', autre: true },
+  { id: 'trottoirs', group: 'infra', label: 'Manque ou mauvais état des trottoirs' },
+  { id: 'velos', group: 'infra', label: 'Manque de pistes cyclables ou d’itinéraires sécurisés' },
+  { id: 'stationnement', group: 'infra', label: 'Difficultés de stationnement' },
+  { id: 'arrets', group: 'infra', label: 'Accès difficile aux arrêts ou aux transports' },
+  { id: 'travaux', group: 'infra', label: 'Travaux, déviations ou routes fermées' },
+  { id: 'infra-autre', group: 'infra', label: 'Autre (à préciser)', autre: true },
+]
+
+export const DIFFICULTY_PACES: { id: DifficultyPace; label: string }[] = [
+  { id: 'toujours', label: 'Toujours' },
+  { id: 'souvent', label: 'Souvent' },
+  { id: 'parfois', label: 'Parfois' },
+]
+
 export type Journey = {
   kind: JourneyKind
   theme: ThemeId | ''
@@ -53,6 +132,8 @@ export type Journey = {
   /** Vrai dès que « qui le ferait » a été modifié à la main. Sinon, ce sont les mêmes personnes que le trajet. */
   replacedRidersCustom: boolean
   comment: string
+  /** Identifiant stable, pour relier une difficulté à ce trajet. */
+  id: string
 }
 
 export const DOMICILE = 'Domicile'
@@ -84,6 +165,24 @@ export function emptyJourney(kind: JourneyKind): Journey {
     replacedRiders: [],
     replacedRidersCustom: false,
     comment: '',
+    id: journeyKey(),
+  }
+}
+
+export function journeyKey(): string {
+  return Math.random().toString(36).slice(2, 10).padEnd(8, '0')
+}
+
+function journeyId(value: unknown): string {
+  return typeof value === 'string' && /^[a-z0-9]{8}$/.test(value) ? value : journeyKey()
+}
+
+export function emptyDifficulties(): JourneyDifficulties {
+  return {
+    groups: [],
+    items: [],
+    notes: { circulation: '', meteo: '', routes: '', infra: '', autres: '' },
+    trips: {},
   }
 }
 
@@ -271,6 +370,7 @@ function cleanJourney(input: unknown, peopleCount: number, allowed: Set<string>)
     replacedRiders: indexesOf(source.replacedRiders, peopleCount),
     replacedRidersCustom: ridersCustom(source, kind === 'actuel' ? indexesOf(source.riders, peopleCount) : [], indexesOf(source.replacedRiders, peopleCount)),
     comment: clip(source.comment, 400),
+    id: journeyId(source.id),
     },
     peopleCount,
   )
@@ -323,6 +423,136 @@ function contentTouched(journey: Journey): boolean {
       journey.comment.trim() ||
       (journey.kind === 'actuel' && journey.replaced),
   )
+}
+
+export function sanitizeDifficulties(input: unknown, tripIds: readonly string[]): JourneyDifficulties {
+  return cleanDifficulties(input, new Set(tripIds))
+}
+
+export function difficultiesIssue(value: JourneyDifficulties): string | null {
+  if (!value.groups.length) return 'Choisissez ce qui pose difficulté.'
+  if (value.groups.includes('aucune')) return null
+  for (const group of value.groups) {
+    if (group === 'autres') {
+      if (!value.notes.autres.trim()) return 'Précisez la difficulté.'
+      const noted = value.trips.autres ?? []
+      if (!noted.length) return 'Indiquez les trajets concernés.'
+      if (noted.some((trip) => !trip.pace)) return 'Indiquez si c’est toujours, souvent ou parfois.'
+      continue
+    }
+    const chosen = DIFFICULTY_ITEMS.filter((item) => item.group === group && value.items.includes(item.id))
+    if (!chosen.length) return 'Choisissez au moins une précision.'
+    for (const item of chosen) {
+      if (item.autre && !value.notes[item.group].trim()) return 'Précisez.'
+      const linked = value.trips[item.id] ?? []
+      if (!linked.length) return 'Indiquez les trajets concernés.'
+      if (linked.some((trip) => !trip.pace)) return 'Indiquez si c’est toujours, souvent ou parfois.'
+    }
+  }
+  return null
+}
+
+function cleanDifficulties(input: unknown, allowed?: Set<string>): JourneyDifficulties {
+  const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+  const asked = Array.isArray(source.groups) ? source.groups : []
+  const groups = DIFFICULTY_GROUPS.map((group) => group.id).filter((id) => asked.includes(id))
+  if (groups.includes('aucune')) return { ...emptyDifficulties(), groups: ['aucune'] }
+  const askedItems = Array.isArray(source.items) ? source.items : []
+  const items = DIFFICULTY_ITEMS.filter((item) => askedItems.includes(item.id) && groups.includes(item.group)).map((item) => item.id)
+  const tripsIn = source.trips && typeof source.trips === 'object' ? (source.trips as Record<string, unknown>) : {}
+  const trips: JourneyDifficulties['trips'] = {}
+  const keys: DifficultyKey[] = groups.includes('autres') ? [...items, 'autres'] : [...items]
+  for (const key of keys) {
+    const list = cleanTripList(tripsIn[key], allowed)
+    if (list.length) trips[key] = list
+  }
+  const notesIn = source.notes && typeof source.notes === 'object' ? (source.notes as Record<string, unknown>) : {}
+  const notes = emptyDifficulties().notes
+  for (const item of DIFFICULTY_ITEMS) {
+    if (item.autre && items.includes(item.id)) notes[item.group] = clip(notesIn[item.group], 160)
+  }
+  if (groups.includes('autres')) notes.autres = clip(notesIn.autres, 160)
+  return { groups, items, notes, trips }
+}
+
+function cleanTripList(input: unknown, allowed?: Set<string>): DifficultyTrip[] {
+  if (!Array.isArray(input)) return []
+  const seen = new Set<string>()
+  const trips: DifficultyTrip[] = []
+  for (const item of input) {
+    const source = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
+    const id = typeof source.id === 'string' ? source.id : ''
+    if (!/^[a-z0-9]{8}$/.test(id) || seen.has(id) || (allowed && !allowed.has(id))) continue
+    seen.add(id)
+    trips.push({ id, pace: paceOf(source.pace) })
+  }
+  return trips
+}
+
+function paceOf(value: unknown): DifficultyPace | '' {
+  return value === 'toujours' || value === 'souvent' || value === 'parfois' ? value : ''
+}
+
+export function toggleDifficultyGroup(current: JourneyDifficulties, group: DifficultyGroup): JourneyDifficulties {
+  const none = current.groups.includes('aucune')
+  const some = current.groups.some((id) => id !== 'aucune')
+  const selected = current.groups.includes(group)
+  if (!selected && ((group === 'aucune' && some) || (group !== 'aucune' && none))) return current
+  if (group === 'aucune') return selected ? emptyDifficulties() : { ...emptyDifficulties(), groups: ['aucune'] }
+  const groups = selected ? current.groups.filter((item) => item !== group) : [...current.groups, group]
+  return cleanDifficulties({ ...current, groups })
+}
+
+export function toggleDifficultyItem(current: JourneyDifficulties, id: DifficultyItemId): JourneyDifficulties {
+  const items = current.items.includes(id) ? current.items.filter((item) => item !== id) : [...current.items, id]
+  return cleanDifficulties({ ...current, items })
+}
+
+export function toggleDifficultyTrip(current: JourneyDifficulties, key: DifficultyKey, tripId: string): JourneyDifficulties {
+  const list = current.trips[key] ?? []
+  const trips = list.some((trip) => trip.id === tripId)
+    ? list.filter((trip) => trip.id !== tripId)
+    : [...list, { id: tripId, pace: '' as const }]
+  return cleanDifficulties({ ...current, trips: { ...current.trips, [key]: trips } })
+}
+
+export function setDifficultyTripPace(
+  current: JourneyDifficulties,
+  key: DifficultyKey,
+  tripId: string,
+  pace: DifficultyPace,
+): JourneyDifficulties {
+  const trips = (current.trips[key] ?? []).map((trip) =>
+    trip.id === tripId ? { ...trip, pace: trip.pace === pace ? '' : pace } : trip,
+  )
+  return cleanDifficulties({ ...current, trips: { ...current.trips, [key]: trips } })
+}
+
+export function setDifficultyNote(current: JourneyDifficulties, key: DifficultyNoteKey, note: string): JourneyDifficulties {
+  return cleanDifficulties({ ...current, notes: { ...current.notes, [key]: note } })
+}
+
+export function difficultiesLine(value: JourneyDifficulties): string {
+  if (value.groups.includes('aucune')) return 'Aucune difficulté particulière'
+  const labels = value.items.map((id) => {
+    const item = DIFFICULTY_ITEMS.find((entry) => entry.id === id)
+    if (!item) return ''
+    if (!item.autre) return item.label
+    const note = value.notes[item.group].trim()
+    return note ? `Autre : ${note}` : ''
+  })
+  if (value.groups.includes('autres') && value.notes.autres.trim()) labels.push(value.notes.autres.trim())
+  return labels.filter(Boolean).join(' · ')
+}
+
+export function listedActualTrips(journeys: Journey[]): { id: string; label: string }[] {
+  let count = 0
+  return journeys.flatMap((journey) => {
+    if (journey.kind !== 'actuel' || !journeyTouched(journey)) return []
+    const heading = journeyHeading(journey, count)
+    count += 1
+    return [{ id: journey.id, label: journey.destination.trim() ? `${heading.title} — ${heading.route}` : heading.title }]
+  })
 }
 
 function rareCountOf(value: unknown): RareCount {

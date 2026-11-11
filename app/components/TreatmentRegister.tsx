@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { CollectifLink } from './CollectifLink'
 import { Reveal } from './Reveal'
 
 const treatments: { id: string; title: string; fiche?: ReactNode }[] = [
@@ -29,7 +30,7 @@ export function TreatmentRegister() {
           Registre des activités de traitement des données personnelles
         </h2>
         <p>
-          <span className="font-extrabold">Responsable</span> : Collectif Mobilité Haut-Doubs représenté par Raphaël
+          <span className="font-extrabold">Responsable</span> : <CollectifLink /> représenté par Raphaël
           Robbe, 11 Grande Rue, 25160 Labergement-Sainte-Marie,{' '}
           <a href="mailto:contact@enquete-mobilite-haut-doubs.fr" className="font-bold text-leaf">
             contact@enquete-mobilite-haut-doubs.fr
@@ -47,7 +48,9 @@ export function TreatmentRegister() {
         <ol className="list-decimal space-y-1 pl-5">
           <li>Enquête et analyse des besoins de mobilité</li>
           <li>Gestion des foyers et organisation de l’enquête</li>
-          <li>Communication du Collectif Mobilité Haut-Doubs</li>
+          <li>
+            Communication du <CollectifLink />
+          </li>
         </ol>
       </article>
       {treatments.map((treatment) => {
@@ -89,7 +92,7 @@ function Updated() {
 function Controller() {
   return (
     <p>
-      Collectif Mobilité Haut-Doubs représenté par Raphaël Robbe, 11 Grande Rue, 25160 Labergement-Sainte-Marie,{' '}
+      <CollectifLink /> représenté par Raphaël Robbe, 11 Grande Rue, 25160 Labergement-Sainte-Marie,{' '}
       <a href="mailto:contact@enquete-mobilite-haut-doubs.fr" className="font-bold text-leaf">
         contact@enquete-mobilite-haut-doubs.fr
       </a>
@@ -115,7 +118,9 @@ function CommunicationFiche() {
       <h3 className="font-extrabold">Responsable du traitement</h3>
       <Controller />
       <h3 className="font-extrabold">Finalité</h3>
-      <p>Envoyer aux personnes qui l’ont accepté des informations et actualités du Collectif Mobilité Haut-Doubs.</p>
+      <p>
+        Envoyer aux personnes qui l’ont accepté des informations et actualités du <CollectifLink />.
+      </p>
       <h3 className="font-extrabold">Personnes concernées</h3>
       <p>Personnes ayant demandé à recevoir les communications du collectif.</p>
       <h3 className="font-extrabold">Données traitées</h3>

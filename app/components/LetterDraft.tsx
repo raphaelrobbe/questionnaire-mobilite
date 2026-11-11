@@ -1,3 +1,5 @@
+import { CollectifLink } from './CollectifLink'
+
 export function LetterDraft() {
   return (
     <article className="grid gap-4 rounded-[28px] border border-line bg-card px-4 py-4 text-base leading-relaxed">
@@ -11,7 +13,7 @@ export function LetterDraft() {
         du département du Doubs.
       </p>
       <p>
-        Cette demande s’inscrit dans le cadre d’une enquête citoyenne menée par le Collectif Mobilité Haut-Doubs, portant
+        Cette demande s’inscrit dans le cadre d’une enquête citoyenne menée par le <CollectifLink />, portant
         sur les besoins de déplacement des habitants des environs de Pontarlier et, plus
         particulièrement, sur l’intérêt et les conditions de mise en place éventuelle d’une desserte régulière en
         transports en commun depuis les communes environnantes.
@@ -60,7 +62,7 @@ export function LetterDraft() {
         l’expression de ma considération distinguée.
       </p>
       <p>
-        Pour le Collectif Mobilité Haut-Doubs,
+        Pour le <CollectifLink />,
         <br />
         Raphaël ROBBE
         <br />

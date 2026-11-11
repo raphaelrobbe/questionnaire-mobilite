@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { acceptContact, contactLetter, readContact, rfc822 } from './contact'
+import { COLLECTIF_TO, CONTACT_TO, acceptContact, contactLetter, isLoopbackAddress, readContact, readContactBox, recipientFor, rfc822 } from './contact'
 import { takeSmtpReply } from './smtpReply'
 
 describe('formulaire de contact', () => {
@@ -19,7 +19,40 @@ describe('formulaire de contact', () => {
     expect(letter.subject).toBe('Message depuis le site')
     expect(letter.replyTo).toBe('ada@exemple.fr')
     expect(letter.text).toContain('Bonjour\nle collectif')
+    expect(letter.box).toBe('enquete')
     expect(rfc822('noreply@exemple.fr', 'contact@exemple.fr', letter)).toContain('Reply-To: ada@exemple.fr')
+  })
+
+  test('la page du collectif écrit à sa boîte, et une autre valeur reste sur l’enquête', () => {
+    expect(readContactBox({ box: 'collectif' })).toBe('collectif')
+    expect(readContactBox({ box: COLLECTIF_TO })).toBe('enquete')
+    expect(readContactBox({})).toBe('enquete')
+    const read = readContact({ email: 'ada@exemple.fr', message: 'bonjour', token: 't' })
+    if (!read.ok) throw new Error('lecture')
+    const letter = contactLetter(read.value, 'collectif')
+    expect(letter.subject).toBe('Message depuis la page du collectif')
+    expect(recipientFor(letter.box)).toBe(COLLECTIF_TO)
+    expect(recipientFor('enquete', 'contact@exemple.fr')).toBe('contact@exemple.fr')
+    expect(recipientFor('enquete')).toBe(CONTACT_TO)
+  })
+
+  test('le message du collectif part vers sa boîte', async () => {
+    const original = globalThis.fetch
+    globalThis.fetch = async () => new Response(JSON.stringify({ success: true }))
+    let box = ''
+    try {
+      await acceptContact(
+        'secret',
+        { email: 'ada@exemple.fr', message: 'bonjour', token: 'tok', box: 'collectif' },
+        undefined,
+        async (letter) => {
+          box = letter.box
+        },
+      )
+      expect(box).toBe('collectif')
+    } finally {
+      globalThis.fetch = original
+    }
   })
 
   test('n’envoie rien si Turnstile refuse', async () => {
@@ -35,6 +68,34 @@ describe('formulaire de contact', () => {
     } finally {
       globalThis.fetch = original
     }
+  })
+
+  test('depuis la machine locale, envoie sans demander Turnstile', async () => {
+    const original = globalThis.fetch
+    let asked = false
+    globalThis.fetch = async () => {
+      asked = true
+      return new Response(JSON.stringify({ success: false }))
+    }
+    let sent = false
+    try {
+      const result = await acceptContact('secret', { email: 'ada@exemple.fr', message: 'bonjour', token: '' }, undefined, async () => {
+        sent = true
+      }, true)
+      expect(result.status).toBe(200)
+      expect(sent).toBe(true)
+      expect(asked).toBe(false)
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
+  test('une adresse réseau ne compte pas comme locale', () => {
+    expect(isLoopbackAddress('127.0.0.1')).toBe(true)
+    expect(isLoopbackAddress('::ffff:127.0.0.1')).toBe(true)
+    expect(isLoopbackAddress('::1')).toBe(true)
+    expect(isLoopbackAddress('192.168.1.20')).toBe(false)
+    expect(isLoopbackAddress(undefined)).toBe(false)
   })
 
   test('envoie après une vérification réussie', async () => {

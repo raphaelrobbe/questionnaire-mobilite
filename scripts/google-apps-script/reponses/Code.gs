@@ -12,7 +12,9 @@
  * n'est pas modifiée. Une fiche de test n'est écrite que dans Réponses TEST.
  * Un nom, une adresse, un téléphone ou des coordonnées reçus par erreur sont
  * ignorés, pas écrits.
- * Le même code n'ajoute pas une seconde ligne.
+ * Le même code met à jour la ligne au lieu d'en ajouter une seconde.
+ * Une colonne nouvelle est ajoutée à droite : les réponses déjà là ne sont pas effacées.
+ * Un envoi plus ancien qu'une mise à jour déjà écrite est ignoré.
  * action=code répond seulement si ce code est déjà dans la feuille, sans renvoyer la ligne.
  * Après une modification : Déployer → Gérer les déploiements → crayon → Nouvelle version.
  */
@@ -172,14 +174,6 @@ function responseSheet(test) {
   return sheet
 }
 
-function sameHeaders(current, next) {
-  if (current.length !== next.length) return false
-  for (let i = 0; i < current.length; i++) {
-    if (current[i] !== next[i]) return false
-  }
-  return true
-}
-
 function readHeaders(sheet) {
   if (sheet.getLastRow() === 0) return []
   const width = Math.max(sheet.getLastColumn(), 1)
@@ -216,19 +210,63 @@ function writeRow(headersFromClient, row, test) {
   const wanted = headersFromClient.filter(Boolean)
   if (!wanted.length) throw new Error('En-têtes manquants.')
   let headers = readHeaders(sheet)
-  if (!sameHeaders(headers, wanted)) {
-    sheet.clear()
+  if (!headers.length) {
     sheet.getRange(1, 1, 1, wanted.length).setValues([wanted])
     sheet.setFrozenRows(1)
     headers = wanted
+  } else {
+    const missing = wanted.filter(function (header) {
+      return headers.indexOf(header) === -1
+    })
+    if (missing.length) {
+      sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing])
+      headers = headers.concat(missing)
+    }
   }
-  if (hasCode(sheet, headers, code)) return
-  const values = headers.map(function (header) {
-    const value = row[header]
-    if (value === null || value === undefined) return ''
-    return String(value).slice(0, 5000)
+  const line = findCodeRow(sheet, headers, code)
+  const values = line ? mergedValues(sheet, headers, row, line) : incomingValues(headers, row)
+  if (line) sheet.getRange(line, 1, 1, headers.length).setValues([values])
+  else sheet.appendRow(values)
+}
+
+function findCodeRow(sheet, headers, code) {
+  const column = headers.indexOf('id')
+  if (column === -1) return 0
+  const last = sheet.getLastRow()
+  if (last < 2) return 0
+  const values = sheet.getRange(2, column + 1, last - 1, 1).getValues()
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0] || '').trim() === code) return i + 2
+  }
+  return 0
+}
+
+function cellText(value) {
+  if (value === null || value === undefined) return ''
+  return String(value).slice(0, 5000)
+}
+
+function incomingValues(headers, row) {
+  return headers.map(function (header) {
+    return cellText(row[header])
   })
-  sheet.appendRow(values)
+}
+
+function mergedValues(sheet, headers, row, line) {
+  const current = sheet.getRange(line, 1, 1, headers.length).getValues()[0]
+  const timeColumn = headers.indexOf('horodatage_utc')
+  const currentTime = timeColumn === -1 ? '' : cellText(current[timeColumn])
+  const nextTime = cellText(row.horodatage_utc)
+  if (currentTime && nextTime && nextTime < currentTime) {
+    return current.map(cellText)
+  }
+  return headers.map(function (header, index) {
+    const previous = cellText(current[index])
+    const text = cellText(row[header])
+    if (header === 'visites') return text.length >= previous.length ? text : previous
+    if (!text) return previous
+    return text
+  })
 }
 
 function json(payload) {

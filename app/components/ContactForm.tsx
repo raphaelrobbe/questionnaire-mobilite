@@ -1,3 +1,4 @@
+import { useNavigate } from '@remix-run/react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { fieldClass } from './fill'
 import { buttonClass } from './Button'
@@ -17,15 +18,17 @@ declare global {
 declare const __TURNSTILE_SITE_KEY__: string
 declare const __CONTACT_URL__: string
 
-export function ContactForm() {
+export function ContactForm({ box = 'enquete' }: { box?: 'enquete' | 'collectif' }) {
   const siteKey = __TURNSTILE_SITE_KEY__
-  const endpoint = __CONTACT_URL__ || '/api/contact'
+  const localMail = import.meta.env.DEV && isLocalPage()
+  const endpoint = localMail ? '/api/contact' : (__CONTACT_URL__ || '/api/contact')
   const captcha = useRef<HTMLDivElement>(null)
   const widget = useRef('')
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
-  const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
+  const navigate = useNavigate()
+  const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
     if (!siteKey || !captcha.current) return
@@ -36,7 +39,7 @@ export function ContactForm() {
         widget.current = window.turnstile.render(captcha.current, { sitekey: siteKey, theme: 'light' })
       })
       .catch(() => {
-        if (!cancelled) setNotice({ tone: 'warn', text: 'La vérification anti-robot n’a pas pu se charger.' })
+        if (!cancelled) setNotice('La vérification anti-robot n’a pas pu se charger.')
       })
     return () => {
       cancelled = true
@@ -48,16 +51,16 @@ export function ContactForm() {
     if (sending) return
     setNotice(null)
     if (!email.trim()) {
-      setNotice({ tone: 'warn', text: 'Indiquez une adresse mail.' })
+      setNotice('Indiquez une adresse mail.')
       return
     }
     if (!message.trim()) {
-      setNotice({ tone: 'warn', text: 'Écrivez votre message.' })
+      setNotice('Écrivez votre message.')
       return
     }
     const token = widget.current && window.turnstile ? window.turnstile.getResponse(widget.current) : ''
-    if (!siteKey || !token) {
-      setNotice({ tone: 'warn', text: 'Confirmez que vous n’êtes pas un robot.' })
+    if (!localMail && (!siteKey || !token)) {
+      setNotice('Confirmez que vous n’êtes pas un robot.')
       return
     }
     setSending(true)
@@ -65,20 +68,17 @@ export function ContactForm() {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, message, token }),
+        body: JSON.stringify({ email, message, token, box }),
       })
       const data = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null
       if (!response.ok || !data?.ok) {
-        setNotice({ tone: 'warn', text: data?.error || 'Le message n’a pas pu être envoyé. Réessayez dans un moment.' })
+        setNotice(data?.error || 'Le message n’a pas pu être envoyé. Réessayez dans un moment.')
         if (widget.current) window.turnstile?.reset(widget.current)
         return
       }
-      setEmail('')
-      setMessage('')
-      if (widget.current) window.turnstile?.reset(widget.current)
-      setNotice({ tone: 'ok', text: 'Message envoyé. Nous vous répondrons à cette adresse.' })
+      navigate('/message-envoye')
     } catch {
-      setNotice({ tone: 'warn', text: 'Le message n’a pas pu être envoyé. Réessayez dans un moment.' })
+      setNotice('Le message n’a pas pu être envoyé. Réessayez dans un moment.')
       if (widget.current) window.turnstile?.reset(widget.current)
     } finally {
       setSending(false)
@@ -113,8 +113,8 @@ export function ContactForm() {
       </label>
       <div ref={captcha} className="min-h-16" />
       {notice ? (
-        <p role="status" className={`text-sm font-semibold leading-relaxed ${notice.tone === 'ok' ? 'text-leaf' : 'text-clay'}`}>
-          {notice.text}
+        <p role="status" className="text-sm font-semibold leading-relaxed text-clay">
+          {notice}
         </p>
       ) : null}
       <button type="submit" disabled={sending} className={buttonClass('primary')}>
@@ -123,6 +123,11 @@ export function ContactForm() {
       <p className="text-sm font-medium leading-relaxed text-muted">Votre adresse sert uniquement à vous répondre.</p>
     </form>
   )
+}
+
+function isLocalPage(): boolean {
+  const host = window.location.hostname
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
 }
 
 function loadTurnstile(): Promise<void> {

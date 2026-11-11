@@ -1,5 +1,5 @@
 import { connect } from 'cloudflare:sockets'
-import { CONTACT_FROM, CONTACT_TO, SMTP_HOST, SMTP_PORT, dotStuff, rfc822, type ContactLetter } from '../app/common/contact'
+import { CONTACT_FROM, CONTACT_TO, SMTP_HOST, SMTP_PORT, dotStuff, recipientFor, rfc822, type ContactLetter } from '../app/common/contact'
 import { takeSmtpReply } from '../app/common/smtpReply'
 
 /** Port 465 : la connexion est chiffrée dès le départ. */
@@ -18,7 +18,7 @@ export async function sendSmtp(
     await session.command(b64(env.SMTP_USER || CONTACT_FROM), 334)
     await session.command(b64(env.SMTP_PASSWORD), 235)
     const from = env.SMTP_USER || CONTACT_FROM
-    const to = env.SMTP_TO || CONTACT_TO
+    const to = recipientFor(letter.box, env.SMTP_TO || CONTACT_TO)
     await session.command(`MAIL FROM:<${from}>`, 250)
     await session.command(`RCPT TO:<${to}>`, 250)
     await session.command('DATA', 354)

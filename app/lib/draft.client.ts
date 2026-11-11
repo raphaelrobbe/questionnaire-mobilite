@@ -1,4 +1,5 @@
-import { draftHasContent, draftIsStarted, emptyDraft, sanitizeDraft, type Draft } from '~/common/draft'
+import { TEST_SAMPLE_COUNT, draftHasContent, draftIsStarted, emptyDraft, sanitizeDraft, testSampleDrafts, type Draft } from '~/common/draft'
+import { isResponseCode, responseCode } from '~/common/response'
 import { forgetPersonal, holdsPersonal } from '~/common/response'
 import { loadSettings } from '~/lib/settings.client'
 
@@ -6,6 +7,7 @@ export type { Draft }
 
 const KEY = 'qm-drafts'
 const LEGACY = 'qm-draft'
+const SAMPLES_KEY = 'qm-test-samples'
 
 function readAll(): Draft[] {
   migrateLegacy()
@@ -82,6 +84,28 @@ export function forgetDraftPersonal(code: string): void {
   if (!draft || !holdsPersonal(draft)) return
   drafts[index] = forgetPersonal(draft)
   writeAll(drafts)
+}
+
+/** Fiches d’exemple, une seule fois, au premier passage en mode test. */
+export function seedTestSamples(): void {
+  try {
+    if (localStorage.getItem(SAMPLES_KEY) === '1') return
+  } catch {
+    return
+  }
+  const taken = new Set(readAll().map((draft) => draft.code))
+  const codes: string[] = []
+  while (codes.length < TEST_SAMPLE_COUNT) {
+    const code = responseCode()
+    if (!isResponseCode(code) || taken.has(code) || codes.includes(code)) continue
+    codes.push(code)
+  }
+  writeAll([...testSampleDrafts(codes), ...readAll()])
+  try {
+    localStorage.setItem(SAMPLES_KEY, '1')
+  } catch {
+    /* Les fiches sont déjà là. Le prochain passage évitera de les refaire si le drapeau a pu s’écrire. */
+  }
 }
 
 export function createDraft(): Draft {

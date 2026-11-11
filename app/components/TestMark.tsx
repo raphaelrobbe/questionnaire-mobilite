@@ -1,4 +1,5 @@
 import { useNavigate } from '@remix-run/react'
+import { seedTestSamples } from '~/lib/draft.client'
 import { useSettings } from '~/hooks/useSettings'
 import { updateSettings } from '~/lib/settings.client'
 
@@ -17,7 +18,9 @@ export function TestModeCard() {
         type="button"
         aria-pressed={settings.testMode}
         onClick={() => {
-          updateSettings({ testMode: !settings.testMode })
+          const enabling = !settings.testMode
+          updateSettings({ testMode: enabling })
+          if (enabling) seedTestSamples()
           navigate('/')
         }}
         className="mt-4 inline-flex min-h-14 w-full items-center justify-center rounded-2xl bg-test-ink px-4 text-base font-extrabold text-test"

@@ -1,5 +1,5 @@
 import { createTransport } from 'nodemailer'
-import { CONTACT_FROM, CONTACT_TO, SMTP_HOST, SMTP_PORT, type ContactLetter } from '../common/contact'
+import { CONTACT_FROM, CONTACT_TO, SMTP_HOST, SMTP_PORT, recipientFor, type ContactLetter } from '../common/contact'
 
 export type SmtpEnv = {
   SMTP_HOST: string
@@ -22,7 +22,7 @@ export async function sendContactMail(env: SmtpEnv, letter: ContactLetter): Prom
   })
   await transport.sendMail({
     from: user,
-    to: env.SMTP_TO || CONTACT_TO,
+    to: recipientFor(letter.box, env.SMTP_TO || CONTACT_TO),
     replyTo: letter.replyTo,
     subject: letter.subject,
     text: letter.text,

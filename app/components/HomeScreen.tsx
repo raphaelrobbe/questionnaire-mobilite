@@ -68,6 +68,9 @@ export function HomeScreen() {
         </p>
       ) : null}
 
+      <Link to="/enqueteur" className={buttonClass('secondary')}>
+        Guide de l’enquêteur
+      </Link>
       <button type="button" className={buttonClass('primary')} onClick={() => navigate(`/entretien?fiche=${createDraft().code}`)}>
         Nouvelle personne
       </button>

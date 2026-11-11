@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
-import { acceptContact } from '../common/contact'
+import { acceptContact, isLoopbackAddress } from '../common/contact'
 import { sendContactMail, type SmtpEnv } from './contact.server'
 
 export function contactDevApi(env: SmtpEnv): Plugin {
@@ -22,7 +22,8 @@ export function contactDevApi(env: SmtpEnv): Plugin {
 async function receive(req: IncomingMessage, res: ServerResponse, env: SmtpEnv) {
   try {
     const body = await readBody(req)
-    const result = await acceptContact(env.TURNSTILE_SECRET_KEY, body, undefined, (letter) => sendContactMail(env, letter))
+    const local = isLoopbackAddress(req.socket.remoteAddress)
+    const result = await acceptContact(env.TURNSTILE_SECRET_KEY, body, undefined, (letter) => sendContactMail(env, letter), local)
     json(res, result.status, result.error ? { ok: false, error: result.error } : { ok: true })
   } catch {
     json(res, 400, { ok: false, error: 'Le message n’a pas pu être lu.' })

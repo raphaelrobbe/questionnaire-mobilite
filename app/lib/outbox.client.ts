@@ -3,7 +3,7 @@ import { classifyEndpoint } from '~/common/endpoint'
 import { ARRIVAL_TRIES, ArrivalStopped, pollArrival } from '~/common/receipt'
 import { forgetPersonal, holdsPersonal, responseIsKept, type ResponseRecord } from '~/common/response'
 import { canRetryRow, canRetrySends, canSync } from '~/common/settings'
-import { forgetDraftPersonal } from './draft.client'
+import { forgetDraftPersonal, loadDraft } from './draft.client'
 import { loadSettings, updateSettings } from './settings.client'
 import { codeIsStored, confirmInterviewer, submitRecord, type SendStatus } from './sheets.client'
 
@@ -19,6 +19,8 @@ export type LocalResponse = ResponseRecord & {
   attempts: number
   lookups: number
   updatedAt: string
+  /** Faux tant que l’enquête n’est pas terminée : le fichier privé ne reçoit pas encore les coordonnées. */
+  includeMail: boolean
 }
 
 const listeners = new Set<() => void>()
@@ -87,6 +89,7 @@ function counted(row: LocalResponse): LocalResponse {
     ...row,
     test: row.test === true,
     lookups: typeof row.lookups === 'number' && Number.isFinite(row.lookups) ? row.lookups : 0,
+    includeMail: row.includeMail !== false,
   }
 }
 
@@ -126,28 +129,48 @@ async function write(row: LocalResponse): Promise<void> {
 
 function remembered(row: LocalResponse): LocalResponse {
   if (row.status !== 'confirmed') return row
-  forgetDraftPersonal(row.id)
+  // Une visite confirmée laisse la fiche ouverte : l’adresse sert encore aux passages suivants.
+  if (!loadDraft(row.id)) forgetDraftPersonal(row.id)
   return holdsPersonal(row) ? forgetPersonal(row) : row
 }
 
-export async function keepResponse(record: ResponseRecord): Promise<LocalResponse> {
-  if (!responseIsKept(record)) throw new Error('Cette réponse n’est pas enregistrée.')
-  const row: LocalResponse = {
+function pendingFrom(record: ResponseRecord, includeMail: boolean): LocalResponse {
+  return {
     ...record,
     answers: {
       ...record.answers,
       people: record.answers.people.map((person) => ({ ...person })),
       cars: record.answers.cars.map((vehicle) => ({ ...vehicle })),
       twoWheelers: record.answers.twoWheelers.map((vehicle) => ({ ...vehicle })),
+      visits: record.answers.visits.map((visit) => ({ ...visit })),
     },
     status: 'pending',
     lastError: null,
     attempts: 0,
     lookups: 0,
     updatedAt: new Date().toISOString(),
+    includeMail,
   }
+}
+
+export async function keepResponse(record: ResponseRecord): Promise<LocalResponse> {
+  if (!responseIsKept(record)) throw new Error('Cette réponse n’est pas enregistrée.')
+  const row = pendingFrom(record, true)
   await write(row)
   return row
+}
+
+/** Écrit la fiche, puis l’envoie. `mail` reste faux tant que l’enquête n’est pas terminée. */
+export function commitResponse(record: ResponseRecord, mail = false): Promise<LocalResponse | null> {
+  if (!responseIsKept(record)) return Promise.reject(new Error('Cette réponse n’est pas enregistrée.'))
+  return lock(async () => {
+    const row = pendingFrom(record, mail)
+    await write(row)
+    return attempt(row)
+  }).then((row) => {
+    if (row?.status === 'sent') confirmArrival(row.id)
+    return row
+  })
 }
 
 export async function removeResponse(id: string): Promise<void> {
@@ -185,7 +208,7 @@ async function attempt(row: LocalResponse): Promise<LocalResponse | null> {
   }
   try {
     const interviewer = row.test ? row.interviewer.trim() || 'Test' : await confirmInterviewer(settings.adminEndpoint, row.deviceId)
-    const status = await submitRecord({ ...toRecord(row), interviewer, test: row.test }, classified.url, settings.adminEndpoint)
+    const status = await submitRecord({ ...toRecord(row), interviewer, test: row.test }, classified.url, settings.adminEndpoint, row.includeMail)
     const sent: LocalResponse = {
       ...row,
       interviewer,

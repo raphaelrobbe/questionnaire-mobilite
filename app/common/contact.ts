@@ -1,15 +1,18 @@
 export const CONTACT_FROM = 'noreply@enquete-mobilite-haut-doubs.fr'
 export const CONTACT_TO = 'contact@enquete-mobilite-haut-doubs.fr'
+export const COLLECTIF_TO = 'zahndfrederique@gmail.com'
 export const SMTP_HOST = 'smtp.ionos.fr'
 export const SMTP_PORT = 465
+
+export type ContactBox = 'enquete' | 'collectif'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MESSAGE_MAX = 4000
 
 export type ContactInput = { email: string; message: string; token: string }
-export type ContactLetter = { replyTo: string; subject: string; text: string }
+export type ContactLetter = { replyTo: string; subject: string; text: string; box: ContactBox }
 
-export function readContact(input: unknown): { ok: true; value: ContactInput } | { ok: false; error: string } {
+export function readContact(input: unknown, tokenRequired = true): { ok: true; value: ContactInput } | { ok: false; error: string } {
   const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const email = typeof source.email === 'string' ? source.email.trim() : ''
   const message = typeof source.message === 'string' ? source.message.trim() : ''
@@ -17,15 +20,33 @@ export function readContact(input: unknown): { ok: true; value: ContactInput } |
   if (!EMAIL.test(email) || email.length > 120 || /[\r\n]/.test(email)) return { ok: false, error: 'Indiquez une adresse mail.' }
   if (!message) return { ok: false, error: 'Écrivez votre message.' }
   if (message.length > MESSAGE_MAX) return { ok: false, error: 'Le message est trop long.' }
-  if (!token) return { ok: false, error: 'Confirmez que vous n’êtes pas un robot.' }
+  if (tokenRequired && !token) return { ok: false, error: 'Confirmez que vous n’êtes pas un robot.' }
   return { ok: true, value: { email, message, token } }
 }
 
-export function contactLetter(value: ContactInput): ContactLetter {
+/** Vrai seulement pour l’adresse TCP réelle, jamais pour un en-tête que le visiteur peut écrire. */
+export function isLoopbackAddress(address: string | undefined): boolean {
+  if (!address) return false
+  const host = address.startsWith('::ffff:') ? address.slice('::ffff:'.length) : address
+  return host === '127.0.0.1' || host === '::1'
+}
+
+/** Seules deux boîtes existent. Une valeur écrite par le visiteur ne devient jamais une adresse. */
+export function readContactBox(input: unknown): ContactBox {
+  const box = input && typeof input === 'object' ? (input as { box?: unknown }).box : undefined
+  return box === 'collectif' ? 'collectif' : 'enquete'
+}
+
+export function recipientFor(box: ContactBox, surveyTo = CONTACT_TO): string {
+  return box === 'collectif' ? COLLECTIF_TO : surveyTo
+}
+
+export function contactLetter(value: ContactInput, box: ContactBox = 'enquete'): ContactLetter {
   return {
     replyTo: value.email,
-    subject: 'Message depuis le site',
+    subject: box === 'collectif' ? 'Message depuis la page du collectif' : 'Message depuis le site',
     text: `Adresse : ${value.email}\n\n${value.message}`,
+    box,
   }
 }
 
@@ -69,13 +90,16 @@ export async function acceptContact(
   body: unknown,
   ip: string | undefined,
   send: (letter: ContactLetter) => Promise<void>,
+  skipTurnstile = false,
 ): Promise<{ status: number; error?: string }> {
-  const read = readContact(body)
+  const read = readContact(body, !skipTurnstile)
   if (!read.ok) return { status: 400, error: read.error }
-  const human = await turnstileOk(secret, read.value.token, ip)
-  if (!human) return { status: 400, error: 'La vérification a échoué. Réessayez.' }
+  if (!skipTurnstile) {
+    const human = await turnstileOk(secret, read.value.token, ip)
+    if (!human) return { status: 400, error: 'La vérification a échoué. Réessayez.' }
+  }
   try {
-    await send(contactLetter(read.value))
+    await send(contactLetter(read.value, readContactBox(body)))
   } catch {
     return { status: 502, error: 'Le message n’a pas pu être envoyé. Réessayez dans un moment.' }
   }
