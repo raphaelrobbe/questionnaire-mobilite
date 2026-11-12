@@ -98,3 +98,10 @@ export function draftHasContent(draft: Draft): boolean {
 export function draftMatchesMode(draft: Pick<Draft, 'test'>, testMode: boolean): boolean {
   return draft.test === testMode
 }
+
+/** Depuis l’accueil, une fiche encore en préparation s’ouvre sur la visite. Une enquête déjà commencée reprend sa question. */
+export function continueStep(draft: Draft): number {
+  const visit = buildSteps(draft.answers).findIndex((step) => step.kind === 'visit')
+  if (visit < 0) return draft.step
+  return Math.max(draft.step, visit)
+}

@@ -16,45 +16,76 @@ export function HouseholdStep({
 }) {
   return (
     <div className="mt-6 grid gap-4">
-      <WhyElectoral />
       {people.map((person, index) => (
-        <Reveal key={index}>
-        <fieldset className="grid gap-3 rounded-[28px] border border-line bg-card px-4 py-4">
-          <legend className="px-1 font-extrabold">Personne {index + 1}</legend>
-          <div>
-            <p className="text-sm font-bold text-muted">Tranche d’âge</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {AGE_BANDS.map((option) => (
-                <Chip
-                  key={option.value}
-                  selected={person.age === option.value}
-                  chosen={Boolean(person.age)}
-                  label={option.label}
-                  onClick={() => onChange(changePerson(people, index, { age: option.value }))}
-                />
-              ))}
-            </div>
+        <PersonCard key={index} person={person} index={index} people={people} commune={commune} onChange={onChange} />
+      ))}
+      <Button variant="secondary" disabled={people.length >= MAX_PEOPLE} onClick={() => onChange(addPerson(people))}>
+        Ajouter une personne
+      </Button>
+    </div>
+  )
+}
+
+function PersonCard({
+  person,
+  index,
+  people,
+  commune,
+  onChange,
+}: {
+  person: Person
+  index: number
+  people: Person[]
+  commune: string
+  onChange: (people: Person[]) => void
+}) {
+  const [confirming, setConfirming] = useState(false)
+  return (
+    <Reveal>
+      <fieldset className="relative grid gap-3 rounded-[28px] border border-line bg-card px-4 py-4">
+        <legend className="px-1 font-extrabold">Personne {index + 1}</legend>
+        {people.length > 1 ? (
+          <RemovePerson
+            confirming={confirming}
+            onAsk={() => setConfirming(true)}
+            onCancel={() => setConfirming(false)}
+            onConfirm={() => onChange(removePerson(people, index))}
+          />
+        ) : null}
+        <div>
+          <p className="text-sm font-bold text-muted">Tranche d’âge</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {AGE_BANDS.map((option) => (
+              <Chip
+                key={option.value}
+                selected={person.age === option.value}
+                chosen={Boolean(person.age)}
+                label={option.label}
+                onClick={() => onChange(changePerson(people, index, { age: option.value }))}
+              />
+            ))}
           </div>
-          {person.age !== '' && person.age !== '0-14' ? (
-            <Reveal>
-              <div>
-                <p className="text-sm font-bold text-muted">Conduite</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {DRIVE_OPTIONS.map((option) => (
-                    <Chip
-                      key={option.value}
-                      selected={person.drive === option.value}
-                      chosen={Boolean(person.drive)}
-                      label={option.label}
-                      onClick={() => onChange(changePerson(people, index, { drive: option.value }))}
-                    />
-                  ))}
-                </div>
+        </div>
+        {person.age !== '' && person.age !== '0-14' ? (
+          <Reveal>
+            <div>
+              <p className="text-sm font-bold text-muted">Conduite</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {DRIVE_OPTIONS.map((option) => (
+                  <Chip
+                    key={option.value}
+                    selected={person.drive === option.value}
+                    chosen={Boolean(person.drive)}
+                    label={option.label}
+                    onClick={() => onChange(changePerson(people, index, { drive: option.value }))}
+                  />
+                ))}
               </div>
-            </Reveal>
-          ) : null}
-          {asksAutonomie(person) ? (
-            <Reveal>
+            </div>
+          </Reveal>
+        ) : null}
+        {asksAutonomie(person) ? (
+          <Reveal>
             <label className="flex min-h-11 items-start gap-3">
               <input
                 type="checkbox"
@@ -64,52 +95,81 @@ export function HouseholdStep({
               />
               <span className="font-bold">Lié à un manque d’autonomie</span>
             </label>
-            </Reveal>
-          ) : null}
-          {asksElectoral(person) ? (
-            <Reveal>
-              <div>
+          </Reveal>
+        ) : null}
+        {asksElectoral(person) ? (
+          <Reveal>
+            <div>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <p className="text-sm font-bold text-muted">Inscrite sur les listes électorales ?</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(['oui', 'non'] as const).map((value) => (
-                    <Chip
-                      key={value}
-                      selected={person.electoral === value}
-                      chosen={Boolean(person.electoral)}
-                      label={value === 'oui' ? 'Oui' : 'Non'}
-                      onClick={() => onChange(changePerson(people, index, electoralPatch(person, value, commune)))}
-                    />
-                  ))}
-                </div>
-                {person.electoral === 'oui' ? (
-                  <Reveal>
-                    <div className="mt-3">
-                      <p className="text-sm font-bold text-muted">Commune d’inscription</p>
-                      <PlacePicker
-                        label="Commune d’inscription"
-                        value={person.electoralCommune}
-                        domicile={false}
-                        suisse={false}
-                        onChange={({ value }) => onChange(changePerson(people, index, { electoralCommune: value }))}
-                      />
-                    </div>
-                  </Reveal>
-                ) : null}
+                <WhyElectoral />
               </div>
-            </Reveal>
-          ) : null}
-          {people.length > 1 ? (
-            <Button variant="ghost" className="w-auto justify-self-start px-0" onClick={() => onChange(removePerson(people, index))}>
-              Retirer cette personne
-            </Button>
-          ) : null}
-        </fieldset>
-        </Reveal>
-      ))}
-      <Button variant="secondary" disabled={people.length >= MAX_PEOPLE} onClick={() => onChange(addPerson(people))}>
-        Ajouter une personne
-      </Button>
-    </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(['oui', 'non'] as const).map((value) => (
+                  <Chip
+                    key={value}
+                    selected={person.electoral === value}
+                    chosen={Boolean(person.electoral)}
+                    label={value === 'oui' ? 'Oui' : 'Non'}
+                    onClick={() => onChange(changePerson(people, index, electoralPatch(person, value, commune)))}
+                  />
+                ))}
+              </div>
+              {person.electoral === 'oui' ? (
+                <Reveal>
+                  <div className="mt-3">
+                    <p className="text-sm font-bold text-muted">Commune d’inscription</p>
+                    <PlacePicker
+                      label="Commune d’inscription"
+                      value={person.electoralCommune}
+                      domicile={false}
+                      suisse={false}
+                      onChange={({ value }) => onChange(changePerson(people, index, { electoralCommune: value }))}
+                    />
+                  </div>
+                </Reveal>
+              ) : null}
+            </div>
+          </Reveal>
+        ) : null}
+      </fieldset>
+    </Reveal>
+  )
+}
+
+function RemovePerson({
+  confirming,
+  onAsk,
+  onCancel,
+  onConfirm,
+}: {
+  confirming: boolean
+  onAsk: () => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Retirer cette personne"
+        className="absolute right-3 top-0 flex h-8 w-8 items-center justify-center rounded-md text-xl font-bold leading-none text-ink"
+        onClick={onAsk}
+      >
+        ×
+      </button>
+      {confirming ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-bold">Retirer cette personne ?</p>
+          <button type="button" className="h-8 rounded-md bg-danger px-2 text-sm font-extrabold text-white" onClick={onConfirm}>
+            Retirer
+          </button>
+          <button type="button" className="h-8 rounded-md border border-line bg-paper px-2 text-sm font-extrabold" onClick={onCancel}>
+            Annuler
+          </button>
+        </div>
+      ) : null}
+    </>
   )
 }
 

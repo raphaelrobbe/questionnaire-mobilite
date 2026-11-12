@@ -1,6 +1,5 @@
 import { fold, PONTARLIER } from './config'
-import { communePlace, frenchCommunityFor } from './frenchCommunes'
-import { swissSectorFor } from './swissCommunes'
+import { communePlace } from './frenchCommunes'
 import { type MapApp } from './settings'
 import { emptyMotives, motivesStarted, sanitizeMotives, type Motives } from './motives'
 import { DOMICILE, actualJourneyIssue, defaultJourneys, difficultiesIssue, difficultiesLine, emptyDifficulties, journeyTouched, journeysStarted, offerJourneyIssue, sanitizeDifficulties, sanitizeJourneys, type Journey, type JourneyDifficulties } from './journeys'
@@ -45,12 +44,6 @@ export type ModeReasonId =
   | 'autre'
   | 'aucune'
 export type ModeConditionId =
-  | 'court'
-  | 'identique'
-  | 'min15'
-  | 'min30'
-  | 'min45'
-  | 'long'
   | 'inferieur'
   | 'equivalent'
   | 'superieur'
@@ -151,12 +144,6 @@ export const MODE_REASONS: Labeled<ModeReasonId>[] = [
 ]
 
 export const MODE_CONDITIONS: Labeled<ModeConditionId>[] = [
-  { value: 'court', label: 'Un temps plus court qu’en voiture' },
-  { value: 'identique', label: 'Un temps de trajet identique à celui en voiture' },
-  { value: 'min15', label: 'Jusqu’à 15 minutes supplémentaires' },
-  { value: 'min30', label: 'Jusqu’à 30 minutes supplémentaires' },
-  { value: 'min45', label: 'Jusqu’à 45 minutes supplémentaires' },
-  { value: 'long', label: 'Même avec un trajet nettement plus long, si cela m’évite de conduire' },
   { value: 'inferieur', label: 'Un tarif inférieur au coût de la voiture (carburant, stationnement…)' },
   { value: 'equivalent', label: 'Un tarif équivalent au coût de la voiture' },
   { value: 'superieur', label: 'Un tarif légèrement supérieur, si le service est plus pratique' },
@@ -173,7 +160,6 @@ export const MODE_CONDITIONS: Labeled<ModeConditionId>[] = [
 ]
 
 export const MODE_CONDITION_GROUPS: { title: string; ids: ModeConditionId[] }[] = [
-  { title: 'Durée du trajet', ids: ['court', 'identique', 'min15', 'min30', 'min45', 'long'] },
   { title: 'Coût', ids: ['inferieur', 'equivalent', 'superieur', 'abonnement'] },
   { title: 'Conditions pratiques', ids: ['arret', 'horaires', 'frequence', 'correspondances', 'fiabilite', 'bagages', 'enfants'] },
 ]
@@ -240,6 +226,8 @@ export type WalkDistance = {
   nearby: WalkNearby | ''
   latitude: number | null
   longitude: number | null
+  /** La carte est inutilisable, ou la personne ne place pas l’arrêt. */
+  mapSkipped: boolean
 }
 
 export function emptyModeReasons(): ModeReasons {
@@ -360,7 +348,7 @@ export function modeBarriersLine(value: ModeBarriers): string {
 }
 
 export function emptyWalkDistance(): WalkDistance {
-  return { choice: '', note: '', nearby: '', latitude: null, longitude: null }
+  return { choice: '', note: '', nearby: '', latitude: null, longitude: null, mapSkipped: false }
 }
 
 export function sanitizeWalkDistance(input: unknown): WalkDistance {
@@ -376,6 +364,7 @@ export function sanitizeWalkDistance(input: unknown): WalkDistance {
     nearby,
     latitude: placed ? latitude : null,
     longitude: placed ? longitude : null,
+    mapSkipped: source.mapSkipped === true,
   }
 }
 
@@ -398,9 +387,14 @@ export function setWalkPoint(current: WalkDistance, latitude: number, longitude:
   return sanitizeWalkDistance({ ...current, latitude, longitude })
 }
 
+export function setWalkMapSkipped(current: WalkDistance, mapSkipped: boolean): WalkDistance {
+  return sanitizeWalkDistance({ ...current, mapSkipped })
+}
+
 export function issueForWalkDistance(value: WalkDistance): string | null {
   if (!value.choice) return 'Choisissez une distance.'
   if (!value.nearby) return 'Indiquez s’il existe déjà un arrêt satisfaisant.'
+  if (value.mapSkipped) return null
   if (value.latitude === null || value.longitude === null) return 'Indiquez l’arrêt sur la carte.'
   return null
 }
@@ -411,7 +405,8 @@ export function walkDistanceLine(value: WalkDistance): string {
   const place = value.nearby === 'oui' ? 'Arrêt existant' : value.nearby === 'non' ? 'Arrêt souhaité' : ''
   const coords =
     value.latitude !== null && value.longitude !== null ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : ''
-  return [label, note, place, coords].filter(Boolean).join(' · ')
+  const skip = value.mapSkipped ? 'La carte ne s’affiche pas ou la personne ne souhaite pas répondre' : ''
+  return [label, note, place, coords, skip].filter(Boolean).join(' · ')
 }
 
 function axis(value: unknown, limit: number): number | null {
@@ -756,6 +751,13 @@ export function visitStarts(outcome: VisitOutcome): boolean {
   return VISITS.find((item) => item.value === outcome)?.starts === true
 }
 
+/** La dernière visite est un refus de répondre. La fiche est alors terminée. */
+export function surveyRefused(input: unknown): boolean {
+  const answers = sanitizeAnswers(input)
+  const last = answers.visits[answers.visits.length - 1]
+  return last?.outcome === 'refus'
+}
+
 export function appendVisit(visits: Visit[], outcome: VisitOutcome, at: string): Visit[] {
   return sanitizeVisits([...visits, { outcome, at }])
 }
@@ -852,9 +854,8 @@ export function questionSide(commune: string): 'de' | 'vers' {
 
 export function issueForCommune(answers: Answers): string | null {
   const commune = answers.commune.trim()
-  if (!commune || fold(commune) === fold(DOMICILE)) return 'Choisissez une commune dans la liste.'
-  if (frenchCommunityFor(commune) || swissSectorFor(commune)) return null
-  return 'Cette commune n’est pas dans la liste.'
+  if (!commune || fold(commune) === fold(DOMICILE)) return 'Indiquez la commune.'
+  return null
 }
 
 export function issueForHousehold(answers: Answers): string | null {
@@ -868,16 +869,9 @@ export function issueForHousehold(answers: Answers): string | null {
   for (const person of answers.people) {
     if (person.electoral !== 'oui') continue
     const commune = person.electoralCommune.trim()
-    if (!commune) return 'Indiquez la commune d’inscription sur les listes électorales.'
-    if (!electoralCommuneOk(commune, answers.commune)) return 'Cette commune n’est pas dans la liste.'
+    if (!commune || fold(commune) === fold(DOMICILE)) return 'Indiquez la commune d’inscription sur les listes électorales.'
   }
   return null
-}
-
-function electoralCommuneOk(commune: string, home: string): boolean {
-  if (fold(commune) === fold(DOMICILE)) return false
-  if (home.trim() && fold(commune) === fold(home)) return true
-  return Boolean(frenchCommunityFor(commune))
 }
 
 export function issueForVehicles(answers: Answers): string | null {

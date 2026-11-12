@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 import { isAdminSession } from '~/common/config'
 import { canRetryRow, canUseSurvey } from '~/common/settings'
 import { classifyEndpoint } from '~/common/endpoint'
-import { answerPreview, draftTitle, mapsDestination } from '~/common/survey'
-import { draftMatchesMode } from '~/common/draft'
-import { createDraft, listDrafts, removeDraft, type Draft } from '~/lib/draft.client'
+import { answerPreview, draftTitle, mapsDestination, surveyRefused } from '~/common/survey'
+import { continueStep, draftMatchesMode } from '~/common/draft'
+import { createDraft, listDrafts, saveDraft, type Draft } from '~/lib/draft.client'
 import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
@@ -23,7 +23,6 @@ export function HomeScreen() {
   const navigate = useNavigate()
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [ready, setReady] = useState(false)
-  const [abandonCode, setAbandonCode] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
@@ -71,9 +70,11 @@ export function HomeScreen() {
       <Link to="/enqueteur" className={buttonClass('secondary')}>
         Guide de l’enquêteur
       </Link>
-      <button type="button" className={buttonClass('primary')} onClick={() => navigate(`/entretien?fiche=${createDraft().code}`)}>
-        Nouvelle personne
-      </button>
+      {settings.testMode ? (
+        <button type="button" className={buttonClass('primary')} onClick={() => navigate(`/entretien?fiche=${createDraft().code}`)}>
+          Nouvelle personne
+        </button>
+      ) : null}
       {visibleDrafts.length > 0 ? (
         <ul className="grid gap-2">
           {visibleDrafts.map((item) => (
@@ -86,36 +87,18 @@ export function HomeScreen() {
               <p className="absolute bottom-3 right-3 rounded-full bg-pine px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
                 {item.code}
               </p>
-              {abandonCode === item.code ? (
-                <div className="mt-3 pr-28">
-                  <p className="font-bold">Effacer cette fiche commencée ?</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button type="button" className={buttonClass('secondary')} onClick={() => setAbandonCode(null)}>
-                      Annuler
-                    </button>
-                    <button
-                      type="button"
-                      className={buttonClass('danger')}
-                      onClick={() => {
-                        removeDraft(item.code)
-                        setDrafts(listDrafts())
-                        setAbandonCode(null)
-                      }}
-                    >
-                      Effacer
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-2 flex gap-4 pr-28">
-                  <Link to={`/entretien?fiche=${item.code}`} className="inline-flex min-h-11 items-center font-bold text-leaf">
-                    Continuer
-                  </Link>
-                  <button type="button" className="inline-flex min-h-11 items-center font-bold text-danger" onClick={() => setAbandonCode(item.code)}>
-                    Abandonner
-                  </button>
-                </div>
-              )}
+              <div className="mt-2 flex gap-4 pr-28">
+                <Link
+                  to={`/entretien?fiche=${item.code}`}
+                  className="inline-flex min-h-11 items-center font-bold text-leaf"
+                  onClick={() => {
+                    const step = continueStep(item)
+                    if (step !== item.step) saveDraft({ ...item, step })
+                  }}
+                >
+                  Continuer
+                </Link>
+              </div>
             </li>
           ))}
         </ul>
@@ -203,6 +186,9 @@ function StoredFiche({
       <span className="shrink-0 rounded-full bg-pine px-2 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
         {row.id}
       </span>
+      {surveyRefused(row.answers) ? (
+        <span className="basis-full w-fit rounded-full bg-clay px-2 py-1 text-xs font-extrabold text-paper">N’a pas souhaité répondre</span>
+      ) : null}
     </>
   )
 
@@ -210,7 +196,7 @@ function StoredFiche({
     <li className={`rounded-2xl border border-line px-3 py-2 ${confirmed ? 'bg-mist' : 'bg-clay-bg'}`}>
       {expandable ? (
         <>
-          <button type="button" aria-expanded={open} onClick={onToggle} className="flex min-h-11 w-full items-center gap-2 text-left">
+          <button type="button" aria-expanded={open} onClick={onToggle} className="flex min-h-11 w-full flex-wrap items-center gap-2 text-left">
             {line}
           </button>
           {open ? (
@@ -227,7 +213,7 @@ function StoredFiche({
           ) : null}
         </>
       ) : (
-        <div className="flex min-h-11 items-center gap-2">{line}</div>
+        <div className="flex min-h-11 flex-wrap items-center gap-2">{line}</div>
       )}
     </li>
   )

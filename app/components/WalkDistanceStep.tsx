@@ -1,4 +1,4 @@
-import { WALK_DISTANCES, setWalkDistance, setWalkNearby, setWalkNote, setWalkPoint, type Answers } from '~/common/survey'
+import { WALK_DISTANCES, setWalkDistance, setWalkMapSkipped, setWalkNearby, setWalkNote, setWalkPoint, type Answers } from '~/common/survey'
 import { choiceClass, fieldClass } from './fill'
 import { Reveal } from './Reveal'
 import { StopMap } from './StopMap'
@@ -71,6 +71,15 @@ export function WalkDistanceStep({ answers, onChange }: { answers: Answers; onCh
                 longitude={distance.longitude}
                 onPick={(latitude, longitude) => onChange({ walkDistance: setWalkPoint(distance, latitude, longitude) })}
               />
+              <label className="mt-3 flex min-h-11 items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={distance.mapSkipped}
+                  onChange={(event) => onChange({ walkDistance: setWalkMapSkipped(distance, event.target.checked) })}
+                  className="mt-1 size-5 accent-pine"
+                />
+                <span className="font-bold">La carte ne s’affiche pas ou la personne ne souhaite pas répondre</span>
+              </label>
             </Reveal>
           ) : null}
         </Reveal>

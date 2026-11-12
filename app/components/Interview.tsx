@@ -218,13 +218,24 @@ export function Interview() {
     setSaveError(null)
     setVisitNote(null)
     const at = new Date().toISOString()
+    const refused = pick === 'refus'
     const next: Draft = {
       ...draft,
-      answers: patchAnswers(draft.answers, { visits: appendVisit(draft.answers.visits, pick, at), visitPick: '' }),
+      answers: patchAnswers(draft.answers, {
+        visits: appendVisit(draft.answers.visits, pick, at),
+        visitPick: '',
+        finishedAt: refused ? at : draft.answers.finishedAt,
+      }),
     }
     try {
       if (!draftMatchesMode(draft, settings?.testMode === true)) throw new Error('Cette fiche n’est pas dans le mode en cours.')
       const row = await commitResponse(toRecord(next, at))
+      if (refused) {
+        removeDraft(next.code)
+        setDraft(null)
+        navigate('/')
+        return
+      }
       setDraft(next)
       if (row?.status === 'error' && row.lastError) setSaveError(readableError(row.lastError))
       else setVisitNote('Visite enregistrée.')
@@ -471,7 +482,7 @@ export function Interview() {
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
             Dans quelle commune habitez-vous ?
           </h1>
-          <p className="mt-2 text-base text-muted">Choisissez-la dans la liste.</p>
+          <p className="mt-2 text-base text-muted">Une commune absente de la liste peut être saisie.</p>
           <PlacePicker
             label="Commune"
             inputId="commune-filtre"
@@ -615,10 +626,12 @@ export function Interview() {
       {step.kind === 'conditions' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            À quelles conditions pourriez-vous remplacer certains de vos trajets actuels en voiture par les transports en
-            commun ?
+            À quelles conditions absolument nécessaires pourriez-vous remplacer certains de vos trajets actuels en voiture par
+            les transports en commun ?
           </h1>
-          <p className="mt-2 text-base text-muted">Plusieurs réponses possibles.</p>
+          <p className="mt-2 text-base text-muted">
+            Sans ces conditions, vous ne changeriez pas. Plusieurs réponses possibles.
+          </p>
           <ModeConditionsStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}

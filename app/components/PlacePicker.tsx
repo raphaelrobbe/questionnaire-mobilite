@@ -282,7 +282,7 @@ function CommuneInput({
               </li>
             ))
           ) : (
-            <li className="px-2 py-2 text-sm font-semibold text-clay">Aucune commune ne commence ainsi.</li>
+            <li className="px-2 py-2 text-sm font-semibold text-muted">Aucune suggestion. La commune saisie est conservée.</li>
           )}
         </ul>
       ) : null}

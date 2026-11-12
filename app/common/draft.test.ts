@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { isResponseCode } from './response'
-import { draftHasContent, draftIsStarted, draftMatchesMode, emptyDraft, sanitizeDraft, testSampleDrafts } from './draft'
+import { continueStep, draftHasContent, draftIsStarted, draftMatchesMode, emptyDraft, sanitizeDraft, testSampleDrafts } from './draft'
 
 describe('brouillon', () => {
   test('ignore un brouillon cassé et borne l’étape', () => {
@@ -140,5 +140,12 @@ describe('brouillon', () => {
     expect(draftMatchesMode({ test: true }, true)).toBe(true)
     expect(draftMatchesMode({ test: false }, true)).toBe(false)
     expect(draftMatchesMode({ test: true }, false)).toBe(false)
+  })
+
+  test('depuis l’accueil, une fiche en préparation s’ouvre sur la visite', () => {
+    const early = sanitizeDraft({ step: 1, answers: { prenom: 'Ada', commune: 'Pontarlier' } })
+    expect(early && continueStep(early)).toBe(3)
+    const started = sanitizeDraft({ step: 7, answers: { prenom: 'Ada', visits: [], handicap: '', difficulties: { groups: [] }, lifeChoices: { selected: [] }, modeReasons: { selected: [] } } })
+    expect(started && continueStep(started)).toBe(7)
   })
 })

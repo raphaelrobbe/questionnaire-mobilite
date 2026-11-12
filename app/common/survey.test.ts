@@ -8,12 +8,14 @@ import {
   changePerson,
   emptyAnswers,
   formatVisits,
+  surveyRefused,
   hasAnyAnswer,
   issueForCommune,
   issueForContact,
   issueForLifeChoices,
   issueForWalkDistance,
   setWalkDistance,
+  setWalkMapSkipped,
   setWalkNearby,
   setWalkNote,
   setWalkPoint,
@@ -68,14 +70,14 @@ describe('questionnaire', () => {
     ])
   })
 
-  test('exige une commune de la liste, puis l’âge et la conduite de chaque personne', () => {
+  test('exige une commune, puis l’âge et la conduite de chaque personne', () => {
     const answers = emptyAnswers()
-    expect(issueForCommune(answers)).toMatch(/Choisissez/)
-    expect(issueForCommune(patchAnswers(answers, { commune: 'Paris' }))).toMatch(/pas dans la liste/)
+    expect(issueForCommune(answers)).toMatch(/commune/)
+    expect(issueForCommune(patchAnswers(answers, { commune: 'Paris' }))).toBeNull()
     expect(issueForCommune(patchAnswers(answers, { commune: 'Métabief' }))).toBeNull()
     expect(issueForCommune(patchAnswers(answers, { commune: 'Pontarlier' }))).toBeNull()
     expect(issueForCommune(patchAnswers(answers, { commune: 'Vallorbe' }))).toBeNull()
-    expect(issueForCommune(patchAnswers(answers, { commune: 'Domicile' }))).toMatch(/Choisissez/)
+    expect(issueForCommune(patchAnswers(answers, { commune: 'Domicile' }))).toMatch(/commune/)
     expect(patchAnswers(emptyAnswers(), { civilite: 'madame', prenom: 'Ada', nom: 'Martin' }).civilite).toBe('madame')
     expect(sanitizeAnswers({ civilite: 'mademoiselle' }).civilite).toBe('')
     expect(questionSide('Pontarlier')).toBe('de')
@@ -106,7 +108,7 @@ describe('questionnaire', () => {
       people: [{ age: '65+', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Vallorbe' }],
     })
     expect(issueForHousehold(swiss)).toBeNull()
-    expect(issueForHousehold(patchAnswers(swiss, { people: [{ age: '65+', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Paris' }] }))).toMatch(/liste/)
+    expect(issueForHousehold(patchAnswers(swiss, { people: [{ age: '65+', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Paris' }] }))).toBeNull()
     const minor = patchAnswers(answers, { people: [{ age: '15-17', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
     expect(minor.people[0]?.electoral).toBe('')
     expect(minor.people[0]?.electoralCommune).toBe('')
@@ -251,6 +253,8 @@ describe('questionnaire', () => {
     expect(kept.startedAt).toBe('')
     expect(sanitizeAnswers({ startedAt: at, finishedAt: later }).finishedAt).toBe(later)
     expect(hasAnyAnswer(patchAnswers(emptyAnswers(), { visits: once }))).toBe(true)
+    expect(surveyRefused(patchAnswers(emptyAnswers(), { visits: appendVisit([], 'refus', at) }))).toBe(true)
+    expect(surveyRefused(patchAnswers(emptyAnswers(), { visits: once }))).toBe(false)
   })
 
   test('un choix de vie désigne des personnes, et « non » reste à part', () => {
@@ -311,10 +315,10 @@ describe('questionnaire', () => {
     const empty = emptyAnswers()
     expect(issueForModeConditions(empty.modeConditions)).toMatch(/condition/)
     expect(stepIssue({ kind: 'conditions' }, empty)).toMatch(/condition/)
-    expect(MODE_CONDITION_GROUPS[0]?.ids[0]).toBe('court')
-    const one = toggleModeCondition(empty.modeConditions, 'min15')
+    expect(MODE_CONDITION_GROUPS[0]?.ids[0]).toBe('inferieur')
+    const one = toggleModeCondition(empty.modeConditions, 'inferieur')
     const both = toggleModeCondition(one, 'horaires')
-    expect(both.selected).toEqual(['min15', 'horaires'])
+    expect(both.selected).toEqual(['inferieur', 'horaires'])
     expect(issueForModeConditions(both)).toBeNull()
     expect(toggleModeCondition(both, 'aucune')).toBe(both)
     const none = toggleModeCondition(empty.modeConditions, 'aucune')
@@ -326,10 +330,11 @@ describe('questionnaire', () => {
       modeConditions: { selected: ['autre', 'aucune', 'inconnu'], note: '  trop loin  ' },
     })
     expect(kept.modeConditions).toEqual({ selected: ['aucune'], note: '  trop loin  ' })
+    expect(sanitizeAnswers({ modeConditions: { selected: ['min15', 'horaires'], note: '' } }).modeConditions.selected).toEqual(['horaires'])
     const lines = Object.fromEntries(
       summary(patchAnswers(empty, { modeConditions: setModeConditionNote(both, 'la neige') })).map((line) => [line.label, line.value]),
     )
-    expect(lines.Conditions).toContain('15 minutes')
+    expect(lines.Conditions).toContain('tarif inférieur')
     expect(lines.Conditions).toContain('horaires adaptés')
     expect(lines.Conditions).toContain('la neige')
     const closing = patchAnswers(emptyAnswers(), { closingNote: '  une idée  ' })
@@ -375,6 +380,8 @@ describe('questionnaire', () => {
     expect(point.latitude).toBe(46.9)
     expect(point.longitude).toBe(6.35)
     expect(issueForWalkDistance(point)).toBeNull()
+    expect(issueForWalkDistance(setWalkMapSkipped(wished, true))).toBeNull()
+    expect(setWalkMapSkipped(wished, false).mapSkipped).toBe(false)
     expect(setWalkNearby(point, 'oui').latitude).toBeNull()
     expect(setWalkDistance(point, 'km1').latitude).toBe(46.9)
     const other = setWalkDistance(one, 'jamais')
@@ -384,7 +391,7 @@ describe('questionnaire', () => {
     expect(noted.note).toBe('  s’il pleut  ')
     expect(noted.choice).toBe('jamais')
     const kept = sanitizeAnswers({ walkDistance: { choice: 'inconnu', nearby: 'peut-etre', latitude: 400, longitude: 6, note: '  la côte  ' } })
-    expect(kept.walkDistance).toEqual({ choice: '', note: '  la côte  ', nearby: '', latitude: null, longitude: null })
+    expect(kept.walkDistance).toEqual({ choice: '', note: '  la côte  ', nearby: '', latitude: null, longitude: null, mapSkipped: false })
     const lines = Object.fromEntries(summary(patchAnswers(empty, { walkDistance: setWalkNote(one, 'la côte') })).map((line) => [line.label, line.value]))
     expect(lines['Distance à l’arrêt']).toBe('Entre 200 et 500 mètres · la côte')
   })

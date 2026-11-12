@@ -1,3 +1,4 @@
+import { fold } from './config'
 import { SLOT_IDS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId, type ThemeId } from './motives'
 
 export const WEEKDAYS = [
@@ -26,19 +27,13 @@ export type RareUnit = '' | (typeof RARE_UNITS)[number]['id']
 /** Un trajet « nouveau » est un trajet jamais fait, déjà considéré comme remplacé par un transport en commun. */
 export type Replaced = '' | 'toujours' | 'souvent' | 'parfois' | 'jamais' | 'offre'
 
-export type DifficultyGroup = 'circulation' | 'meteo' | 'routes' | 'infra' | 'autres' | 'aucune'
+export type DifficultyGroup = 'circulation' | 'routes' | 'infra' | 'autres' | 'aucune'
 export type DifficultyItemId =
   | 'bouchons'
   | 'long'
   | 'imprevisible'
   | 'heures'
   | 'circulation-autre'
-  | 'neige'
-  | 'verglas'
-  | 'pluie'
-  | 'brouillard'
-  | 'vent'
-  | 'meteo-autre'
   | 'chaussee'
   | 'sinueuses'
   | 'visibilite'
@@ -51,7 +46,7 @@ export type DifficultyItemId =
   | 'travaux'
   | 'infra-autre'
 export type DifficultyPace = 'toujours' | 'souvent' | 'parfois'
-export type DifficultyNoteKey = 'circulation' | 'meteo' | 'routes' | 'infra' | 'autres'
+export type DifficultyNoteKey = 'circulation' | 'routes' | 'infra' | 'autres'
 
 export type DifficultyKey = DifficultyItemId | 'autres'
 
@@ -67,7 +62,6 @@ export type JourneyDifficulties = {
 
 export const DIFFICULTY_GROUPS: { id: DifficultyGroup; label: string }[] = [
   { id: 'circulation', label: 'Circulation ou temps de trajet' },
-  { id: 'meteo', label: 'Conditions météorologiques' },
   { id: 'routes', label: 'État ou sécurité des routes' },
   { id: 'infra', label: 'Infrastructures et aménagements' },
   { id: 'autres', label: 'Autres difficultés' },
@@ -80,12 +74,6 @@ export const DIFFICULTY_ITEMS: { id: DifficultyItemId; group: Exclude<Difficulty
   { id: 'imprevisible', group: 'circulation', label: 'Temps de trajet imprévisible' },
   { id: 'heures', group: 'circulation', label: 'Difficultés de circulation à certaines heures' },
   { id: 'circulation-autre', group: 'circulation', label: 'Autre (à préciser)', autre: true },
-  { id: 'neige', group: 'meteo', label: 'Neige ou routes enneigées' },
-  { id: 'verglas', group: 'meteo', label: 'Verglas' },
-  { id: 'pluie', group: 'meteo', label: 'Pluie importante ou inondations' },
-  { id: 'brouillard', group: 'meteo', label: 'Brouillard ou mauvaise visibilité' },
-  { id: 'vent', group: 'meteo', label: 'Vent ou intempéries' },
-  { id: 'meteo-autre', group: 'meteo', label: 'Autre (à préciser)', autre: true },
   { id: 'chaussee', group: 'routes', label: 'Chaussées dégradées (nids-de-poule, revêtement…)' },
   { id: 'sinueuses', group: 'routes', label: 'Routes dangereuses ou sinueuses' },
   { id: 'visibilite', group: 'routes', label: 'Manque de visibilité' },
@@ -119,6 +107,14 @@ export type Journey = {
   days: Weekday[]
   /** Moyens utilisés pour un trajet déjà fait. Plusieurs possibles. */
   modes: string[]
+  /** Minutes du trajet, pour chaque moyen choisi. */
+  durations: Record<string, string>
+  /** Minutes d’attente éventuelle. 0 s’il n’y en a pas. */
+  wait: string
+  /** Minutes porte-à-porte acceptables si une partie du trajet passait en transport en commun. */
+  acceptable: string
+  /** Vrai dès que ce temps a été modifié. Sinon, il suit la durée totale plus 10 %. */
+  acceptableCustom: boolean
   origin: string
   originPlace: string
   destination: string
@@ -127,6 +123,8 @@ export type Journey = {
   riders: number[]
   /** Passagers qui ne vivent pas dans le foyer. Chaque sélection en propose un de plus. */
   extraRiders: number
+  /** Autres passagers qui feraient le trajet en transport en commun. */
+  replacedExtraRiders: number
   /** Vrai si « qui fait ce trajet » a été modifié à la main. Sinon, l’unique personne du foyer est sélectionnée. */
   ridersCustom: boolean
   replacedRiders: number[]
@@ -155,6 +153,10 @@ export function emptyJourney(kind: JourneyKind): Journey {
     everyWeeks: '',
     days: [],
     modes: [],
+    durations: {},
+    wait: '0',
+    acceptable: '',
+    acceptableCustom: false,
     origin: DOMICILE,
     originPlace: '',
     destination: '',
@@ -162,6 +164,7 @@ export function emptyJourney(kind: JourneyKind): Journey {
     replaced: kind === 'nouveau' ? 'offre' : '',
     riders: [],
     extraRiders: 0,
+    replacedExtraRiders: 0,
     ridersCustom: false,
     replacedRiders: [],
     replacedRidersCustom: false,
@@ -182,7 +185,7 @@ export function emptyDifficulties(): JourneyDifficulties {
   return {
     groups: [],
     items: [],
-    notes: { circulation: '', meteo: '', routes: '', infra: '', autres: '' },
+    notes: { circulation: '', routes: '', infra: '', autres: '' },
     trips: {},
   }
 }
@@ -207,6 +210,7 @@ export function journeyTouched(journey: Journey): boolean {
       journey.extraRiders > 0 ||
       journey.replacedRiders.length ||
       journey.comment.trim() ||
+      Boolean(tripMinutes(journey.acceptable)) ||
       (journey.kind === 'actuel' && journey.replaced),
   )
 }
@@ -216,14 +220,16 @@ export function journeyComplete(journey: Journey, peopleCount = 0): boolean {
   if (!journey.aller) return false
   if (!frequencyComplete(journey)) return false
   if (journey.kind === 'actuel' && journey.modes.length === 0) return false
+  if (journey.kind === 'actuel' && journey.modes.some((id) => !tripMinutes(journey.durations[id]))) return false
   if (!(journey.origin ?? DOMICILE).trim() || !journey.destination.trim()) return false
   if (journey.kind === 'actuel') {
     if (!tripRiders(journey, peopleCount).length) return false
+    if (!asksTransit(journey.modes)) return true
     if (!journey.replaced || journey.replaced === 'offre') return false
-    if (journey.replaced !== 'jamais' && !tripReplacedRiders(journey, peopleCount).length) return false
+    if (journey.replaced !== 'jamais' && !tripReplacedRiders(journey, peopleCount).length && !tripReplacedExtras(journey)) return false
     return true
   }
-  return journey.replaced === 'offre' && tripReplacedRiders(journey, peopleCount).length > 0
+  return journey.replaced === 'offre' && tripReplacedRiders(journey, peopleCount).length > 0 && Boolean(tripMinutes(journey.acceptable))
 }
 
 export function tripRiders(journey: Journey, peopleCount: number): number[] {
@@ -235,7 +241,16 @@ export function tripRiders(journey: Journey, peopleCount: number): number[] {
 export function tripReplacedRiders(journey: Journey, peopleCount: number): number[] {
   if (journey.kind === 'nouveau') return !journey.replacedRidersCustom && peopleCount === 1 ? [0] : journey.replacedRiders
   if (!journey.replacedRidersCustom) return tripRiders(journey, peopleCount)
-  return journey.replacedRiders
+  const riding = new Set(journey.riders)
+  return journey.replacedRiders.filter((index) => riding.has(index))
+}
+
+/** Autres passagers du trajet qui le feraient en transport en commun. */
+export function tripReplacedExtras(journey: Journey): number {
+  if (journey.kind !== 'actuel') return 0
+  if (journey.replaced !== 'toujours' && journey.replaced !== 'souvent' && journey.replaced !== 'parfois') return 0
+  if (!journey.replacedRidersCustom) return journey.extraRiders
+  return Math.min(journey.replacedExtraRiders, journey.extraRiders)
 }
 
 function frequencyComplete(journey: Journey): boolean {
@@ -311,8 +326,9 @@ export function updateJourney(journeys: Journey[], index: number, patch: Partial
   return journeys.map((journey, item) => {
     if (item !== index) return journey
     const next = { ...journey, ...patch }
-    if ('replacedRiders' in patch) next.replacedRidersCustom = true
+    if ('replacedRiders' in patch || 'replacedExtraRiders' in patch) next.replacedRidersCustom = true
     if ('riders' in patch) next.ridersCustom = true
+    if ('acceptable' in patch) next.acceptableCustom = true
     return normalizeJourney(next)
   })
 }
@@ -365,6 +381,10 @@ function cleanJourney(input: unknown, peopleCount: number, allowed: Set<string>)
     everyWeeks: weeksOf(source.everyWeeks),
     days: weekdaysOf(source.days),
     modes: journeyModes(source, allowed),
+    durations: rawDurations(source.durations),
+    wait: waitMinutes(source.wait === undefined || source.wait === null ? '0' : String(source.wait)),
+    acceptable: acceptableMinutes(source.acceptable === undefined || source.acceptable === null ? '' : String(source.acceptable)),
+    acceptableCustom: source.acceptableCustom === true,
     origin: 'origin' in source ? clip(source.origin, 120) : DOMICILE,
     originPlace: clip(source.originPlace, 80),
     destination: clip(source.destination, 120),
@@ -372,6 +392,7 @@ function cleanJourney(input: unknown, peopleCount: number, allowed: Set<string>)
     replaced: replacedOf(source.replaced, kind),
     riders: kind === 'actuel' ? indexesOf(source.riders, peopleCount) : [],
     extraRiders: kind === 'actuel' ? extraRidersOf(source.extraRiders) : 0,
+    replacedExtraRiders: kind === 'actuel' ? replacedExtraOf(source.replacedExtraRiders, extraRidersOf(source.extraRiders)) : 0,
     ridersCustom: source.ridersCustom === true,
     replacedRiders: indexesOf(source.replacedRiders, peopleCount),
     replacedRidersCustom: ridersCustom(source, kind === 'actuel' ? indexesOf(source.riders, peopleCount) : [], indexesOf(source.replacedRiders, peopleCount)),
@@ -396,10 +417,26 @@ function normalizeJourney(journey: Journey, peopleCount = 0): Journey {
     next.days = []
   }
   if (next.pace !== 'intervalle') next.everyWeeks = ''
+  if (fold((next.origin ?? '').trim()) === fold(DOMICILE) && fold(next.destination.trim()) === fold(DOMICILE)) {
+    next.destination = ''
+    next.place = ''
+  }
   if (next.kind === 'nouveau') {
     next.riders = []
     next.extraRiders = 0
     next.modes = []
+  }
+  next.durations = durationsFor(next.modes, next.durations)
+  next.wait = waitMinutes(next.wait)
+  if (next.kind === 'nouveau') {
+    next.acceptable = tripMinutes(next.acceptable)
+    next.acceptableCustom = false
+  } else if (asksTransit(next.modes)) {
+    next.acceptable = next.acceptableCustom ? acceptableMinutes(next.acceptable) : suggestedAcceptable(next)
+  } else {
+    next.acceptable = ''
+    next.acceptableCustom = false
+    next.replaced = ''
   }
   if (peopleCount === 1 && contentTouched(next)) {
     if (next.kind === 'actuel' && !next.ridersCustom && next.riders.length === 0) next.riders = [0]
@@ -408,8 +445,14 @@ function normalizeJourney(journey: Journey, peopleCount = 0): Journey {
   if (next.kind === 'actuel' && next.replaced !== 'toujours' && next.replaced !== 'souvent' && next.replaced !== 'parfois') {
     next.replacedRiders = []
     next.replacedRidersCustom = false
+    next.replacedExtraRiders = 0
   } else if (next.kind === 'actuel' && !next.replacedRidersCustom) {
     next.replacedRiders = next.riders
+    next.replacedExtraRiders = next.extraRiders
+  } else if (next.kind === 'actuel') {
+    const riding = new Set(next.riders)
+    next.replacedRiders = next.replacedRiders.filter((index) => riding.has(index))
+    next.replacedExtraRiders = Math.min(Math.max(next.replacedExtraRiders, 0), next.extraRiders)
   }
   return next
 }
@@ -427,6 +470,7 @@ function contentTouched(journey: Journey): boolean {
       journey.destination.trim() ||
       journey.place.trim() ||
       journey.comment.trim() ||
+      Boolean(tripMinutes(journey.acceptable)) ||
       (journey.kind === 'actuel' && journey.replaced),
   )
 }
@@ -601,6 +645,80 @@ function slotOf(value: unknown): SlotId | '' {
   return SLOT_IDS.find((slot) => slot === text) ?? ''
 }
 
+function durationsFor(modes: string[], source: Record<string, string>): Record<string, string> {
+  const kept: Record<string, string> = {}
+  for (const id of modes) {
+    const minutes = tripMinutes(source[id])
+    if (minutes) kept[id] = minutes
+  }
+  return kept
+}
+
+function rawDurations(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') return {}
+  const kept: Record<string, string> = {}
+  for (const [id, minutes] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof minutes === 'string' || typeof minutes === 'number') kept[id] = String(minutes)
+  }
+  return kept
+}
+
+/** Minutes entières, de 1 à 999. Vide si la saisie ne compte pas. */
+export function tripMinutes(value: string | undefined): string {
+  const text = String(value ?? '').replace(/\D/g, '').slice(0, 3)
+  if (!text) return ''
+  const count = Number(text)
+  if (count < 1 || count > 999) return ''
+  return String(count)
+}
+
+/** Minutes d’attente, de 0 à 999. Une saisie vide revient à 0. */
+export function waitMinutes(value: string | undefined): string {
+  const text = String(value ?? '').replace(/\D/g, '').slice(0, 3)
+  if (!text) return '0'
+  const count = Number(text)
+  if (count > 999) return '999'
+  return String(count)
+}
+
+/** Somme des temps de trajet et de l’attente, en minutes. */
+export function doorToDoorMinutes(durations: Record<string, string>, modes: readonly string[], wait: string): number {
+  const legs = modes.reduce((sum, id) => sum + (Number(tripMinutes(durations[id])) || 0), 0)
+  return legs + Number(waitMinutes(wait))
+}
+
+const TRANSIT_MODES = new Set(['train', 'autocar'])
+
+/** Moyens choisis qui ne sont ni le train ni l’autocar. */
+export function modesBesideTransit(modes: readonly string[]): string[] {
+  return modes.filter((id) => !TRANSIT_MODES.has(id))
+}
+
+/** La question du report vers le transport en commun ne concerne pas un trajet déjà fait en train ou en autocar. */
+export function asksTransit(modes: readonly string[]): boolean {
+  return modesBesideTransit(modes).length > 0
+}
+
+/** Durée totale plus 10 %, arrondie à 5 minutes. */
+export function suggestedAcceptableMinutes(total: number): number {
+  if (total <= 0) return 0
+  return Math.min(999, Math.round((total * 1.1) / 5) * 5)
+}
+
+/** Minutes acceptables, de 0 à 999. Vide si la saisie ne compte pas. */
+export function acceptableMinutes(value: string | undefined): string {
+  const text = String(value ?? '').replace(/\D/g, '').slice(0, 3)
+  if (!text) return ''
+  const count = Number(text)
+  if (count > 999) return '999'
+  return String(count)
+}
+
+function suggestedAcceptable(journey: Journey): string {
+  const total = doorToDoorMinutes(journey.durations, journey.modes, journey.wait)
+  return total > 0 ? String(suggestedAcceptableMinutes(total)) : ''
+}
+
 function weeksOf(value: unknown): string {
   const text = String(value ?? '').replace(/\D/g, '').slice(0, 2)
   if (!text) return ''
@@ -623,6 +741,13 @@ function ridersCustom(source: Record<string, unknown>, riders: number[], replace
 
 function sameIndexes(left: number[], right: number[]): boolean {
   return left.length === right.length && left.every((item, index) => item === right[index])
+}
+
+function replacedExtraOf(value: unknown, extraRiders: number): number {
+  if (value === undefined || value === null) return extraRiders
+  const count = typeof value === 'number' ? value : Number(value)
+  if (!Number.isInteger(count) || count < 1) return 0
+  return Math.min(count, extraRiders)
 }
 
 function extraRidersOf(value: unknown): number {

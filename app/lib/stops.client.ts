@@ -6,8 +6,8 @@ export type HomeCenter = MapPoint & { zoom: number; approximate: boolean }
 
 export type TransitStop = MapPoint & { id: string; name: string }
 
-const PONTARLIER: HomeCenter = { latitude: 46.9032, longitude: 6.3554, zoom: 12, approximate: true }
-const HOME_ZOOM = 13
+const PONTARLIER: HomeCenter = { latitude: 46.9032, longitude: 6.3554, zoom: 13, approximate: true }
+const HOME_ZOOM = 14
 
 const geoCache = new Map<string, MapPoint | null>()
 

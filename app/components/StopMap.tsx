@@ -84,7 +84,7 @@ export function StopMap({
       if (mode === 'stops') {
         for (const stop of stops) {
           const selected = samePoint(latitude, longitude, stop.latitude, stop.longitude)
-          const dot = addDot(leaflet, map, markers, stop, selected ? 'selected' : 'stop', stop.name)
+          const dot = addDot(leaflet, map, markers, stop, selected ? 'selected' : 'stop', stop.name, false)
           dot.on('click', (event) => {
             leaflet.DomEvent.stopPropagation(event)
             onPickRef.current(stop.latitude, stop.longitude)
@@ -103,20 +103,18 @@ export function StopMap({
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map || status !== 'ready') return
-    const allowClick = mode === 'click' || (stopsSettled && stops.length === 0)
-    if (!allowClick) return
+    if (!map || status !== 'ready' || (mode === 'stops' && !stopsSettled)) return
     const handler = (event: LeafletMouseEvent) => onPickRef.current(event.latlng.lat, event.latlng.lng)
     map.on('click', handler)
     return () => {
       map.off('click', handler)
     }
-  }, [mode, status, stops.length, stopsSettled])
+  }, [mode, status, stopsSettled])
 
   const hint =
     status === 'loading'
       ? 'Recherche du domicile…'
-      : home?.zoom === 12
+      : home?.zoom === 13
         ? 'Le domicile n’a pas été trouvé. La carte est centrée sur Pontarlier.'
         : home?.approximate
           ? 'L’adresse exacte n’a pas été trouvée. La carte est centrée sur la commune.'
@@ -125,7 +123,7 @@ export function StopMap({
         : mode === 'stops' && stops.length === 0
           ? 'Aucun arrêt trouvé à proximité. Touchez la carte pour indiquer l’emplacement.'
           : mode === 'stops'
-            ? 'Touchez un arrêt pour le retenir.'
+            ? 'Touchez un arrêt pour le retenir, ou un autre endroit de la carte.'
             : 'Touchez la carte pour placer l’arrêt.'
 
   return (
@@ -148,6 +146,7 @@ function addDot(
   point: { latitude: number; longitude: number },
   kind: 'home' | 'stop' | 'selected',
   title: string,
+  bubble = true,
 ) {
   const size = kind === 'selected' ? 22 : kind === 'home' ? 14 : 16
   const icon = leaflet.divIcon({
@@ -156,7 +155,7 @@ function addDot(
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
-  const dot = leaflet.marker([point.latitude, point.longitude], { icon, title, keyboard: true }).addTo(map)
+  const dot = leaflet.marker([point.latitude, point.longitude], { icon, title, keyboard: true, bubblingMouseEvents: bubble }).addTo(map)
   markers.push(dot)
   return dot
 }

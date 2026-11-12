@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { DOMICILE, RARE_COUNTS, RARE_UNITS, addJourney, journeyHeading, journeyTouched, removeJourney, tripReplacedRiders, tripRiders, updateJourney, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { fold } from '~/common/config'
+import { DOMICILE, RARE_COUNTS, RARE_UNITS, acceptableMinutes, addJourney, doorToDoorMinutes, journeyHeading, journeyTouched, modesBesideTransit, removeJourney, tripMinutes, tripReplacedExtras, tripReplacedRiders, tripRiders, updateJourney, waitMinutes, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
 import { SLOTS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId } from '~/common/motives'
 import { AGE_BANDS, type Answers, type Person } from '~/common/survey'
 import { Reveal } from './Reveal'
@@ -141,98 +142,122 @@ function TripCard({
   }
 
   const modes = vehicleModeOptions(answers.cars, answers.twoWheelers)
+  const alternatives = modesBesideTransit(journey.modes)
   const wouldRide = journey.kind === 'nouveau' || journey.replaced === 'toujours' || journey.replaced === 'souvent' || journey.replaced === 'parfois'
+  const transitLegend =
+    alternatives.length > 1
+      ? 'Certains tronçons pourraient-ils être faits en transport en commun, si l’offre était efficace, fiable et financièrement intéressante ?'
+      : 'Ce trajet pourrait-il être fait en transport en commun, si l’offre était efficace, fiable et financièrement intéressante ?'
 
   return (
-    <article ref={cardRef} className="relative rounded-2xl border border-line bg-white p-3">
-      <button type="button" className="min-h-10 w-full py-1 pr-10 text-left" onClick={onOpen}>
-        <TripHeading journey={journey} position={position} />
-      </button>
-      <DeleteTrip confirming={confirming} onAsk={() => setConfirming(true)} onCancel={() => setConfirming(false)} onConfirm={onRemove} />
+    <article ref={cardRef} className="grid gap-3">
+      <div className="relative rounded-2xl border border-line bg-white px-3 py-2">
+        <button type="button" className="min-h-10 w-full py-1 pr-10 text-left" onClick={onOpen}>
+          <TripHeading journey={journey} position={position} />
+        </button>
+        <DeleteTrip confirming={confirming} onAsk={() => setConfirming(true)} onCancel={() => setConfirming(false)} onConfirm={onRemove} />
+      </div>
 
-      <fieldset className="mt-3">
-        <legend className="text-base font-extrabold">Pour quel motif ?</legend>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {THEME_IDS.map((theme) => (
-            <Chip
-              key={theme}
-              pressed={journey.theme === theme}
-              idle={choiceFill('one', Boolean(journey.theme))}
-              onClick={() => onChange({ theme: journey.theme === theme ? '' : theme })}
-            >
-              {themeLabel(theme, '')}
-            </Chip>
-          ))}
-        </div>
-        {journey.theme ? (
-          <Reveal>
-            <label className="mt-2 block text-base font-extrabold">
-              Préciser l’activité <span className="font-medium text-muted">(facultatif)</span>
-              <input
-                value={journey.autre}
-                maxLength={80}
-                aria-label="Préciser l’activité"
-                className={`mt-2 min-h-12 w-full rounded-2xl px-4 text-base font-medium ${fieldClass(Boolean(journey.autre.trim()), true)}`}
-                onChange={(event) => onChange({ autre: event.target.value })}
-              />
-            </label>
-          </Reveal>
-        ) : null}
-      </fieldset>
-
-      {journey.kind === 'actuel' ? (
-        <People
-          title="Qui fait ce trajet ?"
-          rule="many"
-          people={answers.people}
-          selected={tripRiders(journey, answers.people.length)}
-          extras={journey.extraRiders}
-          onToggle={(riders) => onChange({ riders })}
-          onExtras={(extraRiders) => onChange({ extraRiders })}
-        />
-      ) : null}
-
-      {journey.kind === 'actuel' ? (
-        <fieldset className="mt-4">
-          <legend className="text-base font-extrabold">Par quel moyen ?</legend>
-          <p className="mt-1 text-sm text-muted">Plusieurs réponses possibles.</p>
+      <Frame>
+        <fieldset>
+          <legend className="text-base font-extrabold">Pour quel motif ?</legend>
           <div className="mt-2 flex flex-wrap gap-2">
-            {modes.map((mode) => (
+            {THEME_IDS.map((theme) => (
               <Chip
-                key={mode.id}
-                pressed={journey.modes.includes(mode.id)}
-                idle={choiceFill('many', journey.modes.length > 0)}
-                onClick={() =>
-                  onChange({
-                    modes: journey.modes.includes(mode.id) ? journey.modes.filter((id) => id !== mode.id) : [...journey.modes, mode.id],
-                  })
-                }
+                key={theme}
+                pressed={journey.theme === theme}
+                idle={choiceFill('one', Boolean(journey.theme))}
+                onClick={() => onChange({ theme: journey.theme === theme ? '' : theme })}
               >
-                {mode.label}
+                {themeLabel(theme, '')}
               </Chip>
             ))}
           </div>
+          {journey.theme ? (
+            <Reveal>
+              <label className="mt-2 block text-base font-extrabold">
+                Préciser l’activité <span className="font-medium text-muted">(facultatif)</span>
+                <input
+                  value={journey.autre}
+                  maxLength={80}
+                  aria-label="Préciser l’activité"
+                  className={`mt-2 min-h-12 w-full rounded-2xl px-4 text-base font-medium ${fieldClass(Boolean(journey.autre.trim()), true)}`}
+                  onChange={(event) => onChange({ autre: event.target.value })}
+                />
+              </label>
+            </Reveal>
+          ) : null}
         </fieldset>
-      ) : null}
-
-      <Hours aller={journey.aller} retour={journey.retour} onAller={(aller) => onChange({ aller })} onRetour={(retour) => onChange({ retour })} />
-
-      <Frequency journey={journey} onChange={onChange} />
-
-      <RouteField
-        origin={journey.origin ?? DOMICILE}
-        originPlace={journey.originPlace ?? ''}
-        destination={journey.destination}
-        place={journey.place}
-        onChange={onChange}
-      />
+      </Frame>
 
       {journey.kind === 'actuel' ? (
-        <>
-          <fieldset className="mt-4">
-            <legend className="text-base font-extrabold">
-              Pourrait-il être fait en transport en commun, si l’offre était efficace, fiable et financièrement intéressante ?
-            </legend>
+        <Frame>
+          <People
+            title="Qui fait ce trajet ?"
+            rule="many"
+            people={answers.people}
+            selected={tripRiders(journey, answers.people.length)}
+            extras={journey.extraRiders}
+            onToggle={(riders) => onChange({ riders })}
+            onExtras={(extraRiders) => onChange({ extraRiders })}
+          />
+        </Frame>
+      ) : null}
+
+      {journey.kind === 'actuel' ? (
+        <Frame>
+          <fieldset>
+            <legend className="text-base font-extrabold">Par quel moyen ?</legend>
+            <p className="mt-1 text-sm text-muted">Plusieurs réponses possibles.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {modes.map((mode) => (
+                <Chip
+                  key={mode.id}
+                  pressed={journey.modes.includes(mode.id)}
+                  idle={choiceFill('many', journey.modes.length > 0)}
+                  onClick={() =>
+                    onChange({
+                      modes: journey.modes.includes(mode.id) ? journey.modes.filter((id) => id !== mode.id) : [...journey.modes, mode.id],
+                    })
+                  }
+                >
+                  {mode.label}
+                </Chip>
+              ))}
+            </div>
+          </fieldset>
+          {journey.modes.length > 0 ? (
+            <TripDurations
+              modes={modes.filter((mode) => journey.modes.includes(mode.id))}
+              durations={journey.durations}
+              wait={journey.wait}
+              onDurations={(durations) => onChange({ durations })}
+              onWait={(wait) => onChange({ wait })}
+            />
+          ) : null}
+        </Frame>
+      ) : null}
+
+      <Frame>
+        <Hours aller={journey.aller} retour={journey.retour} onAller={(aller) => onChange({ aller })} onRetour={(retour) => onChange({ retour })} />
+        <Frequency journey={journey} onChange={onChange} />
+        <MissingReturn retour={journey.retour} />
+      </Frame>
+
+      <Frame>
+        <RouteField
+          origin={journey.origin ?? DOMICILE}
+          originPlace={journey.originPlace ?? ''}
+          destination={journey.destination}
+          place={journey.place}
+          onChange={onChange}
+        />
+      </Frame>
+
+      {journey.kind === 'actuel' && alternatives.length > 0 ? (
+        <Frame>
+          <fieldset>
+            <legend className="text-base font-extrabold">{transitLegend}</legend>
             <div className="mt-2 flex flex-wrap gap-2">
               {REPLACED.map((choice) => (
                 <Chip
@@ -246,11 +271,27 @@ function TripCard({
               ))}
             </div>
           </fieldset>
-        </>
-      ) : null}
-
-      {wouldRide ? (
-        <Reveal>
+          <AcceptableTime minutes={journey.acceptable} onChange={(acceptable) => onChange({ acceptable })} />
+          {wouldRide ? (
+            <Reveal>
+              <People
+                className="mt-4"
+                title="Qui le ferait en transport en commun ?"
+                hint="La personne qui conduit peut ne plus le faire."
+                rule="many"
+                people={answers.people}
+                indexes={tripRiders(journey, answers.people.length)}
+                selected={tripReplacedRiders(journey, answers.people.length)}
+                extraPool={journey.extraRiders}
+                extraSelected={tripReplacedExtras(journey)}
+                onToggle={(replacedRiders) => onChange({ replacedRiders })}
+                onExtraSelected={(replacedExtraRiders) => onChange({ replacedExtraRiders })}
+              />
+            </Reveal>
+          ) : null}
+        </Frame>
+      ) : journey.kind === 'nouveau' ? (
+        <Frame>
           <People
             title="Qui le ferait en transport en commun ?"
             hint="La personne qui conduit peut ne plus le faire."
@@ -259,22 +300,33 @@ function TripCard({
             selected={tripReplacedRiders(journey, answers.people.length)}
             onToggle={(replacedRiders) => onChange({ replacedRiders })}
           />
-        </Reveal>
+        </Frame>
       ) : null}
 
-      <label className="mt-4 block text-base font-extrabold">
-        Commentaire <span className="font-medium text-muted">(facultatif)</span>
-        <textarea
-          value={journey.comment}
-          maxLength={400}
-          rows={2}
-          className={`mt-2 w-full rounded-2xl px-4 py-3 text-base font-medium ${fieldClass(Boolean(journey.comment.trim()), true)}`}
-          onChange={(event) => onChange({ comment: event.target.value })}
-        />
-      </label>
-      <MissingReturn retour={journey.retour} />
+      {journey.kind === 'nouveau' ? (
+        <Frame>
+          <MinuteRow label="Temps acceptable porte-à-porte ?" minutes={journey.acceptable} blank="" onChange={(acceptable) => onChange({ acceptable })} />
+        </Frame>
+      ) : null}
+
+      <Frame>
+        <label className="block text-base font-extrabold">
+          Commentaire <span className="font-medium text-muted">(facultatif)</span>
+          <textarea
+            value={journey.comment}
+            maxLength={400}
+            rows={2}
+            className={`mt-2 w-full rounded-2xl px-4 py-3 text-base font-medium ${fieldClass(Boolean(journey.comment.trim()), true)}`}
+            onChange={(event) => onChange({ comment: event.target.value })}
+          />
+        </label>
+      </Frame>
     </article>
   )
+}
+
+function Frame({ children }: { children: ReactNode }) {
+  return <section className="rounded-2xl border border-line bg-white p-3">{children}</section>
 }
 
 function MissingReturn({ retour, inset = false }: { retour: string; inset?: boolean }) {
@@ -346,7 +398,7 @@ function RouteField({
   onChange: (patch: Partial<Journey>) => void
 }) {
   return (
-    <div className="mt-4 rounded-2xl border border-line p-3">
+    <div>
       <p className="text-base font-extrabold">De</p>
       <PlacePicker
         label="De"
@@ -363,10 +415,129 @@ function RouteField({
         label="À"
         value={destination}
         place={place}
+        domicile={fold(origin.trim()) !== fold(DOMICILE)}
         detail
         onChange={({ value, place: nextPlace }) => onChange({ destination: value, place: nextPlace })}
       />
     </div>
+  )
+}
+
+const TRIP_MINUTES = ['5', '10', '15', '20', '25', '30', '45', '60']
+
+function TripDurations({
+  modes,
+  durations,
+  wait,
+  onDurations,
+  onWait,
+}: {
+  modes: { id: string; label: string }[]
+  durations: Record<string, string>
+  wait: string
+  onDurations: (durations: Record<string, string>) => void
+  onWait: (wait: string) => void
+}) {
+  const total = doorToDoorMinutes(durations, modes.map((mode) => mode.id), wait)
+  return (
+    <fieldset className="mt-4">
+      <legend className="text-base font-extrabold">Temps moyen de trajet</legend>
+      <div className="mt-2 grid gap-3">
+        {modes.map((mode) => (
+          <MinuteRow
+            key={mode.id}
+            label={mode.label}
+            minutes={durations[mode.id] ?? ''}
+            blank=""
+            onChange={(minutes) => onDurations({ ...durations, [mode.id]: minutes })}
+          />
+        ))}
+        <MinuteRow label="Attente éventuelle" minutes={waitMinutes(wait)} blank="0" onChange={onWait} />
+        <p className="text-base font-extrabold">Temps total porte-à-porte : {total} min</p>
+      </div>
+    </fieldset>
+  )
+}
+
+function MinuteRow({
+  label,
+  minutes,
+  blank,
+  onChange,
+}: {
+  label: string
+  minutes: string
+  blank: string
+  onChange: (minutes: string) => void
+}) {
+  return (
+    <div>
+      <label className="block text-base font-extrabold">
+        {label}
+        <span className="mt-2 flex items-center gap-2">
+          <input
+            inputMode="numeric"
+            aria-label={`Minutes, ${label}`}
+            value={minutes}
+            className={`min-h-12 w-full rounded-2xl px-4 text-base font-medium ${fieldClass(Boolean(minutes), false)}`}
+            onChange={(event) => onChange(blank === '0' ? waitMinutes(event.target.value) : tripMinutes(event.target.value))}
+          />
+          <span className="shrink-0 text-base font-bold">min</span>
+        </span>
+      </label>
+      <div className="mt-1 flex w-full flex-nowrap items-center gap-0.5">
+        {TRIP_MINUTES.map((choice) => (
+          <button
+            key={choice}
+            type="button"
+            aria-pressed={minutes === choice}
+            className={`whitespace-nowrap ${lineButton(minutes === choice, choiceFill('one', Boolean(minutes)))}`}
+            onClick={() => onChange(minutes === choice ? blank : choice)}
+          >
+            {choice}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AcceptableTime({ minutes, onChange }: { minutes: string; onChange: (minutes: string) => void }) {
+  function step(delta: number) {
+    const base = Number(acceptableMinutes(minutes) || '0')
+    onChange(String(Math.min(999, Math.max(0, base + delta))))
+  }
+
+  return (
+    <label className="mt-4 block text-base font-extrabold">
+      Quel temps de trajet maximal porte-à-porte serait alors acceptable ?
+      <span className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Retirer 5 minutes"
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-line text-xl font-extrabold"
+          onClick={() => step(-5)}
+        >
+          −
+        </button>
+        <input
+          inputMode="numeric"
+          aria-label="Temps de trajet maximal acceptable, en minutes"
+          value={minutes}
+          className={`min-h-12 w-full rounded-2xl px-4 text-base font-medium ${fieldClass(Boolean(minutes), false)}`}
+          onChange={(event) => onChange(acceptableMinutes(event.target.value))}
+        />
+        <span className="shrink-0 text-base font-bold">min</span>
+        <button
+          type="button"
+          aria-label="Ajouter 5 minutes"
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-line text-xl font-extrabold"
+          onClick={() => step(5)}
+        >
+          +
+        </button>
+      </span>
+    </label>
   )
 }
 
@@ -504,7 +675,7 @@ function Hours({
 }) {
   const columns = 'grid grid-cols-[5.4rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3'
   return (
-    <div className="mt-4">
+    <div>
       <div className={`${columns} items-end pb-1`}>
         <span />
         <p className="text-center text-[13px] font-extrabold leading-tight">Horaire aller</p>
@@ -562,37 +733,53 @@ function People({
   hint,
   rule,
   people,
+  indexes,
   selected,
   extras = 0,
+  extraPool = 0,
+  extraSelected = 0,
+  className = '',
   onToggle,
   onExtras,
+  onExtraSelected,
 }: {
   title: string
   hint?: string
   rule: 'many' | 'free'
   people: Person[]
+  indexes?: number[]
   selected: number[]
   extras?: number
+  extraPool?: number
+  extraSelected?: number
+  className?: string
   onToggle: (indexes: number[]) => void
   onExtras?: (count: number) => void
+  onExtraSelected?: (count: number) => void
 }) {
-  const householdIdle = choiceFill(rule, selected.length > 0)
-  const extraIdle = choiceFill('free', extras > 0)
+  const listed = indexes ?? people.map((_, index) => index)
+  const picked = selected.length > 0 || extraSelected > 0
+  const householdIdle = choiceFill(rule, onExtraSelected ? picked : selected.length > 0)
+  const extraIdle = onExtraSelected ? choiceFill(rule, picked) : choiceFill('free', extras > 0)
   return (
-    <fieldset className="mt-4">
+    <fieldset className={className}>
       <legend className="text-base font-extrabold">{title}</legend>
       {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
       <div className="mt-2 flex flex-wrap gap-2">
-        {people.map((person, index) => (
-          <Chip
-            key={index}
-            pressed={selected.includes(index)}
-            idle={householdIdle}
-            onClick={() => onToggle(selected.includes(index) ? selected.filter((item) => item !== index) : [...selected, index])}
-          >
-            {personChip(person, index)}
-          </Chip>
-        ))}
+        {listed.map((index) => {
+          const person = people[index]
+          if (!person) return null
+          return (
+            <Chip
+              key={index}
+              pressed={selected.includes(index)}
+              idle={householdIdle}
+              onClick={() => onToggle(selected.includes(index) ? selected.filter((item) => item !== index) : [...selected, index])}
+            >
+              {personChip(person, index)}
+            </Chip>
+          )
+        })}
         {onExtras
           ? Array.from({ length: extras + 1 }, (_, index) => (
               <Chip
@@ -600,6 +787,18 @@ function People({
                 pressed={index < extras}
                 idle={extraIdle}
                 onClick={() => onExtras(index < extras ? extras - 1 : extras + 1)}
+              >
+                Autre passager
+              </Chip>
+            ))
+          : null}
+        {onExtraSelected
+          ? Array.from({ length: extraPool }, (_, index) => (
+              <Chip
+                key={`pool-${index}`}
+                pressed={index < extraSelected}
+                idle={extraIdle}
+                onClick={() => onExtraSelected(index < extraSelected ? extraSelected - 1 : extraSelected + 1)}
               >
                 Autre passager
               </Chip>
