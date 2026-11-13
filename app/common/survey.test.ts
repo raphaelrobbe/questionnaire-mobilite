@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { FRENCH_COMMUNITIES, frenchPostalCode } from './frenchCommunes'
+import { frenchCommunityList, frenchPostalCode } from './frenchCommunes'
 import {
   addVehicle,
   answerPreview,
@@ -230,7 +230,7 @@ describe('questionnaire', () => {
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('1 rue du Lac, Vallorbe')}`,
     )
     expect(frenchPostalCode('pontarlier')).toBe('25300')
-    expect(FRENCH_COMMUNITIES.every((community) => community.communes.every((name) => /^25\d{3}$/.test(frenchPostalCode(name))))).toBe(true)
+    expect(frenchCommunityList().every((community) => community.communes.every((name) => /^25\d{3}$/.test(frenchPostalCode(name))))).toBe(true)
     expect(patchAnswers(emptyAnswers(), { recontact: 'oui', phone: '+33 ' }).phone).toBe('+33 ')
     expect(respondentPhone('  +33 6 12 34 56 78  ')).toBe('+33 6 12 34 56 78')
     expect(respondentPhone('')).toBe('')

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { communesOnOffer, filterCommunes, fold, PONTARLIER } from '~/common/config'
-import { FRENCH_COMMUNITIES, frenchCommunityFor } from '~/common/frenchCommunes'
+import { frenchCommunityFor, frenchCommunityList } from '~/common/frenchCommunes'
 import { DOMICILE } from '~/common/journeys'
 import { SWISS_SECTORS, swissSectorFor } from '~/common/swissCommunes'
 import { choiceClass, fieldClass } from './fill'
 
 const PLACE_PRESETS = [{ commune: 'Pontarlier', places: ['Lycée Xavier Marmier', 'Gare SNCF', 'Hôpital', 'Zone industrielle', 'Zone commerciale Hyper U', 'Centre-ville'] }]
-const PLACE_COMMUNES = communesOnOffer(uniquePlaceNames([...FRENCH_COMMUNITIES, ...SWISS_SECTORS]))
-const FRENCH_PLACE_COMMUNES = communesOnOffer(uniquePlaceNames(FRENCH_COMMUNITIES))
+const FRENCH_GROUPS = frenchCommunityList()
+const PLACE_COMMUNES = communesOnOffer(uniquePlaceNames([...FRENCH_GROUPS, ...SWISS_SECTORS]))
+const FRENCH_PLACE_COMMUNES = communesOnOffer(uniquePlaceNames(FRENCH_GROUPS))
 
 function uniquePlaceNames(groups: readonly { communes: readonly string[] }[]): string[] {
   const seen = new Set<string>()
@@ -82,7 +83,7 @@ export function PlacePicker({
   const suggestions = suisse ? PLACE_COMMUNES : FRENCH_PLACE_COMMUNES
   const groups =
     branch === 'france'
-      ? FRENCH_COMMUNITIES.map((item) => ({ id: item.label, label: item.label, communes: item.communes, note: undefined as string | undefined }))
+      ? FRENCH_GROUPS.map((item) => ({ id: item.label, label: item.label, communes: item.communes, note: undefined as string | undefined }))
       : branch === 'suisse'
         ? SWISS_SECTORS.map((item) => ({ id: item.sector, label: item.sector, communes: item.communes, note: item.note }))
         : []
