@@ -1091,8 +1091,11 @@ export function mapsDestination(answers: Pick<Answers, 'adresse' | 'commune'>, a
   return `https://www.google.com/maps/search/?api=1&query=${query}`
 }
 
+const CIVILITY_SHORT: Record<Civility, string> = { monsieur: 'M.', madame: 'Mme' }
+
 function personName(answers: Answers): string {
-  return [labelOf(CIVILITY, answers.civilite), answers.prenom, answers.nom].filter(Boolean).join(' ')
+  const title = answers.civilite ? CIVILITY_SHORT[answers.civilite] : ''
+  return [title, answers.prenom, answers.nom].filter(Boolean).join(' ')
 }
 
 export function draftTitle(input: Answers): string {

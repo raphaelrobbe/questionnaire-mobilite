@@ -8,7 +8,7 @@
  * Il ne renvoie aucune commune : elles sont dans l'application.
  * Une lecture sans identifiant reconnu ne renvoie aucun enquêteur.
  * Un identifiant reconnu renvoie le nom de sa ligne.
- * Un identifiant porté par un administrateur renvoie toute la liste, avec les identifiants et les numéros.
+ * Un identifiant porté par un administrateur renvoie toute la liste, avec les identifiants, les numéros et les adresses mail.
  * La feuille Enquêtés relie l'identité au code à 8 caractères.
  * Le même code n'ajoute pas une seconde adresse.
  * Après une modification : Déployer → Gérer les déploiements → crayon → Nouvelle version.
@@ -38,6 +38,7 @@ const INTERVIEWER_HEADER = 'Prénom Nom'
 const DEVICE_HEADER = 'Identifiants appareils autorisés'
 const ADMIN_HEADER = 'Admin'
 const PHONE_HEADER = 'Numéro de téléphone'
+const EMAIL_HEADER = 'Adresse mail'
 
 function doGet(e) {
   var params = e && e.parameter ? e.parameter : {}
@@ -99,12 +100,13 @@ function addInterviewer(params) {
   const who = String(params.who || '').trim()
   const name = String(params.interviewer || '').trim().slice(0, 120)
   const phone = normalizePhone(params.phone)
+  const email = normalizeEmail(params.email)
   if (!device || !who) throw new Error('Administration refusée.')
   if (!name) throw new Error('Indiquez le prénom et le nom.')
   const lock = LockService.getScriptLock()
   lock.waitLock(15000)
   try {
-    const loaded = ensurePhoneColumn(loadInterviewers())
+    const loaded = ensureEmailColumn(ensurePhoneColumn(loadInterviewers()))
     if (!isAdmin(loaded.people, who, device)) throw new Error('Administration refusée.')
     const folded = foldName(name)
     for (let i = 0; i < loaded.people.length; i++) {
@@ -115,6 +117,7 @@ function addInterviewer(params) {
     loaded.sheet.getRange(row, loaded.deviceCol).setValue('[]')
     loaded.sheet.getRange(row, loaded.adminCol).setValue('')
     loaded.sheet.getRange(row, loaded.phoneCol).setValue(phone)
+    loaded.sheet.getRange(row, loaded.emailCol).setValue(email)
     SpreadsheetApp.flush()
     return readConfig(device, who)
   } finally {
@@ -162,6 +165,7 @@ function loadInterviewers() {
   const deviceIndex = headerIndex(headers, DEVICE_HEADER)
   const adminIndex = headerIndex(headers, ADMIN_HEADER)
   const phoneIndex = headerIndex(headers, PHONE_HEADER)
+  const emailIndex = headerIndex(headers, EMAIL_HEADER)
   if (nameIndex === -1) throw new Error('Colonne « Prénom Nom » introuvable.')
   if (deviceIndex === -1) throw new Error('Colonne « Identifiants appareils autorisés » introuvable.')
   if (adminIndex === -1) throw new Error('Colonne « Admin » introuvable.')
@@ -178,6 +182,7 @@ function loadInterviewers() {
         admin: String(values[row][adminIndex] || '').trim().toLowerCase() === 'oui',
         devices: parseDevices(values[row][deviceIndex]),
         phone: phoneIndex === -1 ? '' : String(values[row][phoneIndex] || '').trim().slice(0, 40),
+        email: emailIndex === -1 ? '' : String(values[row][emailIndex] || '').trim().toLowerCase().slice(0, 120),
         sheetRow: row + 2,
       })
       if (people.length >= 400) break
@@ -189,6 +194,7 @@ function loadInterviewers() {
     deviceCol: deviceIndex + 1,
     adminCol: adminIndex + 1,
     phoneCol: phoneIndex === -1 ? 0 : phoneIndex + 1,
+    emailCol: emailIndex === -1 ? 0 : emailIndex + 1,
     people: people,
   }
 }
@@ -201,12 +207,27 @@ function ensurePhoneColumn(loaded) {
   return loaded
 }
 
+function ensureEmailColumn(loaded) {
+  if (loaded.emailCol) return loaded
+  const col = loaded.sheet.getLastColumn() + 1
+  loaded.sheet.getRange(1, col).setValue(EMAIL_HEADER)
+  loaded.emailCol = col
+  return loaded
+}
+
 function foldName(value) {
   return String(value || '')
     .trim()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+}
+
+function normalizeEmail(value) {
+  const text = String(value || '').trim().toLowerCase().slice(0, 120)
+  if (!text) return ''
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) throw new Error('Adresse mail illisible.')
+  return text
 }
 
 function normalizePhone(value) {
@@ -238,6 +259,7 @@ function presentInterviewers(people, device, who) {
       authorized: person.devices.indexOf(device) !== -1,
       devices: person.devices,
       phone: person.phone || '',
+      email: person.email || '',
     }
   })
 }

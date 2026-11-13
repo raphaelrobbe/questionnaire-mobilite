@@ -165,7 +165,7 @@ describe('ligne du tableur', () => {
       record({ civilite: 'madame', nom: 'Martin', prenom: 'Ada', adresse: '12 rue de la Gare', recontact: 'oui', phone: '+33 6 12 34 56 78' }),
     )
     expect(plain.email).toBe('')
-    expect(plain.civilite).toBe('Madame')
+    expect(plain.civilite).toBe('Mme')
     expect(plain.nom).toBe('Martin')
     expect(plain.prenom).toBe('Ada')
     expect(JSON.stringify(responseBody(record({ civilite: 'madame', nom: 'Martin' })))).not.toContain('Madame')

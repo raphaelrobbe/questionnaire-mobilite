@@ -135,6 +135,11 @@ export function frenchCommunityFor(commune: string): FrenchCommunity | undefined
   return community ? FRENCH_COMMUNITIES[community] : undefined
 }
 
+/** Communes françaises dans l’ordre des boutons, avec leur population. */
+export function frenchCommunePopulations(): { name: string; population: number }[] {
+  return Object.entries(POSTAL_CODES).map(([name, record]) => ({ name, population: record.population }))
+}
+
 /** Communautés dans l’ordre des boutons, avec les communes qui s’y rattachent. */
 export function frenchCommunityList(): { label: string; territory: string; communes: readonly string[] }[] {
   return (Object.keys(FRENCH_COMMUNITIES) as CommunityId[]).map((id) => ({

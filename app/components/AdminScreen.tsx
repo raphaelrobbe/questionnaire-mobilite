@@ -1,6 +1,6 @@
 import { Link } from '@remix-run/react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { fold, isAdminSession, normalizeDeviceId, normalizePhone } from '~/common/config'
+import { fold, isAdminSession, normalizeDeviceId, normalizeEmail, normalizePhone } from '~/common/config'
 
 const QrScanner = lazy(() => import('~/lib/qr/scan.client').then((mod) => ({ default: mod.QrScanner })))
 import { useSettings } from '~/hooks/useSettings'
@@ -9,6 +9,7 @@ import { fetchSheetLists, publishLists } from '~/lib/config.client'
 import { getDeviceId } from '~/lib/settings.client'
 import { buttonClass } from './Button'
 import { fieldClass } from './fill'
+import { DrawPanel } from './DrawPanel'
 import { LetterDraft } from './LetterDraft'
 
 export function AdminScreen() {
@@ -18,12 +19,13 @@ export function AdminScreen() {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [personName, setPersonName] = useState('')
   const [personPhone, setPersonPhone] = useState('')
+  const [personEmail, setPersonEmail] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
   const [scannedId, setScannedId] = useState<string | null>(null)
   const [scanFor, setScanFor] = useState<string | null>(null)
-  const [tab, setTab] = useState<'enqueteurs' | 'courrier'>('enqueteurs')
+  const [tab, setTab] = useState<'enqueteurs' | 'courrier' | 'tirage'>('enqueteurs')
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -100,6 +102,11 @@ export function AdminScreen() {
       setNotice('Numéro illisible.')
       return
     }
+    const email = normalizeEmail(personEmail)
+    if (email === null) {
+      setNotice('Adresse mail illisible.')
+      return
+    }
     setBusy('create')
     setNotice(null)
     try {
@@ -109,10 +116,15 @@ export function AdminScreen() {
         action: 'create',
         interviewer: name,
         phone: phone || undefined,
+        email: email || undefined,
       })
       publishLists(next)
-      if (!next.interviewers.some((person) => fold(person.name) === fold(name))) {
+      const created = next.interviewers.find((person) => fold(person.name) === fold(name))
+      if (!created) {
         throw new Error('Le script n’a pas ajouté l’enquêteur. Mettez à jour le script du tableur, puis redéployez-le.')
+      }
+      if (email && created.email !== email) {
+        setNotice('L’enquêteur est ajouté. L’adresse mail n’a pas été enregistrée. Mettez à jour le script du tableur, puis redéployez-le.')
       }
       if (scannedId) {
         try {
@@ -127,6 +139,7 @@ export function AdminScreen() {
         } catch (error) {
           setPersonName('')
           setPersonPhone('')
+          setPersonEmail('')
           setScannedId(null)
           const detail = error instanceof Error ? error.message : ''
           throw new Error(detail ? `L’enquêteur est ajouté. L’identifiant n’a pas été enregistré. ${detail}` : 'L’enquêteur est ajouté. Relisez le QR-code sur sa fiche.')
@@ -134,6 +147,7 @@ export function AdminScreen() {
       }
       setPersonName('')
       setPersonPhone('')
+      setPersonEmail('')
       setScannedId(null)
       setConfirmKey(null)
     } catch (error) {
@@ -205,8 +219,21 @@ export function AdminScreen() {
           >
             projet de courrier
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'tirage'}
+            onClick={() => setTab('tirage')}
+            className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-full px-3 text-center text-sm font-bold leading-tight ${
+              tab === 'tirage' ? 'bg-pine text-paper' : 'text-muted hover:bg-mist hover:text-ink'
+            }`}
+          >
+            Tirage au sort
+          </button>
         </div>
       </div>
+
+      {tab === 'tirage' ? <DrawPanel /> : null}
 
       {tab === 'courrier' ? (
         <section className="grid gap-3" role="tabpanel">
@@ -269,6 +296,19 @@ export function AdminScreen() {
           onChange={(event) => setPersonPhone(event.target.value)}
           className={`min-h-11 rounded-xl px-3 text-base outline-none focus:border-leaf ${fieldClass(Boolean(personPhone.trim()), true)}`}
         />
+        <input
+          value={personEmail}
+          maxLength={120}
+          type="email"
+          inputMode="email"
+          aria-label="Adresse mail"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="Adresse mail, facultative"
+          onChange={(event) => setPersonEmail(event.target.value)}
+          className={`min-h-11 rounded-xl px-3 text-base outline-none focus:border-leaf ${fieldClass(Boolean(personEmail.trim()), true)}`}
+        />
         <button
           type="button"
           className="min-h-11 rounded-xl text-base font-bold text-leaf disabled:opacity-45"
@@ -287,6 +327,7 @@ export function AdminScreen() {
               {person.admin ? <p className="text-xs font-bold uppercase tracking-wide text-leaf">Admin</p> : null}
             </div>
             {person.phone ? <p className="text-sm font-semibold text-muted">{person.phone}</p> : null}
+            {person.email ? <p className="break-all text-sm font-semibold text-muted">{person.email}</p> : null}
             {person.devices?.length ? (
               <ul className="grid">
                 {person.devices.map((id) => {

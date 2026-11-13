@@ -13,6 +13,7 @@ export type ConfigQuery = {
   interviewer?: string
   target?: string
   phone?: string
+  email?: string
 }
 
 export function subscribeCachedLists(listener: () => void): () => void {
@@ -72,6 +73,7 @@ async function requestSheetLists(endpoint: string, query: ConfigQuery): Promise<
   if (query.interviewer) url.searchParams.set('interviewer', query.interviewer)
   if (query.target) url.searchParams.set('target', query.target)
   if (query.phone) url.searchParams.set('phone', query.phone)
+  if (query.email) url.searchParams.set('email', query.email)
   return readListsPayload(await getScriptJson(url, 12000, LISTS_SILENCE))
 }
 

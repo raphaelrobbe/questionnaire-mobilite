@@ -112,7 +112,7 @@ export type MailBody = {
   code: string
   appareil: string
   enqueteur: string
-  civilite: '' | 'Monsieur' | 'Madame'
+  civilite: '' | 'M.' | 'Mme'
   nom: string
   prenom: string
   commune: string
@@ -182,7 +182,7 @@ export function mailBody(record: ResponseRecord): MailBody {
     code: clip(record.id, 80),
     appareil: clip(record.deviceId, 80),
     enqueteur: clip(record.interviewer, 80),
-    civilite: answers.civilite === 'monsieur' ? 'Monsieur' : answers.civilite === 'madame' ? 'Madame' : '',
+    civilite: answers.civilite === 'monsieur' ? 'M.' : answers.civilite === 'madame' ? 'Mme' : '',
     nom: clip(answers.nom, 80),
     prenom: clip(answers.prenom, 80),
     commune: clip(answers.commune, 120),

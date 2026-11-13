@@ -7,6 +7,8 @@ export type Interviewer = {
   devices: string[] | null
   /** Vide tant que l’appelant n’est pas un administrateur, ou si aucun numéro n’a été noté. */
   phone: string
+  /** Vide tant que l’appelant n’est pas un administrateur, ou si aucune adresse n’a été notée. */
+  email: string
 }
 
 export type SheetLists = {
@@ -73,6 +75,14 @@ export function formatDeviceCell(devices: string[]): string {
 export function normalizeDeviceId(input: string): string | null {
   const ids = parseDeviceCell(input)
   return ids.length === 1 ? ids[0] : null
+}
+
+/** Chaîne vide si le champ est laissé vide. Null si le texte n’est pas une adresse. */
+export function normalizeEmail(input: string): string | null {
+  const text = input.trim().toLowerCase().slice(0, 120)
+  if (!text) return ''
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return null
+  return text
 }
 
 /** Chaîne vide si le champ est laissé vide. Null si le texte n’est pas un numéro. */
@@ -148,7 +158,8 @@ function cleanInterviewers(values: unknown[]): Interviewer[] {
     seen.add(key)
     const devices = !('devices' in source) || source.devices === null ? null : cleanDevices(source.devices)
     const phone = typeof source.phone === 'string' ? source.phone.trim().slice(0, 40) : ''
-    list.push({ name, admin: source.admin, authorized: source.authorized, devices, phone })
+    const email = typeof source.email === 'string' ? source.email.trim().toLowerCase().slice(0, 120) : ''
+    list.push({ name, admin: source.admin, authorized: source.authorized, devices, phone, email })
     if (list.length >= LIST_MAX) break
   }
   return list
