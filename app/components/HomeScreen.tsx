@@ -1,11 +1,11 @@
 import { Link, useNavigate } from '@remix-run/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { isAdminSession } from '~/common/config'
 import { canRetryRow, canUseSurvey } from '~/common/settings'
 import { classifyEndpoint } from '~/common/endpoint'
 import { answerPreview, draftTitle, mapsDestination, surveyRefused } from '~/common/survey'
 import { continueStep, draftMatchesMode } from '~/common/draft'
-import { createDraft, listDrafts, saveDraft, type Draft } from '~/lib/draft.client'
+import { createDraft, listDrafts, orderDrafts, saveDraft, type Draft } from '~/lib/draft.client'
 import { useOutbox } from '~/hooks/useOutbox'
 import { useSettings } from '~/hooks/useSettings'
 import { useSheetLists } from '~/hooks/useSheetLists'
@@ -14,6 +14,7 @@ import { InstallOffer } from './InstallOffer'
 import { PrivacyLink, PublicHome } from './PublicHome'
 import { TestChip } from './TestMark'
 import { MapsLink } from './MapsLink'
+import { TourMap } from './TourMap'
 import { removeConfirmedResponses, retryResponse, statusLabel, type LocalResponse } from '~/lib/outbox.client'
 
 export function HomeScreen() {
@@ -26,11 +27,44 @@ export function HomeScreen() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
+  const drag = useRef<{ code: string; y: number; moved: boolean } | null>(null)
+  const draftsRef = useRef(drafts)
+  draftsRef.current = drafts
+  const testModeRef = useRef(false)
+  testModeRef.current = settings?.testMode ?? false
 
   useEffect(() => {
     setDrafts(listDrafts())
     setReady(true)
   }, [])
+
+  useEffect(() => {
+    if (!selected) return
+    document.querySelector(`[data-fiche="${selected}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selected])
+
+  function moveFiche(code: string, clientY: number) {
+    const current = draftsRef.current
+    const visible = current.filter((item) => draftMatchesMode(item, testModeRef.current))
+    const from = visible.findIndex((item) => item.code === code)
+    if (from < 0) return
+    let to = 0
+    for (const item of visible) {
+      if (item.code === code) continue
+      const rect = document.querySelector(`[data-fiche="${item.code}"]`)?.getBoundingClientRect()
+      if (rect && clientY > rect.top + rect.height / 2) to += 1
+    }
+    if (from === to) return
+    const nextVisible = visible.slice()
+    const moved = nextVisible[from]
+    if (!moved) return
+    nextVisible.splice(from, 1)
+    nextVisible.splice(to, 0, moved)
+    const next = orderDrafts(nextVisible.map((item) => item.code))
+    draftsRef.current = next
+    setDrafts(next)
+  }
 
   if (!settings || !ready) {
     return <p className="py-16 text-center text-lg font-bold text-muted">Ouverture de l’enquête…</p>
@@ -76,32 +110,81 @@ export function HomeScreen() {
         </button>
       ) : null}
       {visibleDrafts.length > 0 ? (
-        <ul className="grid gap-2">
-          {visibleDrafts.map((item) => (
-            <li key={item.code} className="relative rounded-2xl border border-line bg-card px-4 py-3">
-              <div className={`flex flex-wrap items-center gap-2 ${mapsDestination(item.answers) ? 'pr-16' : ''}`}>
-                <p className="font-bold">{draftTitle(item.answers)}</p>
-                {item.test ? <TestChip /> : null}
-              </div>
-              <MapsLink answers={item.answers} compact className="absolute right-4 top-3" />
-              <p className="absolute bottom-3 right-3 rounded-full bg-pine px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
-                {item.code}
-              </p>
-              <div className="mt-2 flex gap-4 pr-28">
-                <Link
-                  to={`/entretien?fiche=${item.code}`}
-                  className="inline-flex min-h-11 items-center font-bold text-leaf"
-                  onClick={() => {
-                    const step = continueStep(item)
-                    if (step !== item.step) saveDraft({ ...item, step })
-                  }}
+        <>
+          {visibleDrafts.length > 1 ? (
+            <p className="text-sm leading-relaxed text-muted">Glissez les fiches pour préparer la tournée.</p>
+          ) : null}
+          <ul className="grid gap-2">
+            {visibleDrafts.map((item, index) => (
+              <li
+                key={item.code}
+                data-fiche={item.code}
+                onClick={() => setSelected(item.code)}
+                className={`relative flex gap-1 rounded-2xl border px-2 py-3 ring-2 ${selected === item.code ? 'border-leaf bg-mist ring-leaf' : 'border-line bg-card ring-transparent'}`}
+              >
+                {visibleDrafts.length > 1 ? (
+                  <button
+                    type="button"
+                    data-drag={item.code}
+                    aria-label="Déplacer la fiche"
+                    className="mt-0.5 flex h-11 w-8 shrink-0 cursor-grab touch-none items-center justify-center text-muted select-none active:cursor-grabbing"
+                    onPointerDown={(event) => {
+                      if (event.button !== 0) return
+                      drag.current = { code: item.code, y: event.clientY, moved: false }
+                      try {
+                        event.currentTarget.setPointerCapture(event.pointerId)
+                      } catch {
+                        /* Le glisser continue avec les événements reçus par la poignée. */
+                      }
+                    }}
+                    onPointerMove={(event) => {
+                      const current = drag.current
+                      if (!current || current.code !== item.code) return
+                      if (!current.moved && Math.abs(event.clientY - current.y) < 8) return
+                      current.moved = true
+                      moveFiche(current.code, event.clientY)
+                    }}
+                    onPointerUp={() => {
+                      drag.current = null
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Grip />
+                  </button>
+                ) : null}
+                <span
+                  className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm font-extrabold text-paper ${selected === item.code ? 'bg-clay' : 'bg-pine'}`}
                 >
-                  Continuer
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
+                  {index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  {selected === item.code ? <span className="sr-only">Fiche repérée</span> : null}
+                  <div className={`flex flex-wrap items-center gap-2 ${mapsDestination(item.answers) ? 'pr-14' : ''}`}>
+                    <p className="font-bold">{draftTitle(item.answers)}</p>
+                    {item.test ? <TestChip /> : null}
+                  </div>
+                  <MapsLink answers={item.answers} compact className="absolute right-3 top-3" />
+                  <p className="absolute bottom-3 right-3 rounded-full bg-pine px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] text-paper">
+                    {item.code}
+                  </p>
+                  <div className="mt-2 flex gap-4 pr-28">
+                    <Link
+                      to={`/entretien?fiche=${item.code}`}
+                      className="inline-flex min-h-11 items-center font-bold text-leaf"
+                      onClick={() => {
+                        const step = continueStep(item)
+                        if (step !== item.step) saveDraft({ ...item, step })
+                      }}
+                    >
+                      Continuer
+                    </Link>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <TourMap drafts={visibleDrafts} selected={selected} onSelect={setSelected} />
+        </>
       ) : null}
 
       <section>
@@ -158,6 +241,23 @@ export function HomeScreen() {
     </div>
     <PrivacyLink />
     </div>
+  )
+}
+
+function Grip() {
+  return (
+    <svg width="16" height="22" viewBox="0 0 16 22" aria-hidden="true" className="fill-current">
+      {[
+        [4, 4],
+        [12, 4],
+        [4, 11],
+        [12, 11],
+        [4, 18],
+        [12, 18],
+      ].map(([x, y]) => (
+        <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" />
+      ))}
+    </svg>
   )
 }
 

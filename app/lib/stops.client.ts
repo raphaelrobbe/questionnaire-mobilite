@@ -11,6 +11,11 @@ const HOME_ZOOM = 14
 
 const geoCache = new Map<string, MapPoint | null>()
 
+/** Faux seulement pour le repli Pontarlier, quand l’adresse et la commune n’ont pas été trouvées. */
+export function isPlacedHome(center: HomeCenter): boolean {
+  return center.latitude !== PONTARLIER.latitude || center.longitude !== PONTARLIER.longitude || !center.approximate
+}
+
 export async function locateHome(adresse: string, commune: string): Promise<HomeCenter> {
   const street = adresse.trim()
   const place = communePlace(commune)

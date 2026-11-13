@@ -15,6 +15,7 @@ import {
   issueForLifeChoices,
   issueForWalkDistance,
   setWalkDistance,
+  setWalkMapPlace,
   setWalkMapSkipped,
   setWalkNearby,
   setWalkNote,
@@ -381,6 +382,9 @@ describe('questionnaire', () => {
     expect(point.longitude).toBe(6.35)
     expect(issueForWalkDistance(point)).toBeNull()
     expect(issueForWalkDistance(setWalkMapSkipped(wished, true))).toBeNull()
+    const described = setWalkMapPlace(setWalkMapSkipped(wished, true), '  devant la mairie  ')
+    expect(described.mapPlace).toBe('  devant la mairie  ')
+    expect(setWalkMapSkipped(described, false).mapPlace).toBe('')
     expect(setWalkMapSkipped(wished, false).mapSkipped).toBe(false)
     expect(setWalkNearby(point, 'oui').latitude).toBeNull()
     expect(setWalkDistance(point, 'km1').latitude).toBe(46.9)
@@ -391,7 +395,7 @@ describe('questionnaire', () => {
     expect(noted.note).toBe('  s’il pleut  ')
     expect(noted.choice).toBe('jamais')
     const kept = sanitizeAnswers({ walkDistance: { choice: 'inconnu', nearby: 'peut-etre', latitude: 400, longitude: 6, note: '  la côte  ' } })
-    expect(kept.walkDistance).toEqual({ choice: '', note: '  la côte  ', nearby: '', latitude: null, longitude: null, mapSkipped: false })
+    expect(kept.walkDistance).toEqual({ choice: '', note: '  la côte  ', nearby: '', latitude: null, longitude: null, mapSkipped: false, mapPlace: '' })
     const lines = Object.fromEntries(summary(patchAnswers(empty, { walkDistance: setWalkNote(one, 'la côte') })).map((line) => [line.label, line.value]))
     expect(lines['Distance à l’arrêt']).toBe('Entre 200 et 500 mètres · la côte')
   })

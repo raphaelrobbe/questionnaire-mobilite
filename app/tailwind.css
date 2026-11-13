@@ -78,3 +78,31 @@ a:hover {
   height: 22px;
   background: #8a4b08;
 }
+
+.tour-marker {
+  background: transparent;
+  border: 0;
+}
+
+.tour-pin {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #fffcf7;
+  border-radius: 999px;
+  background: #143d36;
+  color: #f3efe6;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgb(28 25 21 / 35%);
+}
+
+.tour-pin.is-selected {
+  width: 34px;
+  height: 34px;
+  background: #8a4b08;
+  font-size: 15px;
+}

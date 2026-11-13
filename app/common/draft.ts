@@ -20,14 +20,29 @@ const TEST_SAMPLE_PEOPLE = [
 
 export const TEST_SAMPLE_COUNT = TEST_SAMPLE_PEOPLE.length
 
-/** Fiches d’exemple, pour le premier passage en mode test. */
-export function testSampleDrafts(codes: readonly string[]): Draft[] {
-  return TEST_SAMPLE_PEOPLE.map((person, index) => ({
+function sampleDraft(person: (typeof TEST_SAMPLE_PEOPLE)[number], code: string): Draft {
+  return {
     ...emptyDraft(),
-    code: isResponseCode(codes[index] ?? '') ? codes[index]! : responseCode(),
+    code: isResponseCode(code) ? code : responseCode(),
     test: true,
     answers: patchAnswers(emptyAnswers(), person),
-  }))
+  }
+}
+
+/** Fiches d’exemple, pour le premier passage en mode test. */
+export function testSampleDrafts(codes: readonly string[]): Draft[] {
+  return TEST_SAMPLE_PEOPLE.map((person, index) => sampleDraft(person, codes[index] ?? ''))
+}
+
+/** Fiches d’exemple dont le nom n’est plus dans la liste. */
+export function missingTestSampleDrafts(
+  existing: readonly { answers: Pick<Answers, 'prenom' | 'nom'> }[],
+  codes: readonly string[],
+): Draft[] {
+  const present = new Set(existing.map((draft) => `${draft.answers.prenom}\t${draft.answers.nom}`))
+  return TEST_SAMPLE_PEOPLE.filter((person) => !present.has(`${person.prenom}\t${person.nom}`)).map((person, index) =>
+    sampleDraft(person, codes[index] ?? ''),
+  )
 }
 
 export function emptyDraft(): Draft {
@@ -97,6 +112,31 @@ export function draftHasContent(draft: Draft): boolean {
 /** Une fiche de test ne s’ouvre qu’en mode test, et une fiche réelle qu’en dehors. */
 export function draftMatchesMode(draft: Pick<Draft, 'test'>, testMode: boolean): boolean {
   return draft.test === testMode
+}
+
+/**
+ * Réordonne les fiches citées, en les replaçant dans les emplacements qu’elles occupaient.
+ * Les autres fiches restent où elles sont. Un ordre incomplet ou déjà en place ne change rien.
+ */
+export function reorderDrafts(drafts: readonly Draft[], codes: readonly string[]): Draft[] {
+  const wanted = new Set<string>()
+  for (const code of codes) {
+    if (wanted.has(code)) return drafts as Draft[]
+    wanted.add(code)
+  }
+  const slots: number[] = []
+  drafts.forEach((draft, index) => {
+    if (wanted.has(draft.code)) slots.push(index)
+  })
+  if (slots.length !== codes.length) return drafts as Draft[]
+  const moving = codes.map((code) => drafts.find((draft) => draft.code === code) as Draft)
+  if (slots.every((slot, index) => drafts[slot] === moving[index])) return drafts as Draft[]
+  const next = drafts.slice()
+  moving.forEach((draft, index) => {
+    const slot = slots[index]
+    if (slot !== undefined) next[slot] = draft
+  })
+  return next
 }
 
 /** Depuis l’accueil, une fiche encore en préparation s’ouvre sur la visite. Une enquête déjà commencée reprend sa question. */

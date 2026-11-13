@@ -1,5 +1,5 @@
 import { useNavigate } from '@remix-run/react'
-import { seedTestSamples } from '~/lib/draft.client'
+import { recreateTestSamples, seedTestSamples, testSamplesSeeded } from '~/lib/draft.client'
 import { useSettings } from '~/hooks/useSettings'
 import { updateSettings } from '~/lib/settings.client'
 
@@ -27,6 +27,18 @@ export function TestModeCard() {
       >
         {settings.testMode ? 'Désactiver le mode test' : 'Activer le mode test'}
       </button>
+      {settings.testMode && testSamplesSeeded() ? (
+        <button
+          type="button"
+          onClick={() => {
+            recreateTestSamples()
+            navigate('/')
+          }}
+          className="mt-2 inline-flex min-h-14 w-full items-center justify-center rounded-2xl border-2 border-test-ink px-4 text-base font-extrabold"
+        >
+          Recréer les fiches de test
+        </button>
+      ) : null}
     </section>
   )
 }

@@ -1,4 +1,14 @@
-import { TEST_SAMPLE_COUNT, draftHasContent, draftIsStarted, emptyDraft, sanitizeDraft, testSampleDrafts, type Draft } from '~/common/draft'
+import {
+  TEST_SAMPLE_COUNT,
+  draftHasContent,
+  draftIsStarted,
+  emptyDraft,
+  missingTestSampleDrafts,
+  reorderDrafts,
+  sanitizeDraft,
+  testSampleDrafts,
+  type Draft,
+} from '~/common/draft'
 import { isResponseCode, responseCode } from '~/common/response'
 import { forgetPersonal, holdsPersonal } from '~/common/response'
 import { loadSettings } from '~/lib/settings.client'
@@ -68,8 +78,23 @@ export function saveDraft(draft: Draft): void {
     removeDraft(draft.code)
     return
   }
-  const rest = readAll().filter((item) => item.code !== draft.code)
-  writeAll([draft, ...rest])
+  const drafts = readAll()
+  const index = drafts.findIndex((item) => item.code === draft.code)
+  if (index < 0) {
+    writeAll([draft, ...drafts])
+    return
+  }
+  const next = drafts.slice()
+  next[index] = draft
+  writeAll(next)
+}
+
+/** Enregistre l’ordre choisi pour la tournée, sans mélanger les fiches d’un autre mode. */
+export function orderDrafts(codes: readonly string[]): Draft[] {
+  const current = readAll()
+  const next = reorderDrafts(current, codes)
+  if (next !== current) writeAll(next)
+  return next.filter(draftHasContent)
 }
 
 export function removeDraft(code: string): void {
@@ -86,26 +111,47 @@ export function forgetDraftPersonal(code: string): void {
   writeAll(drafts)
 }
 
-/** Fiches d’exemple, une seule fois, au premier passage en mode test. */
-export function seedTestSamples(): void {
-  try {
-    if (localStorage.getItem(SAMPLES_KEY) === '1') return
-  } catch {
-    return
-  }
-  const taken = new Set(readAll().map((draft) => draft.code))
+function reserveCodes(taken: Set<string>, count: number): string[] {
   const codes: string[] = []
-  while (codes.length < TEST_SAMPLE_COUNT) {
+  while (codes.length < count) {
     const code = responseCode()
     if (!isResponseCode(code) || taken.has(code) || codes.includes(code)) continue
     codes.push(code)
   }
-  writeAll([...testSampleDrafts(codes), ...readAll()])
+  return codes
+}
+
+function rememberSamples(): void {
   try {
     localStorage.setItem(SAMPLES_KEY, '1')
   } catch {
     /* Les fiches sont déjà là. Le prochain passage évitera de les refaire si le drapeau a pu s’écrire. */
   }
+}
+
+/** Vrai une fois que les fiches d’exemple ont déjà été créées au moins une fois. */
+export function testSamplesSeeded(): boolean {
+  try {
+    return localStorage.getItem(SAMPLES_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Fiches d’exemple, une seule fois, au premier passage en mode test. */
+export function seedTestSamples(): void {
+  if (testSamplesSeeded()) return
+  const current = readAll()
+  writeAll([...testSampleDrafts(reserveCodes(new Set(current.map((draft) => draft.code)), TEST_SAMPLE_COUNT)), ...current])
+  rememberSamples()
+}
+
+/** Rajoute les fiches d’exemple absentes, même si le premier passage a déjà eu lieu. */
+export function recreateTestSamples(): void {
+  const current = readAll()
+  const missing = missingTestSampleDrafts(current, reserveCodes(new Set(current.map((draft) => draft.code)), TEST_SAMPLE_COUNT))
+  if (missing.length > 0) writeAll([...missing, ...current])
+  rememberSamples()
 }
 
 export function createDraft(): Draft {

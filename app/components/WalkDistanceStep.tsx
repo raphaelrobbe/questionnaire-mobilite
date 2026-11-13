@@ -1,4 +1,4 @@
-import { WALK_DISTANCES, setWalkDistance, setWalkMapSkipped, setWalkNearby, setWalkNote, setWalkPoint, type Answers } from '~/common/survey'
+import { WALK_DISTANCES, setWalkDistance, setWalkMapPlace, setWalkMapSkipped, setWalkNearby, setWalkNote, setWalkPoint, type Answers } from '~/common/survey'
 import { choiceClass, fieldClass } from './fill'
 import { Reveal } from './Reveal'
 import { StopMap } from './StopMap'
@@ -80,6 +80,20 @@ export function WalkDistanceStep({ answers, onChange }: { answers: Answers; onCh
                 />
                 <span className="font-bold">La carte ne s’affiche pas ou la personne ne souhaite pas répondre</span>
               </label>
+              {distance.mapSkipped ? (
+                <Reveal>
+                  <label className="mt-3 grid gap-2">
+                    <span className="font-bold">Précisions / commentaires</span>
+                    <input
+                      value={distance.mapPlace}
+                      maxLength={160}
+                      aria-label="Précisions / commentaires"
+                      className={`min-h-14 w-full rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(distance.mapPlace.trim()), true)}`}
+                      onChange={(event) => onChange({ walkDistance: setWalkMapPlace(distance, event.target.value) })}
+                    />
+                  </label>
+                </Reveal>
+              ) : null}
             </Reveal>
           ) : null}
         </Reveal>

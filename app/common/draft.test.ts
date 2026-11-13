@@ -1,6 +1,16 @@
 import { describe, expect, test } from 'vitest'
 import { isResponseCode } from './response'
-import { continueStep, draftHasContent, draftIsStarted, draftMatchesMode, emptyDraft, sanitizeDraft, testSampleDrafts } from './draft'
+import {
+  continueStep,
+  draftHasContent,
+  draftIsStarted,
+  draftMatchesMode,
+  emptyDraft,
+  missingTestSampleDrafts,
+  reorderDrafts,
+  sanitizeDraft,
+  testSampleDrafts,
+} from './draft'
 
 describe('brouillon', () => {
   test('ignore un brouillon cassé et borne l’étape', () => {
@@ -130,6 +140,11 @@ describe('brouillon', () => {
     expect(samples[0]?.answers.complement).toBe('')
     expect(samples[2]?.answers.adresse).toBe('5 Rue du Mont Girod')
     expect(samples.every((draft) => draft.test && draftHasContent(draft))).toBe(true)
+    const again = missingTestSampleDrafts(samples, ['PAUL-0001', 'JEAN-0002', 'LEAS-0003', 'GERA-0004'])
+    expect(again).toEqual([])
+    const missing = missingTestSampleDrafts([samples[0]!], ['NEUF-0005', 'NEUF-0006', 'NEUF-0007', 'NEUF-0008'])
+    expect(missing.map((draft) => draft.answers.prenom)).toEqual(['Jean', 'Léa', 'Gérard'])
+    expect(missing[0]?.code).toBe('NEUF-0005')
     expect(draftIsStarted(emptyDraft())).toBe(false)
     expect(draftHasContent(emptyDraft())).toBe(false)
     expect(sanitizeDraft({ ...draft, test: true })?.test).toBe(true)
@@ -147,5 +162,24 @@ describe('brouillon', () => {
     expect(early && continueStep(early)).toBe(3)
     const started = sanitizeDraft({ step: 7, answers: { prenom: 'Ada', visits: [], handicap: '', difficulties: { groups: [] }, lifeChoices: { selected: [] }, modeReasons: { selected: [] } } })
     expect(started && continueStep(started)).toBe(7)
+  })
+
+  test('réordonne les fiches choisies et laisse les autres à leur place', () => {
+    const drafts = ['AAAA-0001', 'BBBB-0002', 'CCCC-0003', 'DDDD-0004'].map((code) => ({ ...emptyDraft(), code }))
+    expect(reorderDrafts(drafts, ['CCCC-0003', 'AAAA-0001', 'DDDD-0004', 'BBBB-0002']).map((draft) => draft.code)).toEqual([
+      'CCCC-0003',
+      'AAAA-0001',
+      'DDDD-0004',
+      'BBBB-0002',
+    ])
+    expect(reorderDrafts(drafts, ['DDDD-0004', 'AAAA-0001']).map((draft) => draft.code)).toEqual([
+      'DDDD-0004',
+      'BBBB-0002',
+      'CCCC-0003',
+      'AAAA-0001',
+    ])
+    expect(reorderDrafts(drafts, drafts.map((draft) => draft.code))).toBe(drafts)
+    expect(reorderDrafts(drafts, ['AAAA-0001'])).toBe(drafts)
+    expect(reorderDrafts(drafts, ['ZZZZ-9999', 'AAAA-0001', 'BBBB-0002', 'CCCC-0003'])).toBe(drafts)
   })
 })

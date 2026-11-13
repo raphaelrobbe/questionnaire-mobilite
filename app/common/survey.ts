@@ -228,6 +228,8 @@ export type WalkDistance = {
   longitude: number | null
   /** La carte est inutilisable, ou la personne ne place pas l’arrêt. */
   mapSkipped: boolean
+  /** Emplacement décrit à la place du point sur la carte. */
+  mapPlace: string
 }
 
 export function emptyModeReasons(): ModeReasons {
@@ -348,7 +350,7 @@ export function modeBarriersLine(value: ModeBarriers): string {
 }
 
 export function emptyWalkDistance(): WalkDistance {
-  return { choice: '', note: '', nearby: '', latitude: null, longitude: null, mapSkipped: false }
+  return { choice: '', note: '', nearby: '', latitude: null, longitude: null, mapSkipped: false, mapPlace: '' }
 }
 
 export function sanitizeWalkDistance(input: unknown): WalkDistance {
@@ -365,6 +367,7 @@ export function sanitizeWalkDistance(input: unknown): WalkDistance {
     latitude: placed ? latitude : null,
     longitude: placed ? longitude : null,
     mapSkipped: source.mapSkipped === true,
+    mapPlace: source.mapSkipped === true && typeof source.mapPlace === 'string' ? clip(source.mapPlace, 160) : '',
   }
 }
 
@@ -391,6 +394,10 @@ export function setWalkMapSkipped(current: WalkDistance, mapSkipped: boolean): W
   return sanitizeWalkDistance({ ...current, mapSkipped })
 }
 
+export function setWalkMapPlace(current: WalkDistance, mapPlace: string): WalkDistance {
+  return sanitizeWalkDistance({ ...current, mapPlace })
+}
+
 export function issueForWalkDistance(value: WalkDistance): string | null {
   if (!value.choice) return 'Choisissez une distance.'
   if (!value.nearby) return 'Indiquez s’il existe déjà un arrêt satisfaisant.'
@@ -406,7 +413,8 @@ export function walkDistanceLine(value: WalkDistance): string {
   const coords =
     value.latitude !== null && value.longitude !== null ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : ''
   const skip = value.mapSkipped ? 'La carte ne s’affiche pas ou la personne ne souhaite pas répondre' : ''
-  return [label, note, place, coords, skip].filter(Boolean).join(' · ')
+  const placeText = value.mapPlace.trim()
+  return [label, note, place, coords, skip, placeText].filter(Boolean).join(' · ')
 }
 
 function axis(value: unknown, limit: number): number | null {
@@ -1133,6 +1141,7 @@ export function hasAnyAnswer(input: Answers): boolean {
       answers.walkDistance.note.trim() !== '' ||
       answers.walkDistance.nearby !== '' ||
       answers.walkDistance.latitude !== null ||
+      answers.walkDistance.mapPlace.trim() !== '' ||
       answers.recontact !== '' ||
       answers.enqueteur !== '' ||
       answers.collectif ||
