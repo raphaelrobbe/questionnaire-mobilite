@@ -42,7 +42,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <Mark />
               <span className="min-w-0">
                 <span className="block text-base font-extrabold leading-tight tracking-tight text-ink">
-                  Transports en commun dans le Haut-Doubs
+                  La mobilité dans le Haut-Doubs
                 </span>
                 <span className="mt-1 block text-sm font-semibold text-muted">Enquête de terrain</span>
               </span>

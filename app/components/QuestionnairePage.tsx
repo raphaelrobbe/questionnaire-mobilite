@@ -1,17 +1,23 @@
 import { QUESTIONNAIRE, type Question } from '~/common/questionnaire'
-import { buttonClass } from './Button'
 
 export function QuestionnairePage() {
   return (
     <article className="questionnaire grid gap-8">
-      <header className="grid gap-3">
+      <header>
         <h1 className="print-only print-keep text-3xl font-extrabold leading-tight tracking-tight">
           Questionnaire de l’enquête mobilité Haut-Doubs
         </h1>
-        <h1 className="no-print text-3xl font-extrabold leading-tight tracking-tight">Le questionnaire</h1>
-        <button type="button" className={buttonClass('primary', 'no-print')} onClick={() => window.print()}>
-          Télécharger le PDF
-        </button>
+        <div className="no-print flex items-center justify-between gap-3">
+          <h1 className="text-3xl font-extrabold leading-tight tracking-tight">Le questionnaire</h1>
+          <button
+            type="button"
+            aria-label="Télécharger le PDF"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-pine hover:bg-mist"
+            onClick={() => window.print()}
+          >
+            <Printer />
+          </button>
+        </div>
       </header>
       {QUESTIONNAIRE.map((part) => (
         <section key={part.id} className="grid gap-3">
@@ -82,5 +88,15 @@ function QuestionList({ questions }: { questions: readonly Question[] }) {
         </li>
       ))}
     </ol>
+  )
+}
+
+function Printer() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-6" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9V3h12v6" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <path d="M6 14h12v7H6z" />
+    </svg>
   )
 }
