@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { questionText } from '~/common/questionnaire'
 import { AGE_BANDS, DRIVE_OPTIONS, MAX_PEOPLE, addPerson, asksAutonomie, asksElectoral, changePerson, removePerson, type Person } from '~/common/survey'
 import { Button } from './Button'
 import { choiceClass } from './fill'
@@ -53,7 +54,7 @@ function PersonCard({
           />
         ) : null}
         <div>
-          <p className="text-sm font-bold text-muted">Tranche d’âge</p>
+          <p className="text-sm font-bold text-muted">{questionText('age')}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {AGE_BANDS.map((option) => (
               <Chip
@@ -69,7 +70,7 @@ function PersonCard({
         {person.age !== '' && person.age !== '0-14' ? (
           <Reveal>
             <div>
-              <p className="text-sm font-bold text-muted">Conduite</p>
+              <p className="text-sm font-bold text-muted">{questionText('drive')}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {DRIVE_OPTIONS.map((option) => (
                   <Chip
@@ -93,7 +94,7 @@ function PersonCard({
                 onChange={(event) => onChange(changePerson(people, index, { manqueAutonomie: event.target.checked }))}
                 className="mt-1 size-5 accent-pine"
               />
-              <span className="font-bold">Lié à un manque d’autonomie</span>
+              <span className="font-bold">{questionText('autonomy')}</span>
             </label>
           </Reveal>
         ) : null}
@@ -101,7 +102,7 @@ function PersonCard({
           <Reveal>
             <div>
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <p className="text-sm font-bold text-muted">Inscrite sur les listes électorales ?</p>
+                <p className="text-sm font-bold text-muted">{questionText('electoral')}</p>
                 <WhyElectoral />
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -118,7 +119,7 @@ function PersonCard({
               {person.electoral === 'oui' ? (
                 <Reveal>
                   <div className="mt-3">
-                    <p className="text-sm font-bold text-muted">Commune d’inscription</p>
+                    <p className="text-sm font-bold text-muted">{questionText('electoral-commune')}</p>
                     <PlacePicker
                       label="Commune d’inscription"
                       value={person.electoralCommune}

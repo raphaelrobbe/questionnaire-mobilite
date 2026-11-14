@@ -1,3 +1,4 @@
+import { questionNote, questionText } from '~/common/questionnaire'
 import {
   AGE_BANDS,
   LIFE_CHOICES,
@@ -18,11 +19,8 @@ export function LifeChoicesStep({ answers, onChange }: { answers: Answers; onCha
 
   return (
     <fieldset className="mt-4">
-      <legend className="text-base font-extrabold leading-snug">
-        Si des transports en commun adaptés à vos besoins existaient, cela pourrait-il vous amener à faire des choix
-        différents dans votre vie quotidienne ?
-      </legend>
-      <p className="mt-1 text-base text-muted">Plusieurs réponses possibles.</p>
+      <legend className="text-base font-extrabold leading-snug">{questionText('life-choices')}</legend>
+      <p className="mt-1 text-base text-muted">{questionNote('life-choices')}</p>
       <div className="mt-3 grid gap-2">
         {LIFE_CHOICES.map((choice) => {
           const selected = choices.selected.includes(choice.value)

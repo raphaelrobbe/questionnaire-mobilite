@@ -316,7 +316,7 @@ describe('questionnaire', () => {
     const empty = emptyAnswers()
     expect(issueForModeConditions(empty.modeConditions)).toMatch(/condition/)
     expect(stepIssue({ kind: 'conditions' }, empty)).toMatch(/condition/)
-    expect(MODE_CONDITION_GROUPS[0]?.ids[0]).toBe('inferieur')
+    expect(MODE_CONDITION_GROUPS[0]?.ids).toEqual(['inferieur', 'equivalent', 'superieur', 'abonnement', 'impot'])
     const one = toggleModeCondition(empty.modeConditions, 'inferieur')
     const both = toggleModeCondition(one, 'horaires')
     expect(both.selected).toEqual(['inferieur', 'horaires'])
@@ -397,7 +397,7 @@ describe('questionnaire', () => {
     const kept = sanitizeAnswers({ walkDistance: { choice: 'inconnu', nearby: 'peut-etre', latitude: 400, longitude: 6, note: '  la côte  ' } })
     expect(kept.walkDistance).toEqual({ choice: '', note: '  la côte  ', nearby: '', latitude: null, longitude: null, mapSkipped: false, mapPlace: '' })
     const lines = Object.fromEntries(summary(patchAnswers(empty, { walkDistance: setWalkNote(one, 'la côte') })).map((line) => [line.label, line.value]))
-    expect(lines['Distance à l’arrêt']).toBe('Entre 200 et 500 mètres · la côte')
+    expect(lines['Distance à l’arrêt']).toBe('500 m · la côte')
   })
 
   test('le handicap est obligatoire, et les précisions seulement si la réponse est oui', () => {

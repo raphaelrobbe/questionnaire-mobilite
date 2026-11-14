@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { addJourney, applySoleTrip, difficultiesIssue, doorToDoorMinutes, emptyDifficulties, emptyJourney, journeyComplete, journeyIssue, journeyTouched, presetActualJourney, removeJourney, sanitizeDifficulties, sanitizeJourneys, setDifficultyNote, setDifficultyTripPace, suggestedAcceptableMinutes, toggleDifficultyGroup, toggleDifficultyItem, toggleDifficultyTrip, updateJourney, DOMICILE, type Journey } from './journeys'
+import { addJourney, applySoleTrip, difficultiesIssue, doorToDoorMinutes, emptyDifficulties, emptyJourney, journeyComplete, journeyIssue, journeyTouched, presetActualJourney, removeJourney, sanitizeDifficulties, sanitizeJourneys, setDifficultyNote, setDifficultyTripPace, suggestedAcceptableMinutes, toggleDifficultyGroup, toggleDifficultyItem, toggleDifficultyTrip, tripOfferModes, updateJourney, DOMICILE, type Journey } from './journeys'
 
 function filled(patch: Partial<Journey> = {}): Journey {
   return {
@@ -85,6 +85,16 @@ describe('trajets du foyer', () => {
     expect(journeyComplete(filled({ destination: '' }))).toBe(false)
     expect(journeyComplete(filled({ origin: '' }))).toBe(false)
     expect(journeyTouched(emptyJourney('actuel'))).toBe(false)
+    expect(tripOfferModes(emptyJourney('nouveau'))).toEqual(['train', 'autocar', 'covoiturage'])
+    expect(sanitizeJourneys([filled()], 1, [], [])[0]?.offerModes).toEqual(['train', 'autocar', 'covoiturage'])
+    expect(updateJourney([filled()], 0, { offerModes: ['covoiturage'] })[0]).toMatchObject({
+      offerModes: ['covoiturage'],
+      offerModesCustom: true,
+    })
+    expect(sanitizeJourneys([filled({ modes: ['train'], offerModesCustom: true, offerModes: ['covoiturage'] })], 1, [], [])[0]).toMatchObject({
+      offerModes: ['train', 'autocar', 'covoiturage'],
+      offerModesCustom: false,
+    })
     expect(sanitizeJourneys([filled({ riders: [], replacedRiders: [] })], 1, [], [])[0]).toMatchObject({ riders: [0], replacedRiders: [0] })
     expect(sanitizeJourneys([filled({ riders: [], replacedRiders: [] })], 2, [], [])[0]?.riders).toEqual([])
     expect(sanitizeJourneys([{ kind: 'actuel' }], 1, [], [])[0]?.riders).toEqual([])

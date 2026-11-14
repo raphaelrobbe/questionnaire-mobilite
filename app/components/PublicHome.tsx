@@ -174,6 +174,9 @@ function SamplingNote() {
 export function PrivacyLink() {
   return (
     <footer className="mt-auto flex min-h-11 flex-wrap items-end justify-center gap-x-5 gap-y-1 bg-paper pb-1 pt-8 text-sm font-bold">
+      <Link to="/questionnaire" prefetch="intent" className="inline-flex min-h-11 items-center text-leaf">
+        Le questionnaire
+      </Link>
       <Link to="/collectif" prefetch="intent" className="inline-flex min-h-11 items-center text-leaf">
         Collectif Mobilité Haut-Doubs
       </Link>

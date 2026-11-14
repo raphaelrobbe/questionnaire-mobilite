@@ -36,7 +36,7 @@ export function Shell({ children }: { children: ReactNode }) {
         {settings?.testMode ? <TestBanner /> : null}
       </div>
       {interviewing ? null : (
-        <header className="border-b border-line bg-card/90 backdrop-blur">
+        <header data-site-header className="border-b border-line bg-card/90 backdrop-blur">
           <div className="mx-auto flex w-full max-w-lg items-center gap-3 px-4 py-3">
             <Link to="/" className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl">
               <Mark />

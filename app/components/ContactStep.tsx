@@ -1,5 +1,6 @@
 import { COLLECTIF_CONSENT, PHONE_CONSENT } from '~/common/consent'
 import { CollectifLink } from './CollectifLink'
+import { questionText } from '~/common/questionnaire'
 import { isEmail, respondentPhone, type Answers } from '~/common/survey'
 import { choiceClass, fieldClass } from './fill'
 import { Reveal } from './Reveal'
@@ -61,7 +62,7 @@ export function ContactStep({
         ) : null}
       </div>
       <fieldset className="grid gap-3">
-        <legend className="text-base font-extrabold">Souhaitez-vous devenir enquêteur à votre tour ?</legend>
+        <legend className="text-base font-extrabold">{questionText('recruit')}</legend>
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -122,7 +123,7 @@ function contactOptional(answers: Answers): boolean {
 function PhoneField({ value, onChange, optional = false }: { value: string; onChange: (value: string) => void; optional?: boolean }) {
   return (
     <label className="grid gap-2">
-      <span className="font-bold">Numéro de téléphone</span>
+      <span className="font-bold">{questionText('phone')}</span>
       <input
         value={value}
         type="tel"
@@ -143,7 +144,7 @@ function PhoneField({ value, onChange, optional = false }: { value: string; onCh
 function EmailField({ value, onChange, optional = false }: { value: string; onChange: (value: string) => void; optional?: boolean }) {
   return (
     <label className="grid gap-2">
-      <span className="font-bold">Adresse mail</span>
+      <span className="font-bold">{questionText('email')}</span>
       <input
         value={value}
         type="email"

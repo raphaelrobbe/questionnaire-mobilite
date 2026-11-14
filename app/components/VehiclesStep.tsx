@@ -1,3 +1,4 @@
+import { questionText } from '~/common/questionnaire'
 import {
   MAX_VEHICLES,
   MOTOR_OPTIONS,
@@ -24,7 +25,7 @@ export function VehiclesStep({
   return (
     <div className="mt-6 grid gap-4">
       <section className="grid gap-3">
-        <h2 className="text-lg font-extrabold">Voitures</h2>
+        <h2 className="text-lg font-extrabold">{questionText('cars')}</h2>
         {cars.map((vehicle, index) => (
           <Reveal key={`car-${index}`}>
             <VehicleCard
@@ -40,7 +41,7 @@ export function VehiclesStep({
         </Button>
       </section>
       <section className="grid gap-3">
-        <h2 className="text-lg font-extrabold">2/3 roues motorisés</h2>
+        <h2 className="text-lg font-extrabold">{questionText('wheels')}</h2>
         {twoWheelers.map((vehicle, index) => (
           <Reveal key={`wheel-${index}`}>
             <VehicleCard
@@ -96,7 +97,7 @@ function VehicleCard({
           onChange={(event) => onChange({ sansPermis: event.target.checked })}
           className="size-5 accent-pine"
         />
-        Sans permis
+        {questionText('car-license')}
       </label>
       <Button variant="ghost" className="w-auto justify-self-start px-0" onClick={onRemove}>
         Retirer

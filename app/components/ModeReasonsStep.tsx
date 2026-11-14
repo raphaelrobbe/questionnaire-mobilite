@@ -1,3 +1,4 @@
+import { questionText } from '~/common/questionnaire'
 import { MODE_REASONS, setModeNote, toggleModeReason, type Answers } from '~/common/survey'
 import { choiceClass, fieldClass } from './fill'
 
@@ -28,7 +29,7 @@ export function ModeReasonsStep({ answers, onChange }: { answers: Answers; onCha
         })}
       </div>
       <label className="grid gap-2">
-        <span className="font-bold">Préciser</span>
+        <span className="font-bold">{questionText('reasons-note')}</span>
         <input
           value={reasons.note}
           maxLength={160}

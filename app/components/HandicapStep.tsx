@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { questionNote, questionText } from '~/common/questionnaire'
 import {
   HANDICAP_ADAPTATIONS,
   HANDICAP_ANSWERS,
@@ -60,10 +61,7 @@ export function HandicapStep({ answers, onChange }: { answers: Answers; onChange
   return (
     <div className="mt-4 grid gap-6">
       <fieldset>
-        <legend className="text-base font-extrabold leading-snug">
-          Selon vous, les transports devraient-ils proposer des aménagements ou des services adaptés aux personnes en
-          situation de handicap ?
-        </legend>
+        <legend className="text-base font-extrabold leading-snug">{questionText('handicap')}</legend>
         <div className="mt-3 grid grid-cols-3 gap-2">
           {HANDICAP_ANSWERS.map((item) => (
             <button
@@ -81,10 +79,8 @@ export function HandicapStep({ answers, onChange }: { answers: Answers; onChange
 
       {details ? (
         <fieldset>
-          <legend className="text-base font-extrabold leading-snug">
-            Si oui, quels types d’adaptations vous sembleraient nécessaires ?
-          </legend>
-          <p className="mt-1 text-base text-muted">Plusieurs réponses possibles.</p>
+          <legend className="text-base font-extrabold leading-snug">{questionText('handicap-types')}</legend>
+          <p className="mt-1 text-base text-muted">{questionNote('handicap-types')}</p>
           <div className="mt-3 grid gap-2">
             {HANDICAP_ADAPTATIONS.map((item) => {
               const selected = answers.handicapTypes.includes(item.value)
@@ -103,7 +99,7 @@ export function HandicapStep({ answers, onChange }: { answers: Answers; onChange
           </div>
           {answers.handicapTypes.includes('autre') ? (
             <label className="mt-3 grid gap-2">
-              <span className="font-bold">Préciser</span>
+              <span className="font-bold">{questionText('handicap-other')}</span>
               <input
                 value={answers.handicapAutre}
                 maxLength={160}
@@ -117,9 +113,7 @@ export function HandicapStep({ answers, onChange }: { answers: Answers; onChange
 
       {whoReady ? (
         <fieldset ref={concernRef}>
-          <legend className="text-base font-extrabold leading-snug">
-            Ce besoin d’adaptation vous concerne-t-il ou concerne-t-il un proche ?
-          </legend>
+          <legend className="text-base font-extrabold leading-snug">{questionText('handicap-concern')}</legend>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {HANDICAP_CONCERN.map((item) => (
               <button
@@ -138,8 +132,8 @@ export function HandicapStep({ answers, onChange }: { answers: Answers; onChange
 
       {peopleReady ? (
         <fieldset ref={peopleRef}>
-          <legend className="sr-only">Qui est concerné</legend>
-          <p className="text-base text-muted">Plusieurs réponses possibles.</p>
+          <legend className="sr-only">{questionText('handicap-who')}</legend>
+          <p className="text-base text-muted">{questionNote('handicap-who')}</p>
           <div className="mt-3 grid gap-2">
             {HANDICAP_WHO.map((item) => {
               const selected = answers.handicapWho.includes(item.value)

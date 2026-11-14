@@ -4,7 +4,7 @@ import { draftMatchesMode } from '~/common/draft'
 import { classifyEndpoint } from '~/common/endpoint'
 import { canUseSurvey } from '~/common/settings'
 import { listedActualTrips, presetActualJourney } from '~/common/journeys'
-import { type ThemeId } from '~/common/motives'
+import { OCCASIONAL_TRIPS, partById, questionNote, questionText } from '~/common/questionnaire'
 import { CIVILITY, VISITS, appendVisit, buildSteps, patchAnswers, stepIssue, summary, visitLabel, visitStarts, type Answers } from '~/common/survey'
 import type { ResponseRecord } from '~/common/response'
 import { createDraft, loadDraft, removeDraft, saveDraft, type Draft } from '~/lib/draft.client'
@@ -277,7 +277,7 @@ export function Interview() {
     window.scrollTo(0, 0)
   }
 
-  function addReminder(item: OccasionalTrip) {
+  function addReminder(item: (typeof OCCASIONAL_TRIPS)[number]) {
     if (!draft) return
     const created = presetActualJourney(draft.answers.journeys, { theme: item.theme, autre: item.autre })
     if (!created) return
@@ -368,12 +368,12 @@ export function Interview() {
       {step.kind === 'name' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Qui est la personne ?
+            {questionText('who')}
           </h1>
-          <p className="mt-2 text-base text-muted">Facultatif. La fiche peut être préparée avant la rencontre.</p>
+          <p className="mt-2 text-base text-muted">{questionNote('who')} La fiche peut être préparée avant la rencontre.</p>
           <div className="mt-4 grid gap-3">
             <fieldset className="grid gap-2">
-              <legend className="font-bold">Civilité</legend>
+              <legend className="font-bold">{questionText('civility')}</legend>
               <div className="flex flex-wrap gap-2">
                 {CIVILITY.map((item) => (
                   <button
@@ -388,8 +388,8 @@ export function Interview() {
                 ))}
               </div>
             </fieldset>
-            <Field label="Prénom" value={draft.answers.prenom} autoComplete="given-name" onChange={(prenom) => updateAnswers({ prenom })} />
-            <Field label="Nom" value={draft.answers.nom} autoComplete="family-name" onChange={(nom) => updateAnswers({ nom })} />
+            <Field label={questionText('first-name')} value={draft.answers.prenom} autoComplete="given-name" onChange={(prenom) => updateAnswers({ prenom })} />
+            <Field label={questionText('last-name')} value={draft.answers.nom} autoComplete="family-name" onChange={(nom) => updateAnswers({ nom })} />
           </div>
         </section>
       ) : null}
@@ -411,9 +411,9 @@ export function Interview() {
           {visitOpen ? (
             <Reveal>
               <h1 ref={headingRef} tabIndex={-1} className="mt-6 text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-                Pourquoi ?
+                {questionText('visit-why')}
               </h1>
-              <p className="mt-2 text-base text-muted">Chaque visite est conservée, avec l’heure.</p>
+              <p className="mt-2 text-base text-muted">{questionNote('visit-why')}</p>
               <div className="mt-4 grid gap-2">
                 {VISITS.filter((item) => !item.starts).map((item) => {
                   const selected = draft.answers.visitPick === item.value
@@ -459,7 +459,7 @@ export function Interview() {
       {step.kind === 'consent' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Avant de commencer
+            {partById('consent')?.title}
           </h1>
           <div className="mt-4 rounded-[28px] bg-mist px-5 py-5">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-leaf">À lire</p>
@@ -472,7 +472,7 @@ export function Interview() {
               onChange={(event) => update({ consent: event.target.checked })}
               className="mt-1 size-5 accent-pine"
             />
-            <span className="font-bold">La personne a été informée et accepte de répondre.</span>
+            <span className="font-bold">{questionText('consent-accept')}</span>
           </label>
         </section>
       ) : null}
@@ -480,9 +480,9 @@ export function Interview() {
       {step.kind === 'commune' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Dans quelle commune habitez-vous ?
+            {questionText('commune')}
           </h1>
-          <p className="mt-2 text-base text-muted">Une commune absente de la liste peut être saisie.</p>
+          <p className="mt-2 text-base text-muted">{questionNote('commune')}</p>
           <PlacePicker
             label="Commune"
             inputId="commune-filtre"
@@ -496,19 +496,19 @@ export function Interview() {
       {step.kind === 'address' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Quelle est son adresse ?
+            {questionText('address')}
           </h1>
-          <p className="mt-2 text-base text-muted">Facultatif. La seconde ligne précise l’appartement ou le bâtiment.</p>
+          <p className="mt-2 text-base text-muted">{questionNote('address')}</p>
           <div className="mt-4 grid gap-3">
             <Field
-              label="Adresse"
+              label={questionText('street')}
               value={draft.answers.adresse}
               autoComplete="street-address"
               placeholder="12 rue de la Gare"
               onChange={(adresse) => updateAnswers({ adresse })}
             />
             <Field
-              label="Complément"
+              label={questionText('complement')}
               value={draft.answers.complement}
               placeholder="Appartement 12"
               onChange={(complement) => updateAnswers({ complement })}
@@ -521,9 +521,9 @@ export function Interview() {
       {step.kind === 'household' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Qui vit dans le foyer ?
+            {questionText('household-who')}
           </h1>
-          <p className="mt-2 text-base text-muted">Pour chaque personne : la tranche d’âge, et si elle conduit.</p>
+          <p className="mt-2 text-base text-muted">{questionNote('household-who')}</p>
           <HouseholdStep
             people={draft.answers.people}
             commune={draft.answers.commune}
@@ -535,9 +535,9 @@ export function Interview() {
       {step.kind === 'vehicles' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Quels véhicules a le foyer ?
+            {questionText('vehicles')}
           </h1>
-          <p className="mt-2 text-base text-muted">Ajoutez chaque voiture et chaque 2/3 roues motorisé. Aucun, si le foyer n’en a pas.</p>
+          <p className="mt-2 text-base text-muted">{questionNote('vehicles')}</p>
           <VehiclesStep
             cars={draft.answers.cars}
             twoWheelers={draft.answers.twoWheelers}
@@ -549,8 +549,8 @@ export function Interview() {
 
       {step.kind === 'motives' ? (
         <section className="mt-6">
-          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] leading-tight tracking-tight outline-none">
-            <span className="font-extrabold">Trajets que le foyer fait déjà</span>, quel que soit le moyen.
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
+            {partById('trips')?.title}
           </h1>
           <MotivesStep
             kind="actuel"
@@ -564,9 +564,9 @@ export function Interview() {
       {step.kind === 'reminders' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Avez-vous pensé à tout ?
+            {partById('reminders')?.title}
           </h1>
-          <p className="mt-2 text-base text-muted">Les trajets occasionnels comptent aussi, même s’ils sont rares.</p>
+          <p className="mt-2 text-base text-muted">{partById('reminders')?.note}</p>
           <ul className="mt-4 grid gap-2">
             {OCCASIONAL_TRIPS.map((item) => (
               <li key={item.label} className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-2">
@@ -590,9 +590,9 @@ export function Interview() {
       {step.kind === 'difficulties' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Quelles difficultés sur ces trajets ?
+            {partById('difficulties')?.title}
           </h1>
-          <p className="mt-2 text-base text-muted">Une seule fois, pour l’ensemble des trajets déjà notés.</p>
+          <p className="mt-2 text-base text-muted">{partById('difficulties')?.note}</p>
           <TripDifficulties
             trips={listedActualTrips(draft.answers.journeys)}
             difficulties={draft.answers.difficulties}
@@ -604,11 +604,9 @@ export function Interview() {
       {step.kind === 'offers' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Trajets qu’une offre rendrait possibles
+            {partById('offers')?.title}
           </h1>
-          <p className="mt-2 text-base text-muted">
-            Ils ne sont pas faits aujourd’hui. Ils le seraient en transport en commun, si l’offre était efficace, fiable et financièrement intéressante.
-          </p>
+          <p className="mt-2 text-base text-muted">{partById('offers')?.note}</p>
           <MotivesStep kind="nouveau" answers={draft.answers} onChange={(journeys) => updateAnswers({ journeys })} />
         </section>
       ) : null}
@@ -616,9 +614,9 @@ export function Interview() {
       {step.kind === 'reasons' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Pour quelles raisons pourriez-vous envisager de changer de mode de transport ?
+            {questionText('reasons')}
           </h1>
-          <p className="mt-2 text-base text-muted">Plusieurs réponses possibles.</p>
+          <p className="mt-2 text-base text-muted">{questionNote('reasons')}</p>
           <ModeReasonsStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
@@ -626,12 +624,9 @@ export function Interview() {
       {step.kind === 'conditions' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            À quelles conditions absolument nécessaires pourriez-vous remplacer certains de vos trajets actuels en voiture par
-            les transports en commun ?
+            {questionText('conditions')}
           </h1>
-          <p className="mt-2 text-base text-muted">
-            Sans ces conditions, vous ne changeriez pas. Plusieurs réponses possibles.
-          </p>
+          <p className="mt-2 text-base text-muted">{questionNote('conditions')}</p>
           <ModeConditionsStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
@@ -639,10 +634,9 @@ export function Interview() {
       {step.kind === 'barriers' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Qu’est-ce qui pourrait au contraire vous freiner ou vous empêcher d’utiliser les transports en commun, même s’ils
-            desservaient les lieux où vous souhaitez vous rendre ?
+            {questionText('barriers')}
           </h1>
-          <p className="mt-2 text-base text-muted">Plusieurs réponses possibles.</p>
+          <p className="mt-2 text-base text-muted">{questionNote('barriers')}</p>
           <ModeBarriersStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
@@ -650,7 +644,7 @@ export function Interview() {
       {step.kind === 'walk' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Arrêt de transport en commun
+            {partById('walk')?.title}
           </h1>
           <WalkDistanceStep answers={draft.answers} onChange={updateAnswers} />
         </section>
@@ -659,7 +653,7 @@ export function Interview() {
       {step.kind === 'life' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Des choix de vie différents grâce aux transports
+            {partById('life')?.title}
           </h1>
           <LifeChoicesStep answers={draft.answers} onChange={updateAnswers} />
         </section>
@@ -668,7 +662,7 @@ export function Interview() {
       {step.kind === 'handicap' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Adaptation aux situations de handicap
+            {partById('handicap')?.title}
           </h1>
           <HandicapStep answers={draft.answers} onChange={updateAnswers} />
         </section>
@@ -677,9 +671,9 @@ export function Interview() {
       {step.kind === 'contact' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Rester en contact ?
+            {partById('contact')?.title}
           </h1>
-          <p className="mt-2 text-base text-muted">Les informations personnelles ne seront jamais diffusées.</p>
+          <p className="mt-2 text-base text-muted">{partById('contact')?.note}</p>
           <ContactStep answers={draft.answers} onChange={updateAnswers} />
         </section>
       ) : null}
@@ -687,16 +681,14 @@ export function Interview() {
       {step.kind === 'closing' ? (
         <section className="mt-6">
           <h1 ref={headingRef} tabIndex={-1} className="text-[1.65rem] font-extrabold leading-tight tracking-tight outline-none">
-            Souhaitez-vous ajouter quelque chose ?
+            {partById('closing')?.title}
           </h1>
-          <p className="mt-2 text-base text-muted">
-            Vous pouvez partager toute remarque, difficulté, idée ou proposition qui n’aurait pas été abordée dans ce questionnaire.
-          </p>
+          <p className="mt-2 text-base text-muted">{partById('closing')?.note}</p>
           <textarea
             value={draft.answers.closingNote}
             maxLength={2000}
             rows={10}
-            aria-label="Souhaitez-vous ajouter quelque chose ?"
+            aria-label={questionText('closing-note')}
             className={`mt-4 min-h-64 w-full rounded-2xl px-4 py-3 text-base font-medium outline-none focus:border-leaf ${fieldClass(Boolean(draft.answers.closingNote.trim()), true)}`}
             onChange={(event) => updateAnswers({ closingNote: event.target.value })}
           />
@@ -794,20 +786,6 @@ export function Interview() {
     </div>
   )
 }
-
-type OccasionalTrip = { label: string; theme: ThemeId | ''; autre: string }
-
-const OCCASIONAL_TRIPS: OccasionalTrip[] = [
-  { label: 'Démarche administrative', theme: 'administratif', autre: '' },
-  { label: 'Banque', theme: 'administratif', autre: '' },
-  { label: 'Coiffeur', theme: 'loisirs', autre: 'Coiffeur' },
-  { label: 'Cinéma', theme: 'loisirs', autre: 'Cinéma' },
-  { label: 'Soirée', theme: 'loisirs', autre: 'Soirée' },
-  { label: 'Gare', theme: '', autre: '' },
-  { label: 'Activité sportive, pour vous ou les enfants', theme: 'loisirs', autre: 'Sport' },
-  { label: 'Rendez-vous médical, pour vous ou pour quelqu’un d’autre', theme: 'sante', autre: '' },
-  { label: 'Autre', theme: '', autre: '' },
-]
 
 function visitWhen(at: string): string {
   const date = new Date(at)

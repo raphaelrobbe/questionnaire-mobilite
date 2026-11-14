@@ -1,3 +1,4 @@
+import { questionText } from '~/common/questionnaire'
 import {
   MODE_CONDITION_GROUPS,
   MODE_CONDITIONS,
@@ -42,9 +43,13 @@ export function ModeConditionsStep({ answers, onChange }: { answers: Answers; on
           <div className="mt-2 grid gap-2">{group.ids.map((id) => button(id))}</div>
         </div>
       ))}
-      <div className="grid gap-2">{TAIL.map((id) => button(id))}</div>
+      {TAIL.map((id) => (
+        <div key={id} className="border-t border-line pt-4">
+          {button(id)}
+        </div>
+      ))}
       <label className="grid gap-2">
-        <span className="font-bold">Préciser</span>
+        <span className="font-bold">{questionText('conditions-note')}</span>
         <input
           value={conditions.note}
           maxLength={160}

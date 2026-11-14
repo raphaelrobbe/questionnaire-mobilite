@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { fold } from '~/common/config'
-import { DOMICILE, RARE_COUNTS, RARE_UNITS, acceptableMinutes, addJourney, doorToDoorMinutes, journeyHeading, journeyTouched, modesBesideTransit, removeJourney, tripMinutes, tripReplacedExtras, tripReplacedRiders, tripRiders, updateJourney, waitMinutes, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
-import { SLOTS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId } from '~/common/motives'
+import { DOMICILE, RARE_COUNTS, RARE_UNITS, acceptableMinutes, addJourney, doorToDoorMinutes, journeyHeading, journeyTouched, modesBesideTransit, removeJourney, tripMinutes, tripOfferModes, tripReplacedExtras, tripReplacedRiders, tripRiders, updateJourney, waitMinutes, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
+import { OFFER_MODES, SLOTS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId } from '~/common/motives'
+import { REPLACED_ANSWERS, questionNote, questionText, transitQuestion } from '~/common/questionnaire'
 import { AGE_BANDS, type Answers, type Person } from '~/common/survey'
 import { Reveal } from './Reveal'
 import { choiceFill, fieldClass, idleClass, type ChoiceFill } from './fill'
@@ -16,12 +17,7 @@ const SLOT_GROUPS: { label: string; slots: SlotId[] }[] = [
   { label: 'Nuit', slots: ['22-0', '0-4'] },
 ]
 
-const REPLACED = [
-  { id: 'toujours', label: 'Toujours' },
-  { id: 'souvent', label: 'Souvent' },
-  { id: 'parfois', label: 'Parfois' },
-  { id: 'jamais', label: 'Jamais' },
-] as const
+const REPLACED = REPLACED_ANSWERS
 
 export function MotivesStep({
   kind,
@@ -144,10 +140,7 @@ function TripCard({
   const modes = vehicleModeOptions(answers.cars, answers.twoWheelers)
   const alternatives = modesBesideTransit(journey.modes)
   const wouldRide = journey.kind === 'nouveau' || journey.replaced === 'toujours' || journey.replaced === 'souvent' || journey.replaced === 'parfois'
-  const transitLegend =
-    alternatives.length > 1
-      ? 'Certains tronçons pourraient-ils être faits en transport en commun, si l’offre était efficace, fiable et financièrement intéressante ?'
-      : 'Ce trajet pourrait-il être fait en transport en commun, si l’offre était efficace, fiable et financièrement intéressante ?'
+  const transitLegend = transitQuestion(alternatives.length)
 
   return (
     <article ref={cardRef} className="grid gap-3">
@@ -160,7 +153,7 @@ function TripCard({
 
       <Frame>
         <fieldset>
-          <legend className="text-base font-extrabold">Pour quel motif ?</legend>
+          <legend className="text-base font-extrabold">{questionText('trip-theme')}</legend>
           <div className="mt-2 flex flex-wrap gap-2">
             {THEME_IDS.map((theme) => (
               <Chip
@@ -176,7 +169,7 @@ function TripCard({
           {journey.theme ? (
             <Reveal>
               <label className="mt-2 block text-base font-extrabold">
-                Préciser l’activité <span className="font-medium text-muted">(facultatif)</span>
+                {questionText('trip-activity')} <span className="font-medium text-muted">({questionNote('trip-activity').replace(/\.$/, '').toLowerCase()})</span>
                 <input
                   value={journey.autre}
                   maxLength={80}
@@ -193,7 +186,7 @@ function TripCard({
       {journey.kind === 'actuel' ? (
         <Frame>
           <People
-            title="Qui fait ce trajet ?"
+            title={questionText('trip-who')}
             rule="many"
             people={answers.people}
             selected={tripRiders(journey, answers.people.length)}
@@ -207,7 +200,7 @@ function TripCard({
       {journey.kind === 'actuel' ? (
         <Frame>
           <fieldset>
-            <legend className="text-base font-extrabold">Par quel moyen ?</legend>
+            <legend className="text-base font-extrabold">{questionText('trip-mode')}</legend>
             <p className="mt-1 text-sm text-muted">Plusieurs réponses possibles.</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {modes.map((mode) => (
@@ -271,13 +264,14 @@ function TripCard({
               ))}
             </div>
           </fieldset>
+          <OfferModes className="mt-4" journey={journey} onChange={onChange} />
           <AcceptableTime minutes={journey.acceptable} onChange={(acceptable) => onChange({ acceptable })} />
           {wouldRide ? (
             <Reveal>
               <People
                 className="mt-4"
-                title="Qui le ferait en transport en commun ?"
-                hint="La personne qui conduit peut ne plus le faire."
+                title={questionText('trip-riders')}
+                hint={questionNote('trip-riders')}
                 rule="many"
                 people={answers.people}
                 indexes={tripRiders(journey, answers.people.length)}
@@ -292,9 +286,11 @@ function TripCard({
         </Frame>
       ) : journey.kind === 'nouveau' ? (
         <Frame>
+          <OfferModes journey={journey} onChange={onChange} />
           <People
-            title="Qui le ferait en transport en commun ?"
-            hint="La personne qui conduit peut ne plus le faire."
+            className="mt-4"
+            title={questionText('wish-riders')}
+            hint={questionNote('wish-riders')}
             rule="many"
             people={answers.people}
             selected={tripReplacedRiders(journey, answers.people.length)}
@@ -305,13 +301,13 @@ function TripCard({
 
       {journey.kind === 'nouveau' ? (
         <Frame>
-          <MinuteRow label="Temps acceptable porte-à-porte ?" minutes={journey.acceptable} blank="" onChange={(acceptable) => onChange({ acceptable })} />
+          <MinuteRow label={questionText('wish-acceptable')} minutes={journey.acceptable} blank="" onChange={(acceptable) => onChange({ acceptable })} />
         </Frame>
       ) : null}
 
       <Frame>
         <label className="block text-base font-extrabold">
-          Commentaire <span className="font-medium text-muted">(facultatif)</span>
+          {questionText('trip-comment')} <span className="font-medium text-muted">({questionNote('trip-comment').replace(/\.$/, '').toLowerCase()})</span>
           <textarea
             value={journey.comment}
             maxLength={400}
@@ -322,6 +318,32 @@ function TripCard({
         </label>
       </Frame>
     </article>
+  )
+}
+
+function OfferModes({ journey, onChange, className = '' }: { journey: Journey; onChange: (patch: Partial<Journey>) => void; className?: string }) {
+  const selected = tripOfferModes(journey)
+  return (
+    <fieldset className={className}>
+      <legend className="text-base font-extrabold">{questionText('trip-offer-modes')}</legend>
+      <p className="mt-1 text-sm text-muted">{questionNote('trip-offer-modes')}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {OFFER_MODES.map((mode) => (
+          <Chip
+            key={mode.id}
+            pressed={selected.includes(mode.id)}
+            idle={choiceFill('many', selected.length > 0)}
+            onClick={() =>
+              onChange({
+                offerModes: selected.includes(mode.id) ? selected.filter((id) => id !== mode.id) : [...selected, mode.id],
+              })
+            }
+          >
+            {mode.label}
+          </Chip>
+        ))}
+      </div>
+    </fieldset>
   )
 }
 
@@ -399,9 +421,9 @@ function RouteField({
 }) {
   return (
     <div>
-      <p className="text-base font-extrabold">De</p>
+      <p className="text-base font-extrabold">{questionText('trip-from')}</p>
       <PlacePicker
-        label="De"
+        label={questionText('trip-from')}
         value={origin}
         place={originPlace}
         detail
@@ -410,9 +432,9 @@ function RouteField({
       <p className="flex justify-center py-3 text-4xl font-extrabold leading-none text-pine" aria-hidden>
         ↓
       </p>
-      <p className="text-base font-extrabold">À</p>
+      <p className="text-base font-extrabold">{questionText('trip-to')}</p>
       <PlacePicker
-        label="À"
+        label={questionText('trip-to')}
         value={destination}
         place={place}
         domicile={fold(origin.trim()) !== fold(DOMICILE)}
@@ -441,7 +463,7 @@ function TripDurations({
   const total = doorToDoorMinutes(durations, modes.map((mode) => mode.id), wait)
   return (
     <fieldset className="mt-4">
-      <legend className="text-base font-extrabold">Temps moyen de trajet</legend>
+      <legend className="text-base font-extrabold">{questionText('trip-duration')}</legend>
       <div className="mt-2 grid gap-3">
         {modes.map((mode) => (
           <MinuteRow
@@ -510,7 +532,7 @@ function AcceptableTime({ minutes, onChange }: { minutes: string; onChange: (min
 
   return (
     <label className="mt-4 block text-base font-extrabold">
-      Quel temps de trajet maximal porte-à-porte serait alors acceptable ?
+      {questionText('trip-acceptable')}
       <span className="mt-2 flex items-center gap-2">
         <button
           type="button"
@@ -567,7 +589,7 @@ function Frequency({ journey, onChange }: { journey: Journey; onChange: (patch: 
 
   return (
     <fieldset className="mt-4">
-      <legend className="text-base font-extrabold">À quelle fréquence ?</legend>
+      <legend className="text-base font-extrabold">{questionText('trip-frequency')}</legend>
       <div className="mt-2 flex flex-wrap gap-2">
         <Chip
           pressed={journey.regularity === 'irregulier'}
@@ -678,10 +700,10 @@ function Hours({
     <div>
       <div className={`${columns} items-end pb-1`}>
         <span />
-        <p className="text-center text-[13px] font-extrabold leading-tight">Horaire aller</p>
+        <p className="text-center text-[13px] font-extrabold leading-tight">{questionText('trip-out')}</p>
         <p className="text-center text-[13px] font-extrabold leading-tight">
-          Horaire retour
-          <span className="mt-0.5 block text-xs font-medium text-muted">facultatif</span>
+          {questionText('trip-back')}
+          <span className="mt-0.5 block text-xs font-medium text-muted">{questionNote('trip-back').replace(/\.$/, '').toLowerCase()}</span>
         </p>
       </div>
       {SLOT_GROUPS.map((group, index) => (

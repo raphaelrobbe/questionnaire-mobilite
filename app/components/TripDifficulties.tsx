@@ -14,6 +14,7 @@ import {
   type DifficultyPace,
   type JourneyDifficulties,
 } from '~/common/journeys'
+import { questionNote, questionText } from '~/common/questionnaire'
 import { choiceFill, fieldClass, idleClass, type ChoiceFill } from './fill'
 
 export function TripDifficulties({
@@ -59,8 +60,8 @@ export function TripDifficulties({
   return (
     <div className="mt-4 grid gap-3">
       <fieldset>
-        <legend className="text-base font-extrabold">Rencontrez-vous des difficultés lors de ces trajets ?</legend>
-        <p className="mt-1 text-sm text-muted">Plusieurs réponses possibles. Ouvrez un thème, puis indiquez la fréquence.</p>
+        <legend className="text-base font-extrabold">{questionText('difficulty')}</legend>
+        <p className="mt-1 text-sm text-muted">{questionNote('difficulty')}</p>
       </fieldset>
       {themes.map((group) => (
         <ThemeCard
@@ -237,7 +238,7 @@ function TripRows({
     const pace = selected.find((item) => item.id === trip?.id)?.pace ?? ''
     return (
       <div className="mt-2">
-        <p className="text-sm font-bold text-muted">À quelle fréquence ?</p>
+        <p className="text-sm font-bold text-muted">{questionText('difficulty-pace')}</p>
         <PaceButtons pace={pace} idle={paceIdle(pace, answered)} onPace={(next) => trip && onPace(trip.id, next)} />
       </div>
     )

@@ -131,3 +131,86 @@ a:hover {
   min-width: 100%;
   transform: rotateX(180deg);
 }
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  [data-top-banner],
+  [data-site-header],
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  /* La grille empêche le navigateur d’honorer les coupures. */
+  .questionnaire,
+  .questionnaire section,
+  .questionnaire ol {
+    display: block !important;
+  }
+
+  .questionnaire > * + * {
+    margin-top: 2rem;
+  }
+
+  .questionnaire section > * + *,
+  .questionnaire header > * + * {
+    margin-top: 0.75rem;
+  }
+
+  .questionnaire ol > li + li {
+    margin-top: 1rem;
+  }
+
+  .questionnaire ul {
+    display: block !important;
+  }
+
+  .questionnaire ul > li + li {
+    margin-top: 0.1rem;
+  }
+
+  .questionnaire ul.choice-apart {
+    margin-top: 0.8rem;
+  }
+
+  .questionnaire ul.choice-apart > li + li {
+    margin-top: 0.8rem;
+  }
+
+  .questionnaire li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .questionnaire .print-keep {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .questionnaire .print-keep + * {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+}
+
+@page {
+  margin: 14mm;
+}

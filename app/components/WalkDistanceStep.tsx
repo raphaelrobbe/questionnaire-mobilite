@@ -1,3 +1,4 @@
+import { questionNote, questionText } from '~/common/questionnaire'
 import { WALK_DISTANCES, setWalkDistance, setWalkMapPlace, setWalkMapSkipped, setWalkNearby, setWalkNote, setWalkPoint, type Answers } from '~/common/survey'
 import { choiceClass, fieldClass } from './fill'
 import { Reveal } from './Reveal'
@@ -10,11 +11,8 @@ export function WalkDistanceStep({ answers, onChange }: { answers: Answers; onCh
   return (
     <div className="mt-4 grid gap-6">
       <div>
-        <h2 className="text-xl font-extrabold leading-snug">
-          Quelle distance seriez-vous prêt(e) à parcourir à pied entre votre domicile (ou le lieu où vous vous rendez) et un
-          arrêt de transport en commun ?
-        </h2>
-        <p className="mt-2 text-base text-muted">Une seule réponse.</p>
+        <h2 className="text-xl font-extrabold leading-snug">{questionText('walk-distance')}</h2>
+        <p className="mt-2 text-base text-muted">{questionNote('walk-distance')}</p>
         <div className="mt-4 grid gap-2">
           {WALK_DISTANCES.map((item) => {
             const selected = distance.choice === item.value
@@ -32,7 +30,7 @@ export function WalkDistanceStep({ answers, onChange }: { answers: Answers; onCh
           })}
         </div>
         <label className="mt-4 grid gap-2">
-          <span className="font-bold">Préciser</span>
+          <span className="font-bold">{questionText('walk-note')}</span>
           <input
             value={distance.note}
             maxLength={160}
@@ -44,7 +42,7 @@ export function WalkDistanceStep({ answers, onChange }: { answers: Answers; onCh
       </div>
       {distance.choice ? (
         <Reveal>
-          <h2 className="text-xl font-extrabold leading-snug">Existe-t-il déjà un arrêt satisfaisant près de votre domicile ?</h2>
+          <h2 className="text-xl font-extrabold leading-snug">{questionText('walk-nearby')}</h2>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {(['oui', 'non'] as const).map((value) => (
               <button
@@ -61,7 +59,7 @@ export function WalkDistanceStep({ answers, onChange }: { answers: Answers; onCh
           {distance.nearby ? (
             <Reveal className="mt-5">
               {distance.nearby === 'non' ? (
-                <h2 className="mb-3 text-xl font-extrabold leading-snug">Où verriez-vous un arrêt de transport près de chez vous ?</h2>
+                <h2 className="mb-3 text-xl font-extrabold leading-snug">{questionText('walk-where')}</h2>
               ) : null}
               <StopMap
                 adresse={answers.adresse}
@@ -78,16 +76,16 @@ export function WalkDistanceStep({ answers, onChange }: { answers: Answers; onCh
                   onChange={(event) => onChange({ walkDistance: setWalkMapSkipped(distance, event.target.checked) })}
                   className="mt-1 size-5 accent-pine"
                 />
-                <span className="font-bold">La carte ne s’affiche pas ou la personne ne souhaite pas répondre</span>
+                <span className="font-bold">{questionText('walk-skip')}</span>
               </label>
               {distance.mapSkipped ? (
                 <Reveal>
                   <label className="mt-3 grid gap-2">
-                    <span className="font-bold">Précisions / commentaires</span>
+                    <span className="font-bold">{questionText('walk-place')}</span>
                     <input
                       value={distance.mapPlace}
                       maxLength={160}
-                      aria-label="Précisions / commentaires"
+                      aria-label={questionText('walk-place')}
                       className={`min-h-14 w-full rounded-2xl px-4 text-base outline-none focus:border-leaf ${fieldClass(Boolean(distance.mapPlace.trim()), true)}`}
                       onChange={(event) => onChange({ walkDistance: setWalkMapPlace(distance, event.target.value) })}
                     />

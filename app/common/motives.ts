@@ -101,6 +101,12 @@ export const WHY_NOT: { id: string; label: string }[] = [
   { id: 'conduire', label: 'Aime conduire' },
 ]
 
+export const OFFER_MODES: { id: string; label: string }[] = [
+  { id: 'train', label: 'Train' },
+  { id: 'autocar', label: 'Autocar-Bus' },
+  { id: 'covoiturage', label: 'Covoiturage' },
+]
+
 export const EXTRA_MODES: { id: string; label: string }[] = [
   { id: 'marche', label: 'Marche' },
   { id: 'velo', label: 'Vélo' },

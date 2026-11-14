@@ -1,5 +1,5 @@
 import { fold } from './config'
-import { SLOT_IDS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId, type ThemeId } from './motives'
+import { OFFER_MODES, SLOT_IDS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId, type ThemeId } from './motives'
 
 export const WEEKDAYS = [
   { id: 'lun', label: 'Lun' },
@@ -107,6 +107,10 @@ export type Journey = {
   days: Weekday[]
   /** Moyens utilisés pour un trajet déjà fait. Plusieurs possibles. */
   modes: string[]
+  /** Train, autocar ou covoiturage envisagés pour ce trajet. Tous, tant que ce n’est pas modifié. */
+  offerModes: string[]
+  /** Vrai dès que « Par quel moyen ? » a été modifié. Sinon, les trois moyens sont sélectionnés. */
+  offerModesCustom: boolean
   /** Minutes du trajet, pour chaque moyen choisi. */
   durations: Record<string, string>
   /** Minutes d’attente éventuelle. 0 s’il n’y en a pas. */
@@ -153,6 +157,8 @@ export function emptyJourney(kind: JourneyKind): Journey {
     everyWeeks: '',
     days: [],
     modes: [],
+    offerModes: OFFER_MODES.map((mode) => mode.id),
+    offerModesCustom: false,
     durations: {},
     wait: '0',
     acceptable: '',
@@ -202,6 +208,7 @@ export function journeyTouched(journey: Journey): boolean {
       journey.retour ||
       journey.regularity ||
       journey.modes.length > 0 ||
+      journey.offerModesCustom ||
       (journey.origin ?? DOMICILE).trim() !== DOMICILE ||
       (journey.originPlace ?? '').trim() ||
       journey.destination.trim() ||
@@ -329,6 +336,7 @@ export function updateJourney(journeys: Journey[], index: number, patch: Partial
     if ('replacedRiders' in patch || 'replacedExtraRiders' in patch) next.replacedRidersCustom = true
     if ('riders' in patch) next.ridersCustom = true
     if ('acceptable' in patch) next.acceptableCustom = true
+    if ('offerModes' in patch) next.offerModesCustom = true
     return normalizeJourney(next)
   })
 }
@@ -357,6 +365,20 @@ export function sanitizeJourneys(input: unknown, peopleCount: number, cars: { mo
   return [...(actual.length ? actual : [emptyJourney('actuel')]), ...(fresh.length ? fresh : [emptyJourney('nouveau')])]
 }
 
+function offerModesOf(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return knownOfferModes(value.filter((id): id is string => typeof id === 'string'))
+}
+
+function knownOfferModes(ids: readonly string[]): string[] {
+  return OFFER_MODES.map((mode) => mode.id).filter((id) => ids.includes(id))
+}
+
+/** Moyens envisagés. Les trois, tant que la personne n’a pas modifié la sélection. */
+export function tripOfferModes(journey: Journey): string[] {
+  return journey.offerModesCustom ? knownOfferModes(journey.offerModes) : OFFER_MODES.map((mode) => mode.id)
+}
+
 function journeyModes(source: Record<string, unknown>, allowed: Set<string>): string[] {
   const asked = Array.isArray(source.modes) ? source.modes : typeof source.mode === 'string' && source.mode ? [source.mode] : []
   return [...allowed].filter((id) => asked.includes(id))
@@ -381,6 +403,8 @@ function cleanJourney(input: unknown, peopleCount: number, allowed: Set<string>)
     everyWeeks: weeksOf(source.everyWeeks),
     days: weekdaysOf(source.days),
     modes: journeyModes(source, allowed),
+    offerModes: offerModesOf(source.offerModes),
+    offerModesCustom: source.offerModesCustom === true,
     durations: rawDurations(source.durations),
     wait: waitMinutes(source.wait === undefined || source.wait === null ? '0' : String(source.wait)),
     acceptable: acceptableMinutes(source.acceptable === undefined || source.acceptable === null ? '' : String(source.acceptable)),
@@ -428,6 +452,12 @@ function normalizeJourney(journey: Journey, peopleCount = 0): Journey {
   }
   next.durations = durationsFor(next.modes, next.durations)
   next.wait = waitMinutes(next.wait)
+  if (next.kind === 'nouveau' || asksTransit(next.modes)) {
+    next.offerModes = next.offerModesCustom ? knownOfferModes(next.offerModes) : OFFER_MODES.map((mode) => mode.id)
+  } else {
+    next.offerModes = OFFER_MODES.map((mode) => mode.id)
+    next.offerModesCustom = false
+  }
   if (next.kind === 'nouveau') {
     next.acceptable = tripMinutes(next.acceptable)
     next.acceptableCustom = false
@@ -465,6 +495,7 @@ function contentTouched(journey: Journey): boolean {
       journey.retour ||
       journey.regularity ||
       journey.modes.length > 0 ||
+      journey.offerModesCustom ||
       (journey.origin ?? DOMICILE).trim() !== DOMICILE ||
       (journey.originPlace ?? '').trim() ||
       journey.destination.trim() ||

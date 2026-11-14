@@ -48,6 +48,7 @@ export type ModeConditionId =
   | 'equivalent'
   | 'superieur'
   | 'abonnement'
+  | 'impot'
   | 'arret'
   | 'horaires'
   | 'frequence'
@@ -121,7 +122,7 @@ export const HANDICAP_CONCERN: Labeled<HandicapConcern>[] = [
 
 export const LIFE_CHOICES: Labeled<LifeChoiceId>[] = [
   { value: 'residence', label: 'Autre lieu de résidence' },
-  { value: 'emploi', label: 'Autre emploi ou lieu d’études' },
+  { value: 'emploi', label: 'Autre emploi ou école / lieu d’études' },
   { value: 'activite', label: 'Activité sportive, culturelle ou associative ailleurs' },
   { value: 'achats', label: 'Achats, démarches ailleurs' },
   { value: 'non', label: 'Non, cela ne changerait pas mes choix' },
@@ -148,6 +149,7 @@ export const MODE_CONDITIONS: Labeled<ModeConditionId>[] = [
   { value: 'equivalent', label: 'Un tarif équivalent au coût de la voiture' },
   { value: 'superieur', label: 'Un tarif légèrement supérieur, si le service est plus pratique' },
   { value: 'abonnement', label: 'Un abonnement avantageux permettant plusieurs déplacements' },
+  { value: 'impot', label: 'Réduction d’impôt' },
   { value: 'arret', label: 'Un arrêt facilement accessible depuis mon domicile et ma destination' },
   { value: 'horaires', label: 'Des horaires adaptés à mes besoins' },
   { value: 'frequence', label: 'Des passages suffisamment fréquents' },
@@ -160,7 +162,7 @@ export const MODE_CONDITIONS: Labeled<ModeConditionId>[] = [
 ]
 
 export const MODE_CONDITION_GROUPS: { title: string; ids: ModeConditionId[] }[] = [
-  { title: 'Coût', ids: ['inferieur', 'equivalent', 'superieur', 'abonnement'] },
+  { title: 'Coût', ids: ['inferieur', 'equivalent', 'superieur', 'abonnement', 'impot'] },
   { title: 'Conditions pratiques', ids: ['arret', 'horaires', 'frequence', 'correspondances', 'fiabilite', 'bagages', 'enfants'] },
 ]
 
@@ -185,10 +187,10 @@ export const MODE_BARRIERS: Labeled<ModeBarrierId>[] = [
 ]
 
 export const WALK_DISTANCES: Labeled<WalkDistanceId>[] = [
-  { value: 'm200', label: 'Moins de 200 mètres' },
-  { value: 'm500', label: 'Entre 200 et 500 mètres' },
-  { value: 'km1', label: 'Entre 500 mètres et 1 kilomètre' },
-  { value: 'km2', label: 'Entre 1 et 2 kilomètres' },
+  { value: 'm200', label: '200 m' },
+  { value: 'm500', label: '500 m' },
+  { value: 'km1', label: '1 km' },
+  { value: 'km2', label: '2 km' },
   { value: 'plus', label: 'Plus de 2 kilomètres' },
   { value: 'meteo', label: 'Cela dépend de la météo, du relief ou de la qualité du cheminement' },
   { value: 'frequence', label: 'Cela dépend de la fréquence et des horaires du transport' },
