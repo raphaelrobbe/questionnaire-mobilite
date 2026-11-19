@@ -9,11 +9,14 @@ let inflight: Promise<SheetLists> | null = null
 export type ConfigQuery = {
   device?: string
   who?: string
-  action?: 'add' | 'remove' | 'create'
+  action?: 'add' | 'remove' | 'create' | 'update'
   interviewer?: string
+  /** Nouveau nom, quand une fiche existante est modifiée. */
+  name?: string
   target?: string
   phone?: string
   email?: string
+  commune?: string
 }
 
 export function subscribeCachedLists(listener: () => void): () => void {
@@ -72,8 +75,10 @@ async function requestSheetLists(endpoint: string, query: ConfigQuery): Promise<
   if (query.action) url.searchParams.set('action', query.action)
   if (query.interviewer) url.searchParams.set('interviewer', query.interviewer)
   if (query.target) url.searchParams.set('target', query.target)
-  if (query.phone) url.searchParams.set('phone', query.phone)
-  if (query.email) url.searchParams.set('email', query.email)
+  if (query.name !== undefined) url.searchParams.set('name', query.name)
+  if (query.phone !== undefined) url.searchParams.set('phone', query.phone)
+  if (query.email !== undefined) url.searchParams.set('email', query.email)
+  if (query.commune !== undefined) url.searchParams.set('commune', query.commune)
   return readListsPayload(await getScriptJson(url, 12000, LISTS_SILENCE))
 }
 

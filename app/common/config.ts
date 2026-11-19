@@ -9,6 +9,8 @@ export type Interviewer = {
   phone: string
   /** Vide tant que l’appelant n’est pas un administrateur, ou si aucune adresse n’a été notée. */
   email: string
+  /** Vide tant que l’appelant n’est pas un administrateur, ou si aucune commune n’a été notée. */
+  commune: string
 }
 
 export type SheetLists = {
@@ -159,7 +161,8 @@ function cleanInterviewers(values: unknown[]): Interviewer[] {
     const devices = !('devices' in source) || source.devices === null ? null : cleanDevices(source.devices)
     const phone = typeof source.phone === 'string' ? source.phone.trim().slice(0, 40) : ''
     const email = typeof source.email === 'string' ? source.email.trim().toLowerCase().slice(0, 120) : ''
-    list.push({ name, admin: source.admin, authorized: source.authorized, devices, phone, email })
+    const commune = typeof source.commune === 'string' ? source.commune.trim().slice(0, 120) : ''
+    list.push({ name, admin: source.admin, authorized: source.authorized, devices, phone, email, commune })
     if (list.length >= LIST_MAX) break
   }
   return list

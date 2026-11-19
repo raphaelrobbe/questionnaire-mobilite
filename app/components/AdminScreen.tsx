@@ -11,6 +11,7 @@ import { buttonClass } from './Button'
 import { fieldClass } from './fill'
 import { DrawPanel } from './DrawPanel'
 import { LetterDraft } from './LetterDraft'
+import { PlacePicker } from './PlacePicker'
 
 export function AdminScreen() {
   const settings = useSettings()
@@ -20,6 +21,12 @@ export function AdminScreen() {
   const [personName, setPersonName] = useState('')
   const [personPhone, setPersonPhone] = useState('')
   const [personEmail, setPersonEmail] = useState('')
+  const [personCommune, setPersonCommune] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editCommune, setEditCommune] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
@@ -103,6 +110,7 @@ export function AdminScreen() {
       return
     }
     const email = normalizeEmail(personEmail)
+    const commune = personCommune.trim().slice(0, 120)
     if (email === null) {
       setNotice('Adresse mail illisible.')
       return
@@ -117,14 +125,20 @@ export function AdminScreen() {
         interviewer: name,
         phone: phone || undefined,
         email: email || undefined,
+        commune: commune || undefined,
       })
       publishLists(next)
       const created = next.interviewers.find((person) => fold(person.name) === fold(name))
       if (!created) {
         throw new Error('Le script n’a pas ajouté l’enquêteur·rice. Mettez à jour le script du tableur, puis redéployez-le.')
       }
-      if (email && created.email !== email) {
-        setNotice('L’enquêteur·rice est ajouté·e. L’adresse mail n’a pas été enregistrée. Mettez à jour le script du tableur, puis redéployez-le.')
+      const missed = [
+        email && created.email !== email ? 'l’adresse mail' : '',
+        commune && created.commune !== commune ? 'la commune' : '',
+      ].filter(Boolean)
+      if (missed.length) {
+        const detail = missed.length === 1 ? `${missed[0]} n’a pas été enregistrée` : `${missed.join(' et ')} n’ont pas été enregistrées`
+        setNotice(`L’enquêteur·rice est ajouté·e. ${detail}. Mettez à jour le script du tableur, puis redéployez-le.`)
       }
       if (scannedId) {
         try {
@@ -140,6 +154,7 @@ export function AdminScreen() {
           setPersonName('')
           setPersonPhone('')
           setPersonEmail('')
+          setPersonCommune('')
           setScannedId(null)
           const detail = error instanceof Error ? error.message : ''
           throw new Error(detail ? `L’enquêteur·rice est ajouté·e. L’identifiant n’a pas été enregistré. ${detail}` : 'L’enquêteur·rice est ajouté·e. Relisez le QR-code sur sa fiche.')
@@ -148,6 +163,7 @@ export function AdminScreen() {
       setPersonName('')
       setPersonPhone('')
       setPersonEmail('')
+      setPersonCommune('')
       setScannedId(null)
       setConfirmKey(null)
     } catch (error) {
@@ -176,6 +192,63 @@ export function AdminScreen() {
       return
     }
     void apply(target, 'add', id)
+  }
+
+  function openEdit(person: { name: string; phone: string; email: string; commune: string }) {
+    setNotice(null)
+    setEditing(person.name)
+    setEditName(person.name)
+    setEditPhone(person.phone)
+    setEditEmail(person.email)
+    setEditCommune(person.commune)
+  }
+
+  async function saveEdit(original: string) {
+    if (!settings || busy) return
+    const name = editName.trim().slice(0, 120)
+    if (!name) {
+      setNotice('Indiquez le prénom et le nom.')
+      return
+    }
+    if (lists.interviewers.some((person) => person.name !== original && fold(person.name) === fold(name))) {
+      setNotice('Cet·te enquêteur·rice est déjà dans la liste.')
+      return
+    }
+    const phone = normalizePhone(editPhone)
+    if (phone === null) {
+      setNotice('Numéro illisible.')
+      return
+    }
+    const email = normalizeEmail(editEmail)
+    if (email === null) {
+      setNotice('Adresse mail illisible.')
+      return
+    }
+    const commune = editCommune.trim().slice(0, 120)
+    setBusy(`update:${original}`)
+    setNotice(null)
+    try {
+      const next = await fetchSheetLists(settings.adminEndpoint, {
+        device: deviceId,
+        who: settings.interviewer,
+        action: 'update',
+        interviewer: original,
+        name,
+        phone,
+        email,
+        commune,
+      })
+      publishLists(next)
+      const saved = next.interviewers.find((person) => fold(person.name) === fold(name))
+      if (!saved || saved.phone !== phone || saved.email !== email || saved.commune !== commune) {
+        throw new Error('La fiche n’a pas été modifiée. Mettez à jour le script du tableur, puis redéployez-le.')
+      }
+      setEditing(null)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Modification impossible.')
+    } finally {
+      setBusy(null)
+    }
   }
 
   function add(interviewer: string) {
@@ -284,6 +357,7 @@ export function AdminScreen() {
           onChange={(event) => setPersonName(event.target.value)}
           className={`min-h-11 rounded-xl px-3 text-base outline-none focus:border-leaf ${fieldClass(Boolean(personName.trim()), false)}`}
         />
+        <PlacePicker label="Commune" inputId="commune-enqueteur" domicile={false} value={personCommune} onChange={({ value }) => setPersonCommune(value)} />
         <input
           value={personPhone}
           maxLength={40}
@@ -322,12 +396,85 @@ export function AdminScreen() {
       <div className="grid gap-2">
         {lists.interviewers.map((person) => (
           <section key={person.name} className="grid gap-2 rounded-2xl border border-line bg-card px-3 py-3">
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <h2 className="font-extrabold">{person.name}</h2>
-              {person.admin ? <p className="text-xs font-bold uppercase tracking-wide text-leaf">Admin</p> : null}
+              <span className="flex shrink-0 items-center gap-2">
+                {person.admin ? <p className="text-xs font-bold uppercase tracking-wide text-leaf">Admin</p> : null}
+                <button
+                  type="button"
+                  aria-label={`Modifier ${person.name}`}
+                  className="grid size-9 place-items-center rounded-xl text-pine disabled:opacity-45"
+                  disabled={busy !== null}
+                  onClick={() => (editing === person.name ? setEditing(null) : openEdit(person))}
+                >
+                  <PencilIcon />
+                </button>
+              </span>
             </div>
-            {person.phone ? <p className="text-sm font-semibold text-muted">{person.phone}</p> : null}
-            {person.email ? <p className="break-all text-sm font-semibold text-muted">{person.email}</p> : null}
+            {editing === person.name ? (
+              <div className="grid gap-2">
+                <input
+                  value={editName}
+                  maxLength={120}
+                  aria-label="Prénom Nom"
+                  autoCapitalize="words"
+                  placeholder="Prénom Nom"
+                  onChange={(event) => setEditName(event.target.value)}
+                  className={`min-h-11 rounded-xl px-3 text-base outline-none focus:border-leaf ${fieldClass(Boolean(editName.trim()), false)}`}
+                />
+                <PlacePicker
+                  label="Commune"
+                  inputId="commune-fiche"
+                  domicile={false}
+                  value={editCommune}
+                  onChange={({ value }) => setEditCommune(value)}
+                />
+                <input
+                  value={editPhone}
+                  maxLength={40}
+                  aria-label="Numéro de téléphone"
+                  inputMode="tel"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="Numéro de téléphone, facultatif"
+                  onChange={(event) => setEditPhone(event.target.value)}
+                  className={`min-h-11 rounded-xl px-3 text-base outline-none focus:border-leaf ${fieldClass(Boolean(editPhone.trim()), true)}`}
+                />
+                <input
+                  value={editEmail}
+                  maxLength={120}
+                  type="email"
+                  inputMode="email"
+                  aria-label="Adresse mail"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="Adresse mail, facultative"
+                  onChange={(event) => setEditEmail(event.target.value)}
+                  className={`min-h-11 rounded-xl px-3 text-base outline-none focus:border-leaf ${fieldClass(Boolean(editEmail.trim()), true)}`}
+                />
+                <div className="flex gap-3">
+                  <button type="button" className="min-h-11 text-sm font-bold text-muted" onClick={() => setEditing(null)}>
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    className="min-h-11 text-sm font-bold text-leaf disabled:opacity-45"
+                    disabled={busy !== null}
+                    onClick={() => void saveEdit(person.name)}
+                  >
+                    {busy === `update:${person.name}` ? '…' : 'Enregistrer'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {person.commune ? <p className="text-sm font-semibold text-muted">{person.commune}</p> : null}
+                {person.phone ? <p className="text-sm font-semibold text-muted">{person.phone}</p> : null}
+                {person.email ? <p className="break-all text-sm font-semibold text-muted">{person.email}</p> : null}
+              </>
+            )}
             {person.devices?.length ? (
               <ul className="grid">
                 {person.devices.map((id) => {
@@ -412,6 +559,15 @@ export function AdminScreen() {
         </Suspense>
       ) : null}
     </div>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   )
 }
 

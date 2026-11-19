@@ -39,6 +39,7 @@ const DEVICE_HEADER = 'Identifiants appareils autorisés'
 const ADMIN_HEADER = 'Admin'
 const PHONE_HEADER = 'Numéro de téléphone'
 const EMAIL_HEADER = 'Adresse mail'
+const COMMUNE_HEADER = 'Commune'
 
 function doGet(e) {
   var params = e && e.parameter ? e.parameter : {}
@@ -48,6 +49,7 @@ function doGet(e) {
     var action = String(params.action || '')
     if (action === 'add' || action === 'remove') payload = changeDevices(params, action)
     else if (action === 'create') payload = addInterviewer(params)
+    else if (action === 'update') payload = updateInterviewer(params)
     else payload = readConfig(params.device, params.who)
   } catch (error) {
     payload = { ok: false, error: String(error && error.message ? error.message : error).slice(0, 180) }
@@ -101,12 +103,13 @@ function addInterviewer(params) {
   const name = String(params.interviewer || '').trim().slice(0, 120)
   const phone = normalizePhone(params.phone)
   const email = normalizeEmail(params.email)
+  const commune = clipCommune(params.commune)
   if (!device || !who) throw new Error('Administration refusée.')
   if (!name) throw new Error('Indiquez le prénom et le nom.')
   const lock = LockService.getScriptLock()
   lock.waitLock(15000)
   try {
-    const loaded = ensureEmailColumn(ensurePhoneColumn(loadInterviewers()))
+    const loaded = ensureCommuneColumn(ensureEmailColumn(ensurePhoneColumn(loadInterviewers())))
     if (!isAdmin(loaded.people, who, device)) throw new Error('Administration refusée.')
     const folded = foldName(name)
     for (let i = 0; i < loaded.people.length; i++) {
@@ -118,6 +121,43 @@ function addInterviewer(params) {
     loaded.sheet.getRange(row, loaded.adminCol).setValue('')
     loaded.sheet.getRange(row, loaded.phoneCol).setValue(phone)
     loaded.sheet.getRange(row, loaded.emailCol).setValue(email)
+    loaded.sheet.getRange(row, loaded.communeCol).setValue(commune)
+    SpreadsheetApp.flush()
+    return readConfig(device, who)
+  } finally {
+    lock.releaseLock()
+  }
+}
+
+function updateInterviewer(params) {
+  const device = normalizeDevice(params.device)
+  const who = String(params.who || '').trim()
+  const currentName = String(params.interviewer || '').trim()
+  const nextName = String(params.name || currentName).trim().slice(0, 120)
+  const phone = normalizePhone(params.phone)
+  const email = normalizeEmail(params.email)
+  const commune = clipCommune(params.commune)
+  if (!device || !who) throw new Error('Administration refusée.')
+  if (!currentName || !nextName) throw new Error('Indiquez le prénom et le nom.')
+  const lock = LockService.getScriptLock()
+  lock.waitLock(15000)
+  try {
+    const loaded = ensureCommuneColumn(ensureEmailColumn(ensurePhoneColumn(loadInterviewers())))
+    if (!isAdmin(loaded.people, who, device)) throw new Error('Administration refusée.')
+    let person = null
+    for (let i = 0; i < loaded.people.length; i++) {
+      if (loaded.people[i].name === currentName) person = loaded.people[i]
+    }
+    if (!person) throw new Error('Enquêteur introuvable.')
+    const folded = foldName(nextName)
+    for (let i = 0; i < loaded.people.length; i++) {
+      if (loaded.people[i].sheetRow === person.sheetRow) continue
+      if (foldName(loaded.people[i].name) === folded) throw new Error('Cet enquêteur est déjà dans la liste.')
+    }
+    loaded.sheet.getRange(person.sheetRow, loaded.nameCol).setValue(nextName)
+    loaded.sheet.getRange(person.sheetRow, loaded.phoneCol).setValue(phone)
+    loaded.sheet.getRange(person.sheetRow, loaded.emailCol).setValue(email)
+    loaded.sheet.getRange(person.sheetRow, loaded.communeCol).setValue(commune)
     SpreadsheetApp.flush()
     return readConfig(device, who)
   } finally {
@@ -166,6 +206,7 @@ function loadInterviewers() {
   const adminIndex = headerIndex(headers, ADMIN_HEADER)
   const phoneIndex = headerIndex(headers, PHONE_HEADER)
   const emailIndex = headerIndex(headers, EMAIL_HEADER)
+  const communeIndex = headerIndex(headers, COMMUNE_HEADER)
   if (nameIndex === -1) throw new Error('Colonne « Prénom Nom » introuvable.')
   if (deviceIndex === -1) throw new Error('Colonne « Identifiants appareils autorisés » introuvable.')
   if (adminIndex === -1) throw new Error('Colonne « Admin » introuvable.')
@@ -183,6 +224,7 @@ function loadInterviewers() {
         devices: parseDevices(values[row][deviceIndex]),
         phone: phoneIndex === -1 ? '' : String(values[row][phoneIndex] || '').trim().slice(0, 40),
         email: emailIndex === -1 ? '' : String(values[row][emailIndex] || '').trim().toLowerCase().slice(0, 120),
+        commune: communeIndex === -1 ? '' : String(values[row][communeIndex] || '').trim().slice(0, 120),
         sheetRow: row + 2,
       })
       if (people.length >= 400) break
@@ -195,6 +237,7 @@ function loadInterviewers() {
     adminCol: adminIndex + 1,
     phoneCol: phoneIndex === -1 ? 0 : phoneIndex + 1,
     emailCol: emailIndex === -1 ? 0 : emailIndex + 1,
+    communeCol: communeIndex === -1 ? 0 : communeIndex + 1,
     people: people,
   }
 }
@@ -213,6 +256,18 @@ function ensureEmailColumn(loaded) {
   loaded.sheet.getRange(1, col).setValue(EMAIL_HEADER)
   loaded.emailCol = col
   return loaded
+}
+
+function ensureCommuneColumn(loaded) {
+  if (loaded.communeCol) return loaded
+  const col = loaded.sheet.getLastColumn() + 1
+  loaded.sheet.getRange(1, col).setValue(COMMUNE_HEADER)
+  loaded.communeCol = col
+  return loaded
+}
+
+function clipCommune(value) {
+  return String(value || '').trim().slice(0, 120)
 }
 
 function foldName(value) {
@@ -260,6 +315,7 @@ function presentInterviewers(people, device, who) {
       devices: person.devices,
       phone: person.phone || '',
       email: person.email || '',
+      commune: person.commune || '',
     }
   })
 }

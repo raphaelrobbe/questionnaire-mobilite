@@ -30,8 +30,8 @@ describe('listes du tableur', () => {
       }),
     ).toEqual({
       interviewers: [
-        { name: 'Ada', admin: true, authorized: true, devices: null, phone: '', email: '' },
-        { name: 'Camille', admin: false, authorized: false, devices: ['abc'], phone: '', email: '' },
+        { name: 'Ada', admin: true, authorized: true, devices: null, phone: '', email: '', commune: '' },
+        { name: 'Camille', admin: false, authorized: false, devices: ['abc'], phone: '', email: '', commune: '' },
       ],
     })
     expect(() => readListsPayload({ ok: true, interviewers: [{ name: 'Ada', devices: ['abc'] }] })).toThrow(/redéployez/)
@@ -55,9 +55,9 @@ describe('listes du tableur', () => {
 
   test('n’autorise un appareil que s’il est listé pour l’enquêteur, et jamais si la cellule est vide', () => {
     const interviewers = [
-      { name: 'Ada', admin: true, authorized: true, devices: ['abc'], phone: '', email: '' },
-      { name: 'Camille', admin: false, authorized: false, devices: [] as string[], phone: '', email: '' },
-      { name: 'Noé', admin: false, authorized: true, devices: null, phone: '', email: '' },
+      { name: 'Ada', admin: true, authorized: true, devices: ['abc'], phone: '', email: '', commune: '' },
+      { name: 'Camille', admin: false, authorized: false, devices: [] as string[], phone: '', email: '', commune: '' },
+      { name: 'Noé', admin: false, authorized: true, devices: null, phone: '', email: '', commune: '' },
     ]
     expect(deviceAllowed(interviewers, 'Ada', 'ABC')).toBe(true)
     expect(deviceAllowed(interviewers, 'Ada', 'autre')).toBe(false)
@@ -71,17 +71,17 @@ describe('listes du tableur', () => {
 
   test('retrouve le nom à partir de l’identifiant, sans liste à choisir', () => {
     const hidden = [
-      { name: 'Ada', admin: true, authorized: false, devices: null, phone: '', email: '' },
-      { name: 'Camille', admin: false, authorized: true, devices: null, phone: '', email: '' },
+      { name: 'Ada', admin: true, authorized: false, devices: null, phone: '', email: '', commune: '' },
+      { name: 'Camille', admin: false, authorized: true, devices: null, phone: '', email: '', commune: '' },
     ]
     expect(interviewerForDevice(hidden, 'abc')?.name).toBe('Camille')
     const revealed = [
-      { name: 'Ada', admin: true, authorized: false, devices: ['zzz'], phone: '', email: '' },
-      { name: 'Camille', admin: false, authorized: true, devices: ['abc'], phone: '', email: '' },
+      { name: 'Ada', admin: true, authorized: false, devices: ['zzz'], phone: '', email: '', commune: '' },
+      { name: 'Camille', admin: false, authorized: true, devices: ['abc'], phone: '', email: '', commune: '' },
     ]
     expect(interviewerForDevice(revealed, 'ABC')?.name).toBe('Camille')
     expect(interviewerForDevice(revealed, 'absent')).toBeNull()
-    expect(interviewerForDevice([{ name: 'Ada', admin: false, authorized: true, devices: [], phone: '', email: '' }], 'abc')).toBeNull()
+    expect(interviewerForDevice([{ name: 'Ada', admin: false, authorized: true, devices: [], phone: '', email: '', commune: '' }], 'abc')).toBeNull()
     expect(interviewerForDevice(hidden, '')).toBeNull()
     expect(interviewerForDevice([], 'abc')).toBeNull()
   })
@@ -110,5 +110,11 @@ describe('listes du tableur', () => {
         interviewers: [{ name: 'Ada', admin: false, authorized: false, email: ' Ada@Exemple.fr ' }],
       }).interviewers[0]?.email,
     ).toBe('ada@exemple.fr')
+    expect(
+      readListsPayload({
+        ok: true,
+        interviewers: [{ name: 'Ada', admin: false, authorized: false, commune: '  Métabief ' }],
+      }).interviewers[0]?.commune,
+    ).toBe('Métabief')
   })
 })
