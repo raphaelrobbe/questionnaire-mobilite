@@ -30,7 +30,17 @@ export function QuestionnairePage() {
   )
 }
 
-function Choices({ choices, inline, apart = 0 }: { choices: readonly string[]; inline?: boolean; apart?: number }) {
+function Choices({
+  choices,
+  inline,
+  apart = 0,
+  notes,
+}: {
+  choices: readonly string[]
+  inline?: boolean
+  apart?: number
+  notes?: Readonly<Record<string, string>>
+}) {
   const split = inline ? choices.length : Math.max(0, choices.length - apart)
   const main = choices.slice(0, split)
   const tail = choices.slice(split)
@@ -49,7 +59,10 @@ function Choices({ choices, inline, apart = 0 }: { choices: readonly string[]; i
         ) : (
           <ul className="mt-1 grid list-disc gap-1 pl-4 text-sm leading-snug">
             {main.map((choice) => (
-              <li key={choice}>{choice}</li>
+              <li key={choice}>
+                {choice}
+                {notes?.[choice] ? <span className="mt-0.5 block font-medium leading-snug text-muted">{notes[choice]}</span> : null}
+              </li>
             ))}
           </ul>
         )
@@ -67,13 +80,15 @@ function Choices({ choices, inline, apart = 0 }: { choices: readonly string[]; i
 
 function QuestionList({ questions }: { questions: readonly Question[] }) {
   return (
-    <ol className="grid list-decimal gap-4 pl-5 marker:font-extrabold marker:text-pine">
+    <ol className="grid list-decimal gap-4 pl-9 marker:font-extrabold marker:text-pine">
       {questions.map((question) => (
         <li key={question.id} className="pl-1">
           {question.when ? <p className="print-keep text-sm font-bold text-clay">Posée si {question.when}</p> : null}
           <p className="print-keep font-extrabold leading-snug">{question.ask}</p>
           {question.note ? <p className="print-keep mt-1 text-sm leading-relaxed text-muted">{question.note}</p> : null}
-          {question.choices?.length ? <Choices choices={question.choices} inline={question.inline} apart={question.apart} /> : null}
+          {question.choices?.length ? (
+            <Choices choices={question.choices} inline={question.inline} apart={question.apart} notes={question.choiceNotes} />
+          ) : null}
           {question.each ? (
             <div className="mt-3">
               <p className="print-keep text-sm font-bold leading-relaxed">{question.each.intro}</p>

@@ -6,10 +6,8 @@ import {
   CIVILITY,
   DRIVE_OPTIONS,
   HANDICAP_ADAPTATIONS,
-  HANDICAP_ANSWERS,
-  HANDICAP_CONCERN,
-  HANDICAP_WHO,
   LIFE_CHOICES,
+  LIFE_LIKELIHOOD,
   MODE_BARRIERS,
   MODE_CONDITION_GROUPS,
   MODE_CONDITIONS,
@@ -28,6 +26,8 @@ export type Question = {
   inline?: boolean
   /** Nombre d’options finales écartées du bloc, avec un espace avant chacune. */
   apart?: number
+  /** Sous-titre d’une réponse, retrouvé par son libellé. */
+  choiceNotes?: Readonly<Record<string, string>>
   /** Complément de « Posée si ». Absent quand la question est toujours posée. */
   when?: string
   /** Questions communes à chaque catégorie, affichées une seule fois avant elles. */
@@ -68,6 +68,12 @@ export function transitQuestion(modes: number): string {
 }
 
 const labels = (items: readonly { label: string }[]) => items.map((item) => item.label)
+
+function choiceNotes(items: readonly { label: string; note?: string }[]): Readonly<Record<string, string>> | undefined {
+  const notes: Record<string, string> = {}
+  for (const item of items) if (item.note) notes[item.label] = item.note
+  return Object.keys(notes).length ? notes : undefined
+}
 
 function optionalNote(id: string, ask = 'Préciser'): Question {
   return { id, ask, note: 'Facultatif.' }
@@ -451,15 +457,17 @@ export const QUESTIONNAIRE: readonly QuestionnairePart[] = [
     questions: [
       {
         id: 'life-choices',
-        ask: 'Si des transports en commun adaptés à vos besoins existaient, cela pourrait-il vous amener à faire des choix différents dans votre vie quotidienne ?',
+        ask: 'Si une offre de transports en commun ou de covoiturage adaptée à vos besoins existait, cela pourrait-il vous amener à faire des choix différents dans votre vie quotidienne ?',
         note: 'Plusieurs réponses possibles.',
         choices: labels(LIFE_CHOICES),
         children: [
           {
             id: 'life-who',
             ask: 'Qui cela concerne-t-il ?',
-            note: 'Les personnes du foyer, puis une précision facultative.',
+            note: 'Les personnes du foyer, en colonne. Pour chaque personne retenue : oui, probablement ou peut-être, puis une précision facultative.',
             when: 'une réponse autre que « Non, cela ne changerait pas mes choix » est retenue',
+            choices: labels(LIFE_LIKELIHOOD),
+            inline: true,
           },
         ],
       },
@@ -471,36 +479,17 @@ export const QUESTIONNAIRE: readonly QuestionnairePart[] = [
     questions: [
       {
         id: 'handicap',
-        ask: 'Selon vous, les transports devraient-ils proposer des aménagements ou des services adaptés aux personnes en situation de handicap ?',
-        choices: labels(HANDICAP_ANSWERS),
-        inline: true,
+        ask: 'Une ou plusieurs personnes de votre foyer ont-elles besoin de services adaptés ?',
+        note: 'Plusieurs réponses possibles. Pour chaque réponse retenue, indiquer les personnes du foyer concernées.',
+        choices: labels(HANDICAP_ADAPTATIONS),
+        choiceNotes: choiceNotes(HANDICAP_ADAPTATIONS),
         children: [
           {
-            id: 'handicap-types',
-            ask: 'Si oui, quels types d’adaptations vous sembleraient nécessaires ?',
-            note: 'Plusieurs réponses possibles.',
-            when: 'la réponse est oui',
-            choices: labels(HANDICAP_ADAPTATIONS),
-            children: [
-              { id: 'handicap-other', ask: 'Préciser', when: '« Autre (à préciser) » est choisi' },
-            ],
+            id: 'handicap-who',
+            ask: 'Qui est concerné ?',
+            when: 'une adaptation est retenue',
           },
-          {
-            id: 'handicap-concern',
-            ask: 'Ce besoin d’adaptation vous concerne-t-il ou concerne-t-il un proche ?',
-            when: 'au moins une adaptation est indiquée',
-            choices: labels(HANDICAP_CONCERN),
-            inline: true,
-            children: [
-              {
-                id: 'handicap-who',
-                ask: 'Qui est concerné',
-                note: 'Plusieurs réponses possibles.',
-                when: 'cela concerne la personne ou un proche',
-                choices: labels(HANDICAP_WHO),
-              },
-            ],
-          },
+          { id: 'handicap-other', ask: 'Préciser', when: '« Autre (à préciser) » est choisi' },
         ],
       },
     ],

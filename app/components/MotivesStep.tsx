@@ -3,7 +3,7 @@ import { fold } from '~/common/config'
 import { DOMICILE, RARE_COUNTS, RARE_UNITS, acceptableMinutes, addJourney, doorToDoorMinutes, journeyHeading, journeyTouched, modesBesideTransit, removeJourney, tripMinutes, tripOfferModes, tripReplacedExtras, tripReplacedRiders, tripRiders, updateJourney, waitMinutes, WEEKDAYS, type Journey, type JourneyKind, type Weekday } from '~/common/journeys'
 import { OFFER_MODES, SLOTS, THEME_IDS, themeLabel, vehicleModeOptions, type SlotId } from '~/common/motives'
 import { REPLACED_ANSWERS, questionNote, questionText, transitQuestion } from '~/common/questionnaire'
-import { AGE_BANDS, type Answers, type Person } from '~/common/survey'
+import { ageLabel, type Answers, type Person } from '~/common/survey'
 import { Reveal } from './Reveal'
 import { choiceFill, fieldClass, idleClass, type ChoiceFill } from './fill'
 import { PlacePicker } from './PlacePicker'
@@ -849,6 +849,6 @@ function Chip({ pressed, idle, onClick, children }: { pressed: boolean; idle: Ch
 }
 
 function personChip(person: Person, index: number): string {
-  const age = AGE_BANDS.find((band) => band.value === person.age)?.label
+  const age = ageLabel(person.age)
   return age ? `Personne ${index + 1} · ${age}` : `Personne ${index + 1}`
 }

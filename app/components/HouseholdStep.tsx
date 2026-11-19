@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { questionText } from '~/common/questionnaire'
-import { AGE_BANDS, DRIVE_OPTIONS, MAX_PEOPLE, addPerson, asksAutonomie, asksElectoral, changePerson, removePerson, type Person } from '~/common/survey'
+import { AGE_BANDS, DRIVE_OPTIONS, MAX_PEOPLE, addPerson, ageLabel, asksAutonomie, asksElectoral, changePerson, isUnder15, personLine, removePerson, type Person } from '~/common/survey'
 import { Button } from './Button'
 import { choiceClass } from './fill'
 import { PlacePicker } from './PlacePicker'
@@ -15,12 +15,42 @@ export function HouseholdStep({
   commune: string
   onChange: (people: Person[]) => void
 }) {
+  const [folded, setFolded] = useState<boolean[]>([])
+
+  function toggle(index: number) {
+    setFolded((current) => {
+      const next = people.map((_, item) => current[item] === true)
+      next[index] = !next[index]
+      return next
+    })
+  }
+
+  function add() {
+    setFolded(people.map(() => true))
+    onChange(addPerson(people))
+  }
+
+  function removeAt(index: number) {
+    setFolded((current) => current.filter((_, item) => item !== index))
+    onChange(removePerson(people, index))
+  }
+
   return (
     <div className="mt-6 grid gap-4">
       {people.map((person, index) => (
-        <PersonCard key={index} person={person} index={index} people={people} commune={commune} onChange={onChange} />
+        <PersonCard
+          key={index}
+          person={person}
+          index={index}
+          people={people}
+          commune={commune}
+          folded={people.length > 1 && folded[index] === true}
+          onToggle={() => toggle(index)}
+          onRemove={() => removeAt(index)}
+          onChange={onChange}
+        />
       ))}
-      <Button variant="secondary" disabled={people.length >= MAX_PEOPLE} onClick={() => onChange(addPerson(people))}>
+      <Button variant="secondary" disabled={people.length >= MAX_PEOPLE} onClick={add}>
         Ajouter une personne
       </Button>
     </div>
@@ -32,33 +62,61 @@ function PersonCard({
   index,
   people,
   commune,
+  folded,
+  onToggle,
+  onRemove,
   onChange,
 }: {
   person: Person
   index: number
   people: Person[]
   commune: string
+  folded: boolean
+  onToggle: () => void
+  onRemove: () => void
   onChange: (people: Person[]) => void
 }) {
   const [confirming, setConfirming] = useState(false)
+  const panelId = useId()
+  const summary = personLine(person) || ageLabel(person.age)
+  const several = people.length > 1
   return (
     <Reveal>
-      <fieldset className="relative grid gap-3 rounded-[28px] border border-line bg-card px-4 py-4">
-        <legend className="px-1 font-extrabold">Personne {index + 1}</legend>
-        {people.length > 1 ? (
+      <div className="relative rounded-[28px] border border-line bg-card">
+        {several ? (
+          <button
+            type="button"
+            aria-expanded={!folded}
+            aria-controls={panelId}
+            className="flex min-h-14 w-full items-center gap-3 px-4 py-3 pr-12 text-left"
+            onClick={onToggle}
+          >
+            <span className="shrink-0 font-extrabold">Personne {index + 1}</span>
+            {folded && summary ? <span className="truncate text-sm font-medium text-muted">{summary}</span> : null}
+          </button>
+        ) : (
+          <p className="px-4 pt-4 font-extrabold">Personne {index + 1}</p>
+        )}
+        {several ? (
           <RemovePerson
             confirming={confirming}
             onAsk={() => setConfirming(true)}
             onCancel={() => setConfirming(false)}
-            onConfirm={() => onChange(removePerson(people, index))}
+            onConfirm={onRemove}
           />
         ) : null}
+        {folded ? null : (
+        <div id={panelId} className={`grid gap-3 px-4 pb-4 ${several ? '' : 'pt-3'}`}>
         <div>
           <p className="text-sm font-bold text-muted">{questionText('age')}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {AGE_BANDS.some((option) => option.value === person.age) || !person.age ? null : (
+              <Chip compact selected chosen label={ageLabel(person.age)} onClick={() => undefined} />
+            )}
             {AGE_BANDS.map((option) => (
               <Chip
                 key={option.value}
+                compact
                 selected={person.age === option.value}
                 chosen={Boolean(person.age)}
                 label={option.label}
@@ -67,7 +125,7 @@ function PersonCard({
             ))}
           </div>
         </div>
-        {person.age !== '' && person.age !== '0-14' ? (
+        {person.age !== '' && !isUnder15(person.age) ? (
           <Reveal>
             <div>
               <p className="text-sm font-bold text-muted">{questionText('drive')}</p>
@@ -133,7 +191,9 @@ function PersonCard({
             </div>
           </Reveal>
         ) : null}
-      </fieldset>
+        </div>
+        )}
+      </div>
     </Reveal>
   )
 }
@@ -230,13 +290,25 @@ function WhyElectoral() {
   )
 }
 
-function Chip({ selected, chosen, label, onClick }: { selected: boolean; chosen: boolean; label: string; onClick: () => void }) {
+function Chip({
+  selected,
+  chosen,
+  label,
+  onClick,
+  compact = false,
+}: {
+  selected: boolean
+  chosen: boolean
+  label: string
+  onClick: () => void
+  compact?: boolean
+}) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={`min-h-11 rounded-full px-3 text-sm font-bold ${choiceClass(selected, 'one', chosen)}`}
+      className={`rounded-full font-bold ${compact ? 'min-h-9 px-2.5 text-sm' : 'min-h-11 px-3 text-sm'} ${choiceClass(selected, 'one', chosen)}`}
     >
       {label}
     </button>

@@ -7,12 +7,15 @@ import { DOMICILE, actualJourneyIssue, defaultJourneys, difficultiesIssue, diffi
 export const MAX_PEOPLE = 12
 export const MAX_VEHICLES = 8
 
-export type AgeBand = '0-14' | '15-17' | '18-24' | '25-39' | '40-64' | '65+'
+export type AgeBand = '0-10' | '11-14' | '15-17' | '18-24' | '25-39' | '40-54' | '55-64' | '65-74' | '75+'
+/** Tranches précédentes, encore lues pour ne pas effacer une fiche déjà saisie. */
+type RetiredAgeBand = '0-14' | '40-64' | '65+'
+type StoredAge = AgeBand | RetiredAgeBand
 export type Drive = 'non' | 'accompagnee' | 'oui'
 export type Motor = 'electrique' | 'hybride' | 'thermique'
 
 export type Person = {
-  age: AgeBand | ''
+  age: StoredAge | ''
   drive: Drive | ''
   manqueAutonomie: boolean
   /** Inscription sur les listes électorales, à partir de 18 ans. */
@@ -27,7 +30,8 @@ export type Recontact = 'oui' | 'non'
 export type HandicapAnswer = 'oui' | 'non' | 'nsp'
 export type HandicapAdaptation = 'pmr' | 'montee' | 'vue' | 'ouie' | 'cognitif' | 'humain' | 'autre'
 export type HandicapWho = 'moi' | 'foyer' | 'proche'
-export type LifeChoiceId = 'residence' | 'emploi' | 'activite' | 'achats' | 'non'
+export type LifeChoiceId = 'voiture' | 'residence' | 'emploi' | 'activite' | 'achats' | 'autres' | 'non'
+export type LifeLikelihood = 'oui' | 'probablement' | 'peut-etre'
 export type LifeChoiceDetail = Exclude<LifeChoiceId, 'non'>
 export type ModeReasonId =
   | 'environnement'
@@ -41,6 +45,7 @@ export type ModeReasonId =
   | 'repos'
   | 'dependance'
   | 'sante'
+  | 'compagnie'
   | 'autre'
   | 'aucune'
 export type ModeConditionId =
@@ -56,6 +61,7 @@ export type ModeConditionId =
   | 'fiabilite'
   | 'bagages'
   | 'enfants'
+  | 'confiance'
   | 'autre'
   | 'aucune'
 export type ModeBarrierId =
@@ -74,6 +80,7 @@ export type ModeBarrierId =
   | 'sante'
   | 'reservation'
   | 'habitudes'
+  | 'confiance'
   | 'autre'
   | 'aucun'
 export type WalkDistanceId = 'm200' | 'm500' | 'km1' | 'km2' | 'plus' | 'meteo' | 'frequence' | 'jamais' | 'autre'
@@ -106,13 +113,37 @@ export const HANDICAP_ANSWERS: Labeled<HandicapAnswer>[] = [
 ]
 
 export const HANDICAP_ADAPTATIONS: Labeled<HandicapAdaptation>[] = [
-  { value: 'pmr', label: 'Accessibilité pour les personnes à mobilité réduite (fauteuil roulant, difficultés à marcher, etc.)' },
+  {
+    value: 'pmr',
+    label: 'Accessibilité pour les personnes à mobilité réduite (fauteuil roulant, difficultés à marcher, etc.)',
+    note: 'ex : rampe d’accès PMR aux portes de bus, places réservées fauteuils / PMR, accessibilité des arrêts…',
+  },
   { value: 'montee', label: 'Aide à la montée et à la descente des véhicules' },
-  { value: 'vue', label: 'Adaptations pour les personnes malvoyantes ou aveugles' },
-  { value: 'ouie', label: 'Adaptations pour les personnes sourdes ou malentendantes' },
-  { value: 'cognitif', label: 'Adaptations pour les personnes ayant un handicap cognitif, intellectuel ou psychique' },
-  { value: 'humain', label: 'Accompagnement humain ou aide dans les déplacements' },
-  { value: 'autre', label: 'Autre (à préciser)' },
+  {
+    value: 'vue',
+    label: 'Adaptations pour les personnes malvoyantes ou aveugles',
+    note: 'ex : signalétique et horaires plus grands, contrastés, site web/application adaptés, annonces sonores, guidage au sol…',
+  },
+  {
+    value: 'ouie',
+    label: 'Adaptations pour les personnes sourdes ou malentendantes',
+    note: 'ex : informations visuelles systématiques (habituel et en cas de perturbation / urgence)…',
+  },
+  {
+    value: 'cognitif',
+    label: 'Adaptations pour les personnes ayant un handicap cognitif, intellectuel ou psychique',
+    note: 'ex : signalétique/plans simplifiés, pictogrammes, repérages visuels, site web/application adaptés…',
+  },
+  {
+    value: 'humain',
+    label: 'Accompagnement humain ou aide dans les déplacements',
+    note: 'ex : agents d’accueil, accompagnants, aide à la réservation, formation du personnel…',
+  },
+  {
+    value: 'autre',
+    label: 'Autre (à préciser)',
+    note: 'concernant handicap invisible, troubles sensoriels, personnes de petite taille, grossesse, blessure…',
+  },
 ]
 
 export const HANDICAP_CONCERN: Labeled<HandicapConcern>[] = [
@@ -120,11 +151,19 @@ export const HANDICAP_CONCERN: Labeled<HandicapConcern>[] = [
   { value: 'non', label: 'Non' },
 ]
 
+export const LIFE_LIKELIHOOD: Labeled<LifeLikelihood>[] = [
+  { value: 'oui', label: 'Oui' },
+  { value: 'probablement', label: 'Probablement' },
+  { value: 'peut-etre', label: 'Peut-être' },
+]
+
 export const LIFE_CHOICES: Labeled<LifeChoiceId>[] = [
+  { value: 'voiture', label: 'Revente/non-renouvellement d’une voiture ou renoncement à l’achat d’une voiture' },
   { value: 'residence', label: 'Autre lieu de résidence' },
   { value: 'emploi', label: 'Autre emploi ou école / lieu d’études' },
   { value: 'activite', label: 'Activité sportive, culturelle ou associative ailleurs' },
   { value: 'achats', label: 'Achats, démarches ailleurs' },
+  { value: 'autres', label: 'Autres' },
   { value: 'non', label: 'Non, cela ne changerait pas mes choix' },
 ]
 
@@ -140,6 +179,7 @@ export const MODE_REASONS: Labeled<ModeReasonId>[] = [
   { value: 'repos', label: 'Pouvoir se reposer, lire ou faire autre chose pendant le trajet' },
   { value: 'dependance', label: 'Être moins dépendant de la disponibilité d’un véhicule' },
   { value: 'sante', label: 'Ne pas conduire (santé, âge, difficultés à conduire)' },
+  { value: 'compagnie', label: 'Ne pas être seul.e, partager le trajet avec quelqu’un' },
   { value: 'autre', label: 'Autre raison (préciser dans le champ ci-dessous)' },
   { value: 'aucune', label: 'Je ne changerais pas de mode de transport' },
 ]
@@ -157,13 +197,14 @@ export const MODE_CONDITIONS: Labeled<ModeConditionId>[] = [
   { value: 'fiabilite', label: 'Une bonne fiabilité (ponctualité, maintien des trajets…)' },
   { value: 'bagages', label: 'La possibilité de transporter des bagages, des courses ou du matériel' },
   { value: 'enfants', label: 'La possibilité de voyager avec des enfants, une poussette ou des personnes à charge' },
+  { value: 'confiance', label: 'Avoir confiance dans les covoitureurs et covoitureuses' },
   { value: 'autre', label: 'Autres conditions (à préciser)' },
   { value: 'aucune', label: 'Aucune condition ne me permettrait de remplacer ces trajets en voiture' },
 ]
 
 export const MODE_CONDITION_GROUPS: { title: string; ids: ModeConditionId[] }[] = [
   { title: 'Coût', ids: ['inferieur', 'equivalent', 'superieur', 'abonnement', 'impot'] },
-  { title: 'Conditions pratiques', ids: ['arret', 'horaires', 'frequence', 'correspondances', 'fiabilite', 'bagages', 'enfants'] },
+  { title: 'Conditions pratiques', ids: ['arret', 'horaires', 'frequence', 'correspondances', 'fiabilite', 'bagages', 'enfants', 'confiance'] },
 ]
 
 export const MODE_BARRIERS: Labeled<ModeBarrierId>[] = [
@@ -182,6 +223,7 @@ export const MODE_BARRIERS: Labeled<ModeBarrierId>[] = [
   { value: 'sante', label: 'Difficultés liées à mon âge, ma santé ou un handicap' },
   { value: 'reservation', label: 'Fait de devoir réserver à l’avance (si c’est le cas)' },
   { value: 'habitudes', label: 'Changement des habitudes' },
+  { value: 'confiance', label: 'Manque de confiance dans les covoitureurs et covoitureuses' },
   { value: 'autre', label: 'Autre raison (à préciser)' },
   { value: 'aucun', label: 'Aucun frein particulier' },
 ]
@@ -201,6 +243,8 @@ export const WALK_DISTANCES: Labeled<WalkDistanceId>[] = [
 export type LifeChoices = {
   selected: LifeChoiceId[]
   people: Partial<Record<LifeChoiceDetail, number[]>>
+  /** Oui, probablement ou peut-être, pour chaque personne retenue. */
+  likelihood: Partial<Record<LifeChoiceDetail, Partial<Record<number, LifeLikelihood>>>>
   notes: Partial<Record<LifeChoiceDetail, string>>
 }
 
@@ -426,7 +470,7 @@ function axis(value: unknown, limit: number): number | null {
 }
 
 export function emptyLifeChoices(): LifeChoices {
-  return { selected: [], people: {}, notes: {} }
+  return { selected: [], people: {}, likelihood: {}, notes: {} }
 }
 
 export const HANDICAP_WHO: Labeled<HandicapWho>[] = [
@@ -481,7 +525,9 @@ export type Answers = {
   handicap: HandicapAnswer | ''
   handicapTypes: HandicapAdaptation[]
   handicapAutre: string
-  /** Ce besoin concerne la personne ou un proche. */
+  /** Personnes du foyer concernées, pour chaque adaptation retenue. */
+  handicapPeople: Partial<Record<HandicapAdaptation, number[]>>
+  /** Ancienne question, conservée vide pour les fiches déjà enregistrées. */
   handicapConcern: HandicapConcern | ''
   handicapWho: HandicapWho[]
   handicapComment: string
@@ -489,16 +535,34 @@ export type Answers = {
   closingNote: string
 }
 
-type Labeled<T extends string> = { value: T; label: string }
+type Labeled<T extends string> = { value: T; label: string; note?: string }
 
 export const AGE_BANDS: Labeled<AgeBand>[] = [
-  { value: '0-14', label: '0–14 ans' },
+  { value: '0-10', label: '0–10 ans' },
+  { value: '11-14', label: '11–14 ans' },
   { value: '15-17', label: '15–17 ans' },
   { value: '18-24', label: '18–24 ans' },
   { value: '25-39', label: '25–39 ans' },
+  { value: '40-54', label: '40–54 ans' },
+  { value: '55-64', label: '55–64 ans' },
+  { value: '65-74', label: '65–74 ans' },
+  { value: '75+', label: '75 ans et plus' },
+]
+
+const RETIRED_AGE_BANDS: Labeled<RetiredAgeBand>[] = [
+  { value: '0-14', label: '0–14 ans' },
   { value: '40-64', label: '40–64 ans' },
   { value: '65+', label: '65 ans et plus' },
 ]
+
+export function ageLabel(age: string): string {
+  return labelOf(AGE_BANDS, age) || labelOf(RETIRED_AGE_BANDS, age)
+}
+
+/** Moins de 15 ans : la conduite n’est pas demandée. */
+export function isUnder15(age: string): boolean {
+  return age === '0-10' || age === '11-14' || age === '0-14'
+}
 
 export const DRIVE_OPTIONS: Labeled<Drive>[] = [
   { value: 'non', label: 'Ne conduit pas' },
@@ -540,12 +604,21 @@ export function emptyPerson(): Person {
 
 /** 18 ans ou plus : l’inscription électorale est demandée. */
 export function asksElectoral(person: Pick<Person, 'age'>): boolean {
-  return person.age === '18-24' || person.age === '25-39' || person.age === '40-64' || person.age === '65+'
+  return (
+    person.age === '18-24' ||
+    person.age === '25-39' ||
+    person.age === '40-54' ||
+    person.age === '55-64' ||
+    person.age === '65-74' ||
+    person.age === '75+' ||
+    person.age === '40-64' ||
+    person.age === '65+'
+  )
 }
 
 /** 15 ans ou plus, et ne conduit pas. */
 export function asksAutonomie(person: Pick<Person, 'age' | 'drive'>): boolean {
-  return person.drive === 'non' && person.age !== '' && person.age !== '0-14'
+  return person.drive === 'non' && person.age !== '' && !isUnder15(person.age)
 }
 
 export function emptyVehicle(): Vehicle {
@@ -585,6 +658,7 @@ export function emptyAnswers(): Answers {
     handicap: '',
     handicapTypes: [],
     handicapAutre: '',
+    handicapPeople: {},
     handicapConcern: '',
     handicapWho: [],
     handicapComment: '',
@@ -697,29 +771,37 @@ export function sanitizeAnswers(input: unknown): Answers {
     modeBarriers: sanitizeModeBarriers(source.modeBarriers),
     walkDistance: sanitizeWalkDistance(source.walkDistance),
     closingNote: typeof source.closingNote === 'string' ? clip(source.closingNote, 2000) : '',
-    ...handicapFields(source),
+    ...handicapFields(source, people.length || 1),
   }
 }
 
 function handicapFields(
   source: Record<string, unknown>,
-): Pick<Answers, 'handicap' | 'handicapTypes' | 'handicapAutre' | 'handicapConcern' | 'handicapWho' | 'handicapComment'> {
+  peopleCount: number,
+): Pick<Answers, 'handicap' | 'handicapTypes' | 'handicapAutre' | 'handicapPeople' | 'handicapConcern' | 'handicapWho' | 'handicapComment'> {
   const handicapComment = text(source.handicapComment, 400)
-  const handicap = known(HANDICAP_ANSWERS, source.handicap)
-  if (handicap !== 'oui') {
-    return { handicap, handicapTypes: [], handicapAutre: '', handicapConcern: '', handicapWho: [], handicapComment }
-  }
-  const handicapTypes = selected(HANDICAP_ADAPTATIONS, source.handicapTypes)
-  const typesReady = handicapTypes.length > 0 && (!handicapTypes.includes('autre') || Boolean(text(source.handicapAutre, 160).trim()))
-  const handicapConcern = typesReady ? known(HANDICAP_CONCERN, source.handicapConcern) : ''
+  const previous = known(HANDICAP_ANSWERS, source.handicap)
+  const kept = previous === 'non' || previous === 'nsp' ? [] : selected(HANDICAP_ADAPTATIONS, source.handicapTypes)
+  const handicap: HandicapAnswer | '' = kept.length ? 'oui' : previous === 'non' || previous === 'nsp' ? previous : ''
   return {
     handicap,
-    handicapTypes,
-    handicapAutre: handicapTypes.includes('autre') ? text(source.handicapAutre, 160) : '',
-    handicapConcern,
-    handicapWho: handicapConcern === 'oui' ? selected(HANDICAP_WHO, source.handicapWho) : [],
+    handicapTypes: kept,
+    handicapAutre: kept.includes('autre') ? text(source.handicapAutre, 160) : '',
+    handicapPeople: handicapPeopleOf(source.handicapPeople, kept, peopleCount),
+    handicapConcern: '',
+    handicapWho: [],
     handicapComment,
   }
+}
+
+function handicapPeopleOf(input: unknown, types: readonly HandicapAdaptation[], peopleCount: number): Answers['handicapPeople'] {
+  const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+  const people: Answers['handicapPeople'] = {}
+  for (const id of types) {
+    const indexes = personIndexes(source[id], peopleCount)
+    if (indexes.length) people[id] = indexes
+  }
+  return people
 }
 
 function selected<T extends string>(options: Labeled<T>[], input: unknown): T[] {
@@ -780,8 +862,8 @@ function sanitizePeople(input: unknown): Person[] {
   if (!Array.isArray(input)) return []
   return input.slice(0, MAX_PEOPLE).map((item) => {
     const source = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
-    const age = known(AGE_BANDS, source.age)
-    const drive = age === '0-14' ? '' : known(DRIVE_OPTIONS, source.drive)
+    const age = known(AGE_BANDS, source.age) || known(RETIRED_AGE_BANDS, source.age)
+    const drive = isUnder15(age) ? '' : known(DRIVE_OPTIONS, source.drive)
     const electoral = asksElectoral({ age }) && (source.electoral === 'oui' || source.electoral === 'non') ? source.electoral : ''
     return {
       age,
@@ -870,7 +952,7 @@ export function issueForCommune(answers: Answers): string | null {
 
 export function issueForHousehold(answers: Answers): string | null {
   if (!answers.people.length) return 'Ajoutez au moins une personne.'
-  if (answers.people.some((person) => !person.age || (person.age !== '0-14' && !person.drive))) {
+  if (answers.people.some((person) => !person.age || (!isUnder15(person.age) && !person.drive))) {
     return 'Indiquez l’âge et la conduite de chaque personne.'
   }
   if (answers.people.some((person) => asksElectoral(person) && !person.electoral)) {
@@ -932,19 +1014,40 @@ export function sanitizeLifeChoices(input: unknown, peopleCount: number): LifeCh
   const source = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const asked = Array.isArray(source.selected) ? source.selected : []
   const selected = LIFE_CHOICES.map((choice) => choice.value).filter((id) => asked.includes(id))
-  if (selected.includes('non')) return { selected: ['non'], people: {}, notes: {} }
+  if (selected.includes('non')) return { selected: ['non'], people: {}, likelihood: {}, notes: {} }
   const peopleIn = source.people && typeof source.people === 'object' ? (source.people as Record<string, unknown>) : {}
+  const likelihoodIn = source.likelihood && typeof source.likelihood === 'object' ? (source.likelihood as Record<string, unknown>) : {}
   const notesIn = source.notes && typeof source.notes === 'object' ? (source.notes as Record<string, unknown>) : {}
   const people: LifeChoices['people'] = {}
+  const likelihood: LifeChoices['likelihood'] = {}
   const notes: LifeChoices['notes'] = {}
   for (const id of selected) {
     if (id === 'non') continue
-    const indexes = personIndexes(peopleIn[id], peopleCount)
+    const indexes = personIndexes(peopleIn[id], peopleCount).filter((index) => !declinedLikelihood(likelihoodIn[id], index))
     if (indexes.length) people[id] = indexes
+    const degrees = likelihoodOf(likelihoodIn[id], indexes)
+    if (degrees) likelihood[id] = degrees
     const note = typeof notesIn[id] === 'string' ? clip(notesIn[id], 160) : ''
     if (note) notes[id] = note
   }
-  return { selected, people, notes }
+  return { selected, people, likelihood, notes }
+}
+
+function declinedLikelihood(input: unknown, index: number): boolean {
+  if (!input || typeof input !== 'object') return false
+  const source = input as Record<string, unknown>
+  return (source[index] ?? source[String(index)]) === 'non'
+}
+
+function likelihoodOf(input: unknown, indexes: number[]): Partial<Record<number, LifeLikelihood>> | undefined {
+  if (!input || typeof input !== 'object') return undefined
+  const source = input as Record<string, unknown>
+  const kept: Partial<Record<number, LifeLikelihood>> = {}
+  for (const index of indexes) {
+    const value = source[index] ?? source[String(index)]
+    if (value === 'oui' || value === 'probablement' || value === 'peut-etre') kept[index] = value
+  }
+  return Object.keys(kept).length ? kept : undefined
 }
 
 export function toggleLifeChoice(current: LifeChoices, id: LifeChoiceId): LifeChoices {
@@ -952,7 +1055,7 @@ export function toggleLifeChoice(current: LifeChoices, id: LifeChoiceId): LifeCh
   const some = current.selected.some((item) => item !== 'non')
   const selected = current.selected.includes(id)
   if (!selected && ((id === 'non' && some) || (id !== 'non' && none))) return current
-  if (id === 'non') return selected ? emptyLifeChoices() : { selected: ['non'], people: {}, notes: {} }
+  if (id === 'non') return selected ? emptyLifeChoices() : { selected: ['non'], people: {}, likelihood: {}, notes: {} }
   const next = selected ? current.selected.filter((item) => item !== id) : [...current.selected, id]
   return sanitizeLifeChoices({ ...current, selected: next }, MAX_PEOPLE)
 }
@@ -964,6 +1067,14 @@ export function toggleLifePerson(current: LifeChoices, id: LifeChoiceDetail, ind
   return sanitizeLifeChoices({ ...current, people: { ...current.people, [id]: people } }, MAX_PEOPLE)
 }
 
+export function setLifeLikelihood(current: LifeChoices, id: LifeChoiceDetail, index: number, value: LifeLikelihood): LifeChoices {
+  if (!current.people[id]?.includes(index)) return current
+  const row = { ...current.likelihood[id] }
+  if (row[index] === value) delete row[index]
+  else row[index] = value
+  return sanitizeLifeChoices({ ...current, likelihood: { ...current.likelihood, [id]: row } }, MAX_PEOPLE)
+}
+
 export function setLifeNote(current: LifeChoices, id: LifeChoiceDetail, note: string): LifeChoices {
   if (!current.selected.includes(id)) return current
   return sanitizeLifeChoices({ ...current, notes: { ...current.notes, [id]: note } }, MAX_PEOPLE)
@@ -973,6 +1084,9 @@ export function issueForLifeChoices(value: LifeChoices): string | null {
   if (!value.selected.length) return 'Choisissez ce qui pourrait changer.'
   if (value.selected.includes('non')) return null
   if (value.selected.some((id) => id !== 'non' && !(value.people[id]?.length))) return 'Indiquez les personnes concernées.'
+  if (value.selected.some((id) => id !== 'non' && (value.people[id] ?? []).some((index) => !value.likelihood[id]?.[index]))) {
+    return 'Indiquez oui, probablement ou peut-être.'
+  }
   return null
 }
 
@@ -981,8 +1095,16 @@ export function lifeChoicesLine(value: LifeChoices): string {
   return value.selected
     .map((id) => {
       const label = labelOf(LIFE_CHOICES, id)
-      const note = id === 'non' ? '' : value.notes[id]?.trim() ?? ''
-      return note ? `${label} : ${note}` : label
+      if (id === 'non') return label
+      const people = (value.people[id] ?? [])
+        .map((index) => {
+          const stance = labelOf(LIFE_LIKELIHOOD, value.likelihood[id]?.[index] ?? '')
+          return stance ? `Personne ${index + 1} ${stance}` : `Personne ${index + 1}`
+        })
+        .join(', ')
+      const note = value.notes[id]?.trim() ?? ''
+      const detail = [people, note].filter(Boolean).join(' · ')
+      return detail ? `${label} : ${detail}` : label
     })
     .filter(Boolean)
     .join(' · ')
@@ -998,37 +1120,64 @@ function personIndexes(input: unknown, peopleCount: number): number[] {
   return [...chosen].sort((left, right) => left - right)
 }
 
+export function toggleHandicapType(answers: Answers, id: HandicapAdaptation): Answers {
+  const handicapTypes = answers.handicapTypes.includes(id)
+    ? answers.handicapTypes.filter((item) => item !== id)
+    : [...answers.handicapTypes, id]
+  return patchAnswers(answers, { handicap: handicapTypes.length ? 'oui' : '', handicapTypes })
+}
+
+export function toggleHandicapPerson(answers: Answers, id: HandicapAdaptation, index: number): Answers {
+  if (!answers.handicapTypes.includes(id)) return answers
+  const list = answers.handicapPeople[id] ?? []
+  const next = list.includes(index) ? list.filter((item) => item !== index) : [...list, index]
+  return patchAnswers(answers, { handicapPeople: { ...answers.handicapPeople, [id]: next } })
+}
+
+export function setHandicapAutre(answers: Answers, note: string): Answers {
+  return patchAnswers(answers, { handicapAutre: note })
+}
+
 export function issueForHandicap(answers: Answers): string | null {
-  if (!answers.handicap) return 'Choisissez oui, non ou ne sait pas.'
-  if (answers.handicap !== 'oui') return null
-  if (!answers.handicapTypes.length) return 'Choisissez au moins une adaptation.'
+  if (!answers.handicapTypes.length) return null
+  if (answers.handicapTypes.some((id) => !answers.handicapPeople[id]?.length)) return 'Indiquez les personnes concernées.'
   if (answers.handicapTypes.includes('autre') && !answers.handicapAutre.trim()) return 'Précisez l’autre adaptation.'
-  if (!answers.handicapConcern) return 'Indiquez si ce besoin vous concerne.'
-  if (answers.handicapConcern === 'oui' && !answers.handicapWho.length) return 'Indiquez qui est concerné.'
   return null
 }
 
 export function handicapSheet(answers: Answers): { handicap: string; adaptations: string; qui: string } {
   const handicap = labelOf(HANDICAP_ANSWERS, answers.handicap)
   if (answers.handicap !== 'oui') return { handicap, adaptations: '', qui: '' }
-  const adaptations = answers.handicapTypes.map((value) => {
-    if (value !== 'autre') return labelOf(HANDICAP_ADAPTATIONS, value)
-    const detail = answers.handicapAutre.trim()
-    return detail ? `Autre : ${detail}` : 'Autre'
+  const adaptations = answers.handicapTypes.map((value) => adaptationLabel(answers, value))
+  const qui = answers.handicapTypes.map((value) => {
+    const name = value === 'autre' ? 'Autre' : labelOf(HANDICAP_ADAPTATIONS, value)
+    const people = (answers.handicapPeople[value] ?? [])
+      .map((index) => (answers.people[index] ? householdPerson(answers.people[index], index) : ''))
+      .filter(Boolean)
+      .join(', ')
+    return people ? `${name} : ${people}` : name
   })
   return {
     handicap,
     adaptations: adaptations.filter(Boolean).join(' · '),
-    qui:
-      answers.handicapConcern === 'non'
-        ? 'Non'
-        : answers.handicapWho.map((value) => labelOf(HANDICAP_WHO, value)).filter(Boolean).join(' · '),
+    qui: qui.filter(Boolean).join(' ; '),
   }
 }
 
+function adaptationLabel(answers: Answers, value: HandicapAdaptation): string {
+  if (value !== 'autre') return labelOf(HANDICAP_ADAPTATIONS, value)
+  const detail = answers.handicapAutre.trim()
+  return detail ? `Autre : ${detail}` : 'Autre'
+}
+
+function householdPerson(person: Person, index: number): string {
+  const age = ageLabel(person.age)
+  return age ? `Personne ${index + 1} · ${age}` : `Personne ${index + 1}`
+}
+
 export function personLine(person: Person): string {
-  const age = labelOf(AGE_BANDS, person.age)
-  if (person.age === '0-14') return age
+  const age = ageLabel(person.age)
+  if (isUnder15(person.age)) return age
   const drive = labelOf(DRIVE_OPTIONS, person.drive)
   if (!age || !drive) return ''
   const driving = `${drive.charAt(0).toLocaleLowerCase('fr')}${drive.slice(1)}`
@@ -1110,7 +1259,7 @@ export function draftTitle(input: Answers): string {
 export function answerPreview(input: unknown): string {
   const answers = sanitizeAnswers(input)
   const commune = answers.commune.trim() || legacyPlace(input) || 'Commune non précisée'
-  const count = answers.people.filter((person) => person.age && (person.age === '0-14' || person.drive)).length
+  const count = answers.people.filter((person) => person.age && (isUnder15(person.age) || person.drive)).length
   return count ? `${commune} · ${count} pers.` : commune
 }
 

@@ -266,13 +266,13 @@ function paceIdle(pace: DifficultyPace | '', answered: boolean): ChoiceFill {
 
 function PaceButtons({ pace, idle, onPace }: { pace: DifficultyPace | ''; idle: ChoiceFill; onPace: (pace: DifficultyPace) => void }) {
   return (
-    <div className="mt-1 grid grid-cols-3 gap-1">
+    <div className="mt-1 flex flex-wrap gap-1">
       {DIFFICULTY_PACES.map((item) => (
         <button
           key={item.id}
           type="button"
           aria-pressed={pace === item.id}
-          className={`min-h-11 rounded-xl px-1 text-sm font-extrabold ${pace === item.id ? 'bg-pine text-white' : idleClass(idle)}`}
+          className={`min-h-7 rounded-full px-2 text-[11px] font-bold leading-none ${pace === item.id ? 'bg-pine text-white' : idleClass(idle)}`}
           onClick={() => onPace(item.id)}
         >
           {item.label}

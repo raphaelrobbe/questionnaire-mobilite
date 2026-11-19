@@ -15,8 +15,8 @@ function record(patch: Parameters<typeof patchAnswers>[1] = {}): ResponseRecord 
     answers: patchAnswers(emptyAnswers(), {
       commune: 'Lyon',
       people: [
-        { age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: '', electoralCommune: '' },
-        { age: '0-14', drive: 'non', manqueAutonomie: false, electoral: '', electoralCommune: '' },
+        { age: '40-54', drive: 'oui', manqueAutonomie: false, electoral: '', electoralCommune: '' },
+        { age: '0-10', drive: 'non', manqueAutonomie: false, electoral: '', electoralCommune: '' },
       ],
       cars: [{ motor: 'hybride', sansPermis: false }],
       twoWheelers: [{ motor: 'electrique', sansPermis: true }],
@@ -104,7 +104,7 @@ describe('ligne du tableur', () => {
     expect(row.commune).toBe('Lyon')
     expect('version' in row).toBe(false)
     expect(row.personnes).toBe('2')
-    expect(row.detail_personnes).toBe('40–64 ans, conduit · 0–14 ans')
+    expect(row.detail_personnes).toBe('40–54 ans, conduit · 0–10 ans')
     expect(row.voitures).toBe('1')
     expect(row.detail_voitures).toBe('Hybride')
     expect(row.handicap).toBe('')
@@ -115,14 +115,14 @@ describe('ligne du tableur', () => {
         handicap: 'oui',
         handicapTypes: ['montee', 'autre'],
         handicapAutre: 'siège enfant',
-        handicapConcern: 'oui',
-        handicapWho: ['foyer'],
+        handicapPeople: { montee: [0], autre: [1] },
       }),
     )
     expect(adapted.handicap).toBe('Oui')
     expect(adapted.handicap_adaptations).toContain('montée')
     expect(adapted.handicap_adaptations).toContain('Autre : siège enfant')
-    expect(adapted.handicap_qui).toBe('une ou plusieurs personnes de mon foyer')
+    expect(adapted.handicap_qui).toContain('Personne 1 · 40–54 ans')
+    expect(adapted.handicap_qui).toContain('Personne 2 · 0–10 ans')
     expect(adapted.handicap_commentaire).toBe('')
     expect(row.deux_trois_roues).toBe('1')
     expect(row.detail_deux_trois_roues).toBe('100 % électrique, sans permis')

@@ -166,6 +166,30 @@ a:hover {
     display: block !important;
   }
 
+  /* Le marqueur natif « 10. » est plus large que « 9. » et se fait couper par la marge. */
+  .questionnaire ol {
+    list-style: none !important;
+    counter-reset: question;
+    padding-left: 2.5rem !important;
+  }
+
+  .questionnaire ol > li {
+    counter-increment: question;
+    position: relative;
+  }
+
+  .questionnaire ol > li::before {
+    content: counter(question) ". ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translateX(-100%);
+    padding-right: 0.35rem;
+    font-weight: 800;
+    color: var(--color-pine);
+    white-space: nowrap;
+  }
+
   .questionnaire > * + * {
     margin-top: 2rem;
   }

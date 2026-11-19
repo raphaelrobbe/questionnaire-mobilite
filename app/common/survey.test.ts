@@ -29,6 +29,7 @@ import {
   setModeBarrierNote,
   toggleModeBarrier,
   setModeNote,
+  setLifeLikelihood,
   toggleLifeChoice,
   toggleLifePerson,
   toggleModeReason,
@@ -88,35 +89,41 @@ describe('questionnaire', () => {
     const ready = patchAnswers(answers, { people: [{ age: '15-17', drive: 'accompagnee', manqueAutonomie: false, electoral: '', electoralCommune: '' }] })
     expect(issueForHousehold(ready)).toBeNull()
     expect(personLine(ready.people[0])).toBe('15–17 ans, conduite accompagnée')
-    const blocked = patchAnswers(answers, { people: [{ age: '65+', drive: 'non', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
+    const blocked = patchAnswers(answers, { people: [{ age: '75+', drive: 'non', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
     expect(blocked.people[0]?.manqueAutonomie).toBe(true)
-    expect(personLine(blocked.people[0])).toBe('65 ans et plus, ne conduit pas, manque d’autonomie')
-    const child = patchAnswers(answers, { people: [{ age: '0-14', drive: 'non', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
-    expect(child.people[0]).toEqual({ age: '0-14', drive: '', manqueAutonomie: false, electoral: '', electoralCommune: '' })
+    expect(personLine(blocked.people[0])).toBe('75 ans et plus, ne conduit pas, manque d’autonomie')
+    const child = patchAnswers(answers, { people: [{ age: '0-10', drive: 'non', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
+    expect(child.people[0]).toEqual({ age: '0-10', drive: '', manqueAutonomie: false, electoral: '', electoralCommune: '' })
+    const olderChild = patchAnswers(answers, { people: [{ age: '11-14', drive: 'oui', manqueAutonomie: true, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
+    expect(olderChild.people[0]).toEqual({ age: '11-14', drive: '', manqueAutonomie: false, electoral: '', electoralCommune: '' })
     const adult = patchAnswers(answers, {
       commune: 'Pontarlier',
-      people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: '' }],
+      people: [{ age: '40-54', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: '' }],
     })
     expect(issueForHousehold(adult)).toMatch(/commune/)
-    const listed = patchAnswers(adult, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
+    const listed = patchAnswers(adult, { people: [{ age: '40-54', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
     expect(issueForHousehold(listed)).toBeNull()
-    expect(personLine(listed.people[0])).toBe('40–64 ans, conduit, inscrit à Pontarlier')
-    const declined = patchAnswers(listed, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: 'non', electoralCommune: 'Pontarlier' }] })
+    expect(personLine(listed.people[0])).toBe('40–54 ans, conduit, inscrit à Pontarlier')
+    const declined = patchAnswers(listed, { people: [{ age: '55-64', drive: 'oui', manqueAutonomie: false, electoral: 'non', electoralCommune: 'Pontarlier' }] })
     expect(declined.people[0]?.electoralCommune).toBe('')
-    expect(personLine(declined.people[0])).toBe('40–64 ans, conduit, non inscrit')
+    expect(personLine(declined.people[0])).toBe('55–64 ans, conduit, non inscrit')
     const swiss = patchAnswers(answers, {
       commune: 'Vallorbe',
-      people: [{ age: '65+', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Vallorbe' }],
+      people: [{ age: '65-74', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Vallorbe' }],
     })
     expect(issueForHousehold(swiss)).toBeNull()
-    expect(issueForHousehold(patchAnswers(swiss, { people: [{ age: '65+', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Paris' }] }))).toBeNull()
+    expect(issueForHousehold(patchAnswers(swiss, { people: [{ age: '75+', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Paris' }] }))).toBeNull()
+    const former = patchAnswers(answers, { people: [{ age: '0-14', drive: 'oui', manqueAutonomie: true, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
+    expect(former.people[0]?.age).toBe('0-14')
+    expect(former.people[0]?.drive).toBe('')
+    expect(personLine(former.people[0])).toBe('0–14 ans')
     const minor = patchAnswers(answers, { people: [{ age: '15-17', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
     expect(minor.people[0]?.electoral).toBe('')
     expect(minor.people[0]?.electoralCommune).toBe('')
     expect(issueForHousehold(child)).toBeNull()
-    expect(personLine(child.people[0])).toBe('0–14 ans')
+    expect(personLine(child.people[0])).toBe('0–10 ans')
     expect(issueForHousehold(patchAnswers(answers, { people: [{ age: '15-17', drive: '', manqueAutonomie: false, electoral: '', electoralCommune: '' }] }))).toMatch(/conduite/)
-    const driver = patchAnswers(answers, { people: [{ age: '40-64', drive: 'oui', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
+    const driver = patchAnswers(answers, { people: [{ age: '40-54', drive: 'oui', manqueAutonomie: true, electoral: '', electoralCommune: '' }] })
     expect(driver.people[0]?.manqueAutonomie).toBe(false)
   })
 
@@ -137,6 +144,7 @@ describe('questionnaire', () => {
       people: [
         { age: 'pirate', drive: 'oui' },
         { age: '65+', drive: 'non' },
+        { age: '40-64', drive: 'oui', electoral: 'oui', electoralCommune: 'Pontarlier' },
       ],
       cars: Array.from({ length: 20 }, () => ({ motor: 'electrique', sansPermis: 'oui' })),
       twoWheelers: [{ motor: 'fusee', sansPermis: true }],
@@ -144,12 +152,13 @@ describe('questionnaire', () => {
     expect(clean.commune).toBe('Lyon')
     expect(clean.people[0]).toEqual({ age: '', drive: 'oui', manqueAutonomie: false, electoral: '', electoralCommune: '' })
     expect(clean.people[1]).toEqual({ age: '65+', drive: 'non', manqueAutonomie: false, electoral: '', electoralCommune: '' })
+    expect(clean.people[2]).toEqual({ age: '40-64', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Pontarlier' })
     expect(clean.cars).toHaveLength(8)
     expect(clean.cars[0]?.sansPermis).toBe(false)
     expect(clean.twoWheelers[0]?.motor).toBe('')
     expect(hasAnyAnswer(emptyAnswers())).toBe(false)
     expect(hasAnyAnswer(clean)).toBe(true)
-    expect(changePerson(clean.people, 0, { age: '0-14' })[0]?.age).toBe('0-14')
+    expect(changePerson(clean.people, 0, { age: '11-14' })[0]?.age).toBe('11-14')
   })
 
   test('demande le téléphone pour un rappel, et l’adresse mail seulement pour le collectif', () => {
@@ -261,11 +270,16 @@ describe('questionnaire', () => {
   test('un choix de vie désigne des personnes, et « non » reste à part', () => {
     const empty = emptyAnswers()
     expect(issueForLifeChoices(empty.lifeChoices)).toMatch(/changer/)
+    expect(toggleLifeChoice(empty.lifeChoices, 'autres').selected).toEqual(['autres'])
     const home = toggleLifeChoice(empty.lifeChoices, 'residence')
     expect(issueForLifeChoices(home)).toMatch(/personnes/)
     const named = toggleLifePerson(home, 'residence', 0)
-    expect(issueForLifeChoices(named)).toBeNull()
     expect(named.people.residence).toEqual([0])
+    expect(issueForLifeChoices(named)).toMatch(/probablement/)
+    const answered = setLifeLikelihood(named, 'residence', 0, 'probablement')
+    expect(answered.likelihood.residence?.[0]).toBe('probablement')
+    expect(issueForLifeChoices(answered)).toBeNull()
+    expect(setLifeLikelihood(answered, 'residence', 0, 'probablement').likelihood.residence).toBeUndefined()
     const blocked = toggleLifeChoice(named, 'non')
     expect(blocked).toBe(named)
     const none = toggleLifeChoice(empty.lifeChoices, 'non')
@@ -284,6 +298,12 @@ describe('questionnaire', () => {
     expect(noted.lifeChoices.selected).toEqual(['achats'])
     expect(noted.lifeChoices.people.achats).toEqual([1])
     expect(noted.lifeChoices.notes.achats).toBe('  le marché  ')
+    const declined = sanitizeAnswers({
+      people: [{ age: '40-64', drive: 'oui' }, { age: '0-14' }],
+      lifeChoices: { selected: ['residence'], people: { residence: [0, 1] }, likelihood: { residence: { 0: 'non', 1: 'oui' } } },
+    })
+    expect(declined.lifeChoices.people.residence).toEqual([1])
+    expect(declined.lifeChoices.likelihood.residence).toEqual({ 1: 'oui' })
   })
 
   test('une raison de changer de mode est demandée, et « aucune » reste à part', () => {
@@ -317,6 +337,7 @@ describe('questionnaire', () => {
     expect(issueForModeConditions(empty.modeConditions)).toMatch(/condition/)
     expect(stepIssue({ kind: 'conditions' }, empty)).toMatch(/condition/)
     expect(MODE_CONDITION_GROUPS[0]?.ids).toEqual(['inferieur', 'equivalent', 'superieur', 'abonnement', 'impot'])
+    expect(MODE_CONDITION_GROUPS[1]?.ids).toContain('confiance')
     const one = toggleModeCondition(empty.modeConditions, 'inferieur')
     const both = toggleModeCondition(one, 'horaires')
     expect(both.selected).toEqual(['inferieur', 'horaires'])
@@ -400,34 +421,32 @@ describe('questionnaire', () => {
     expect(lines['Distance à l’arrêt']).toBe('500 m · la côte')
   })
 
-  test('le handicap est obligatoire, et les précisions seulement si la réponse est oui', () => {
-    expect(issueForHandicap(emptyAnswers())).toMatch(/oui, non/)
+  test('le handicap demande les personnes du foyer pour chaque adaptation retenue', () => {
+    expect(issueForHandicap(emptyAnswers())).toBeNull()
     expect(issueForHandicap(patchAnswers(emptyAnswers(), { handicap: 'non' }))).toBeNull()
-    expect(issueForHandicap(patchAnswers(emptyAnswers(), { handicap: 'nsp' }))).toBeNull()
-    const oui = patchAnswers(emptyAnswers(), { handicap: 'oui' })
-    expect(issueForHandicap(oui)).toMatch(/adaptation/)
-    const typed = patchAnswers(oui, { handicapTypes: ['vue', 'autre'], handicapAutre: '  rampe  ' })
+    const typed = patchAnswers(emptyAnswers(), {
+      people: [{ age: '40-54', drive: 'oui', manqueAutonomie: false, electoral: '', electoralCommune: '' }],
+      handicapTypes: ['vue', 'autre'],
+      handicapAutre: '  rampe  ',
+    })
+    expect(typed.handicap).toBe('oui')
     expect(typed.handicapTypes).toEqual(['vue', 'autre'])
     expect(typed.handicapAutre).toBe('  rampe  ')
-    expect(issueForHandicap(patchAnswers(typed, { handicapAutre: '   ' }))).toMatch(/Précisez/)
-    expect(issueForHandicap(typed)).toMatch(/concerne/)
-    const aside = patchAnswers(typed, { handicapConcern: 'non', handicapWho: ['moi'] })
-    expect(aside.handicapWho).toEqual([])
-    expect(issueForHandicap(aside)).toBeNull()
-    const dropped = sanitizeAnswers({ handicap: 'non', handicapTypes: ['vue'], handicapConcern: 'oui', handicapWho: ['moi'], handicapAutre: 'rampe' })
+    expect(typed.handicapConcern).toBe('')
+    expect(typed.handicapWho).toEqual([])
+    expect(issueForHandicap(typed)).toMatch(/personnes concernées/)
+    const named = patchAnswers(typed, { handicapPeople: { vue: [0], autre: [0] } })
+    expect(issueForHandicap(named)).toBeNull()
+    expect(issueForHandicap(patchAnswers(named, { handicapAutre: '   ' }))).toMatch(/Précisez/)
+    const dropped = sanitizeAnswers({ handicap: 'non', handicapTypes: ['vue'], handicapConcern: 'oui', handicapWho: ['moi'], handicapAutre: 'rampe', handicapPeople: { vue: [0] } })
     expect(dropped.handicapTypes).toEqual([])
-    expect(dropped.handicapConcern).toBe('')
-    expect(dropped.handicapWho).toEqual([])
+    expect(dropped.handicapPeople).toEqual({})
     expect(dropped.handicapAutre).toBe('')
-    const lines = Object.fromEntries(summary(typed).map((line) => [line.label, line.value]))
+    const lines = Object.fromEntries(summary(named).map((line) => [line.label, line.value]))
     expect(lines.Handicap).toBe('Oui')
     expect(lines.Adaptations).toContain('malvoyantes')
     expect(lines.Adaptations).toContain('Autre : rampe')
-    expect(lines['Qui est concerné']).toBeUndefined()
-    const concerned = sanitizeAnswers({ ...typed, handicapConcern: 'oui', handicapWho: ['proche', 'moi', 'inconnu'] })
-    expect(concerned.handicapConcern).toBe('oui')
-    expect(concerned.handicapWho).toEqual(['moi', 'proche'])
-    expect(issueForHandicap(concerned)).toBeNull()
+    expect(lines['Qui est concerné']).toContain('Personne 1 · 40–54 ans')
     expect(hasAnyAnswer(patchAnswers(emptyAnswers(), { handicap: 'nsp' }))).toBe(true)
   })
 

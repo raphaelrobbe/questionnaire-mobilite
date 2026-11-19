@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AGE_BANDS, questionSide, type Answers, type Person } from '~/common/survey'
+import { ageLabel, questionSide, type Answers, type Person } from '~/common/survey'
 import {
   BUS_CHOICES,
   BUS_OFTEN,
@@ -27,7 +27,7 @@ import { Button } from './Button'
 import { Reveal } from './Reveal'
 
 export function motivePersonLabel(person: Person | undefined, index: number): string {
-  const age = person ? AGE_BANDS.find((band) => band.value === person.age)?.label : ''
+  const age = person ? ageLabel(person.age) : ''
   const who = `Personne ${index + 1}`
   return age ? `${who} · ${age}` : who
 }
