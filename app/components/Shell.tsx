@@ -8,7 +8,7 @@ import { useSheetLists } from '~/hooks/useSheetLists'
 import { Mark } from './Mark'
 import { TestBanner } from './TestMark'
 
-const links = [{ to: '/', label: 'Accueil enquêteur' }]
+const links = [{ to: '/', label: 'Accueil enquêteur·rice' }]
 
 export function Shell({ children }: { children: ReactNode }) {
   const location = useLocation()

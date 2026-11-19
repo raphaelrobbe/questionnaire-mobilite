@@ -49,7 +49,7 @@ export function DrawPanel() {
     <section className="grid gap-3" role="tabpanel">
       <h2 className="text-2xl font-extrabold leading-tight tracking-tight">Tirage au sort</h2>
       <p className="text-sm leading-relaxed text-muted">
-        Le pourcentage fixe un quota, réparti au prorata des habitants. Une commune en dessous du minimum est remontée,
+        Le pourcentage fixe un quota, réparti au prorata des habitant·es. Une commune en dessous du minimum est remontée,
         et le total peut alors dépasser le quota.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -99,10 +99,10 @@ export function DrawPanel() {
           <thead>
             <tr className="border-b border-line text-xs text-muted">
               <th className="px-2 py-2 text-left font-bold">Commune</th>
-              <th className="px-1 py-2 text-right font-bold" title="Habitants">
+              <th className="px-1 py-2 text-right font-bold" title="Habitant·es">
                 Hab.
               </th>
-              <th className="px-1 py-2 text-right font-bold" title="Nombre théorique moyen de tirés au sort">
+              <th className="px-1 py-2 text-right font-bold" title="Nombre théorique moyen de tiré·es au sort">
                 Moyen
               </th>
               <th className="px-1 py-2 text-right font-bold" title="Simulation de tirage au sort">

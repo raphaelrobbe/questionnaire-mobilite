@@ -15,7 +15,7 @@ export function PrivacyNotice() {
       </p>
       <h3 className="font-extrabold">Pourquoi vos données sont-elles collectées ?</h3>
       <p>
-        Les données recueillies servent à réaliser une enquête sur les besoins de déplacement des habitants du
+        Les données recueillies servent à réaliser une enquête sur les besoins de déplacement des habitant·es du
         Haut-Doubs, à analyser les besoins actuels et potentiels en transports
         en commun et à présenter des résultats aux collectivités et autorités publiques compétentes.
       </p>

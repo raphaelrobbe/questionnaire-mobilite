@@ -24,7 +24,7 @@ describe('questionnaire', () => {
     expect(findQuestion('difficulty-circulation')?.children).toBeUndefined()
     expect(questionText('difficulty-pace')).toBe('À quelle fréquence ?')
     expect(findQuestion('life-choices')?.choices?.at(-2)).toBe('Autres')
-    expect(findQuestion('reasons')?.choices).toContain('Ne pas être seul.e, partager le trajet avec quelqu’un')
+    expect(findQuestion('reasons')?.choices).toContain('Ne pas être seul·e, partager le trajet avec quelqu’un')
     expect(findQuestion('conditions')?.choices).toContain('Avoir confiance dans les covoitureurs et covoitureuses')
     expect(findQuestion('barriers')?.choices).toContain('Manque de confiance dans les covoitureurs et covoitureuses')
     const adaptations = findQuestion('handicap')

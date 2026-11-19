@@ -8,20 +8,20 @@ export function LetterDraft() {
       </p>
       <p>Madame, Monsieur,</p>
       <p>
-        En ma qualité d’électeur inscrit sur une liste électorale française, je souhaite obtenir, sur le fondement de
+        En ma qualité d’électeur·rice inscrit·e sur une liste électorale française, je souhaite obtenir, sur le fondement de
         l’article L.37 du Code électoral, communication et copie des listes électorales à jour de l’ensemble des communes
         du département du Doubs.
       </p>
       <p>
         Cette demande s’inscrit dans le cadre d’une enquête citoyenne menée par le <CollectifLink />, portant
-        sur les besoins de déplacement des habitants des environs de Pontarlier et, plus
+        sur les besoins de déplacement des habitant·es des environs de Pontarlier et, plus
         particulièrement, sur l’intérêt et les conditions de mise en place éventuelle d’une desserte régulière en
         transports en commun depuis les communes environnantes.
       </p>
       <p>
         L’objectif est de recueillir des données précises sur les déplacements actuellement réalisés, les déplacements
-        auxquels les habitants renoncent faute de solution de transport, ainsi que les déplacements supplémentaires
-        qu’ils pourraient effectuer si une ligne directe vers Pontarlier était proposée avec des horaires adaptés.
+        auxquels les habitant·es renoncent faute de solution de transport, ainsi que les déplacements supplémentaires
+        qu’iels pourraient effectuer si une ligne directe vers Pontarlier était proposée avec des horaires adaptés.
       </p>
       <p>
         Les résultats de cette enquête ont vocation à être présentés aux collectivités et autorités publiques compétentes

@@ -85,7 +85,7 @@ export function ContactStep({
           <Reveal>
             <div className="grid gap-4">
               <p className="text-base leading-relaxed">
-                Vous serez recontacté très prochainement pour en discuter et vous mettre en route, en particulier pour une très courte formation.
+                Vous serez recontacté·e très prochainement pour en discuter et vous mettre en route, en particulier pour une très courte formation.
               </p>
               {answers.recontact !== 'oui' || !answers.collectif ? (
                 <>

@@ -27,7 +27,7 @@ export function InterviewerGuide() {
   if (!canUseSurvey(settings)) {
     return (
       <div className="grid gap-4">
-        <h1 className="text-3xl font-extrabold tracking-tight">Guide de l’enquêteur</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight">Guide de l’enquêteur·rice</h1>
         <p className="rounded-2xl bg-clay-bg px-4 py-3 text-sm font-semibold leading-relaxed text-clay">
           Connectez cet appareil depuis l’accueil, ou activez le mode test dans les réglages.
         </p>
@@ -42,19 +42,19 @@ export function InterviewerGuide() {
     <div className="flex flex-1 flex-col">
       <article className="grid gap-4">
         <header>
-          <h1 className="text-3xl font-extrabold leading-tight tracking-tight">Guide de l’enquêteur</h1>
+          <h1 className="text-3xl font-extrabold leading-tight tracking-tight">Guide de l’enquêteur·rice</h1>
           <p className="mt-3 text-base leading-relaxed">
-            Merci d’être volontaire pour aider à réaliser cette grande enquête sur la mobilité des habitants du Haut-Doubs.
+            Merci d’être volontaire pour aider à réaliser cette grande enquête sur la mobilité des habitant·es du Haut-Doubs.
           </p>
           <p className="mt-3 text-base leading-relaxed">
-            Votre rôle est essentiel : recueillir la parole des habitants de manière aussi fidèle et neutre que possible.
+            Votre rôle est essentiel : recueillir la parole des habitant·es de manière aussi fidèle et neutre que possible.
           </p>
         </header>
 
         <section className="rounded-[28px] border border-line bg-card px-5 py-5">
           <h2 className="text-xl font-extrabold">Avant de partir</h2>
           <p className="mt-3 leading-relaxed">
-            Vous allez chez les habitants.{' '}
+            Vous allez chez les habitant·es.{' '}
             <span className="font-extrabold">
               Imprimez ces deux documents en nombre suffisant avant de partir. Pré-remplissez votre nom et votre numéro de
               téléphone.
@@ -97,13 +97,17 @@ export function InterviewerGuide() {
             Neymar], qui a été sélectionné par tirage au sort sur les listes électorales. »
           </p>
           <p className="mt-3 leading-relaxed">
+            « Bonjour, nous réalisons une enquête sur les besoins de mobilité dans le Haut-Doubs. Je cherche [Mme Léa
+            Slalomée], qui a été sélectionnée par tirage au sort sur les listes électorales. »
+          </p>
+          <p className="mt-3 leading-relaxed">
             Attendez que la personne vous indique si elle est la personne recherchée ou si celle-ci est présente.
           </p>
           <p className="mt-4 leading-relaxed">
             <span className="font-extrabold">Si c’est la personne recherchée :</span>
           </p>
           <p className="mt-2 leading-relaxed">
-            « Nous souhaitons vous interroger pour mieux connaître les déplacements des habitants, leurs difficultés et
+            « Nous souhaitons vous interroger pour mieux connaître les déplacements des habitant·es, leurs difficultés et
             leurs besoins, afin d’informer les autorités et d’améliorer l’offre de transports en commun. Auriez-vous un peu
             de temps à me consacrer pour que nous puissions réaliser cette enquête ? Elle dure environ 20 minutes. »
           </p>
@@ -139,7 +143,7 @@ export function InterviewerGuide() {
 
           <h3 className="mt-5 text-lg font-extrabold">3. Restez neutre</h3>
           <p className="mt-3 leading-relaxed">
-            L’objectif est de connaître les besoins réels, pas de convaincre les habitants de l’intérêt des transports en
+            L’objectif est de connaître les besoins réels, pas de convaincre les habitant·es de l’intérêt des transports en
             commun.
           </p>
           <ul className="mt-3 grid list-disc gap-2 pl-5 leading-relaxed">
@@ -175,7 +179,7 @@ export function InterviewerGuide() {
           </ul>
           <p className="mt-4 leading-relaxed">
             <span className="font-extrabold">Merci de votre implication !</span> La qualité de cette enquête repose sur la
-            rigueur, l’écoute et la neutralité de chaque enquêteur.
+            rigueur, l’écoute et la neutralité de chaque enquêteur·rice.
           </p>
         </section>
       </article>

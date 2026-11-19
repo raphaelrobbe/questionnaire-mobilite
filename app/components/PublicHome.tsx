@@ -10,7 +10,7 @@ const METHOD = [
   },
   {
     title: 'Tous les membres du foyer sont concernés',
-    text: 'Nous cherchons à connaître les besoins de chacun, adultes comme mineurs, et pas seulement ceux de la personne initialement sélectionnée. Les personnes d’un même foyer n’ont pas les mêmes besoins, et elles partagent ou non les véhicules : on ne peut donc pas en interroger une sans tenir compte des autres.',
+    text: 'Nous cherchons à connaître les besoins de chacun·e, adultes comme mineurs, et pas seulement ceux de la personne initialement sélectionnée. Les personnes d’un même foyer n’ont pas les mêmes besoins, et elles partagent ou non les véhicules : on ne peut donc pas en interroger une sans tenir compte des autres.',
   },
   {
     title: 'Un questionnaire neutre',
@@ -22,7 +22,7 @@ const METHOD = [
   },
   {
     title: 'Identifier les renoncements',
-    text: 'L’enquête cherche aussi à identifier les déplacements auxquels les habitants renoncent faute de solution de transport adaptée : aller boire un verre ou dîner sans avoir à prendre le volant, consulter un spécialiste de santé, faire des achats, participer à une activité sportive ou associative, aller au cinéma, rendre visite à des proches ou simplement profiter d’une sortie. Autant de besoins qui restent invisibles tant qu’on ne prend pas la peine de les interroger.',
+    text: 'L’enquête cherche aussi à identifier les déplacements auxquels les habitant·es renoncent faute de solution de transport adaptée : aller boire un verre ou dîner sans avoir à prendre le volant, consulter un spécialiste de santé, faire des achats, participer à une activité sportive ou associative, aller au cinéma, rendre visite à des proches ou simplement profiter d’une sortie. Autant de besoins qui restent invisibles tant qu’on ne prend pas la peine de les interroger.',
   },
 ]
 
@@ -37,7 +37,7 @@ export function PublicHome() {
           Enquête sur les besoins de mobilité dans le Haut-Doubs
         </h1>
         <p className="mt-4 text-lg font-bold leading-snug text-mist">
-          Comment se déplacent les habitants aujourd’hui ?
+          Comment se déplacent les habitant·es aujourd’hui ?
           <br />
           De quoi auraient-ils besoin demain ?
         </p>
@@ -45,14 +45,14 @@ export function PublicHome() {
 
       <section className="bg-card px-5 py-8">
         <div className="grid gap-4 text-base leading-relaxed">
-          <p>Le Haut-Doubs a besoin de solutions de mobilité adaptées à la réalité de ses habitants et de ses territoires.</p>
+          <p>Le Haut-Doubs a besoin de solutions de mobilité adaptées à la réalité de ses habitant·es et de ses territoires.</p>
           <p>
             Travail, études, rendez-vous médicaux, courses, loisirs, visites : beaucoup prennent la voiture, faute de transports en commun.
             D’autres renoncent à certains déplacements ou limitent leurs choix de vie : emploi, logement, sorties… faute de pouvoir se
             déplacer facilement.
           </p>
           <p>
-            Le <CollectifLink /> lance une enquête auprès des habitants pour mieux
+            Le <CollectifLink /> lance une enquête auprès des habitant·es pour mieux
             connaître ces besoins, dans l’ensemble du territoire.
           </p>
         </div>
@@ -84,10 +84,10 @@ export function PublicHome() {
       </section>
 
       <section className="bg-leaf px-5 py-10 text-paper">
-        <h2 className="text-4xl font-extrabold leading-tight tracking-tight">On cherche des enquêteurs !</h2>
+        <h2 className="text-4xl font-extrabold leading-tight tracking-tight">On cherche des enquêteur·rices !</h2>
         <p className="mt-3 text-2xl font-extrabold leading-tight tracking-tight">Une enquête citoyenne, qui a besoin de vous !</p>
         <div className="mt-4 grid gap-4 text-base leading-relaxed">
-          <p>Pour aller à la rencontre des habitants, nous avons besoin de bénévoles prêts à participer aux enquêtes en porte-à-porte.</p>
+          <p>Pour aller à la rencontre des habitant·es, nous avons besoin de bénévoles prêt·es à participer aux enquêtes en porte-à-porte.</p>
           <p>
             Pas besoin d’être spécialiste des transports : il suffit d’être disponible, à l’écoute et de suivre le questionnaire, qui se
             remplit directement sur smartphone.
@@ -95,7 +95,7 @@ export function PublicHome() {
           <p className="font-extrabold">
             Chaque foyer interrogé compte. Chaque réponse contribue à mieux faire connaître les besoins du territoire.
           </p>
-          <p>Rejoignez-nous pour faire entendre la voix des habitants du Haut-Doubs !</p>
+          <p>Rejoignez-nous pour faire entendre la voix des habitant·es du Haut-Doubs !</p>
         </div>
         <ContactForm />
       </section>
@@ -107,8 +107,8 @@ export function PublicHome() {
 
 const REPRESENTATIVITY = [
   'Le tirage au sort sera organisé pour garantir une présence suffisante des différentes communes, en tenant compte de leur taille. Un nombre minimal de foyers pourra ainsi être sélectionné dans les petites communes, puis les autres tirages seront répartis en fonction de la population.',
-  'Comme les foyers ne comportent pas tous le même nombre d’électeurs inscrits, leurs chances d’être sélectionnés ne sont pas identiques. Les calculs statistiques en tiendront compte afin que chaque personne soit représentée à sa juste proportion.',
-  'Enfin, les listes électorales ne couvrent pas toute la population : les mineurs, les personnes non inscrites et celles qui ne disposent pas du droit de vote en sont notamment absents. Le fait d’interroger tous les membres des foyers sélectionnés permettra d’inclure une partie de ces personnes. Des ajustements statistiques, à partir des données démographiques disponibles, contribueront à mieux représenter l’ensemble de la population.',
+  'Comme les foyers ne comportent pas tous le même nombre d’électeur·rices inscrit·es, leurs chances d’être sélectionnés ne sont pas identiques. Les calculs statistiques en tiendront compte afin que chaque personne soit représentée à sa juste proportion.',
+  'Enfin, les listes électorales ne couvrent pas toute la population : les mineurs, les personnes non inscrites et celles qui ne disposent pas du droit de vote en sont notamment absent·es. Le fait d’interroger tous les membres des foyers sélectionnés permettra d’inclure une partie de ces personnes. Des ajustements statistiques, à partir des données démographiques disponibles, contribueront à mieux représenter l’ensemble de la population.',
 ]
 
 function SamplingNote() {

@@ -103,10 +103,10 @@ describe('questionnaire', () => {
     expect(issueForHousehold(adult)).toMatch(/commune/)
     const listed = patchAnswers(adult, { people: [{ age: '40-54', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Pontarlier' }] })
     expect(issueForHousehold(listed)).toBeNull()
-    expect(personLine(listed.people[0])).toBe('40–54 ans, conduit, inscrit à Pontarlier')
+    expect(personLine(listed.people[0])).toBe('40–54 ans, conduit, inscrit·e à Pontarlier')
     const declined = patchAnswers(listed, { people: [{ age: '55-64', drive: 'oui', manqueAutonomie: false, electoral: 'non', electoralCommune: 'Pontarlier' }] })
     expect(declined.people[0]?.electoralCommune).toBe('')
-    expect(personLine(declined.people[0])).toBe('55–64 ans, conduit, non inscrit')
+    expect(personLine(declined.people[0])).toBe('55–64 ans, conduit, non inscrit·e')
     const swiss = patchAnswers(answers, {
       commune: 'Vallorbe',
       people: [{ age: '65-74', drive: 'oui', manqueAutonomie: false, electoral: 'oui', electoralCommune: 'Vallorbe' }],
@@ -446,7 +446,7 @@ describe('questionnaire', () => {
     expect(lines.Handicap).toBe('Oui')
     expect(lines.Adaptations).toContain('malvoyantes')
     expect(lines.Adaptations).toContain('Autre : rampe')
-    expect(lines['Qui est concerné']).toContain('Personne 1 · 40–54 ans')
+    expect(lines['Qui est concerné·e']).toContain('Personne 1 · 40–54 ans')
     expect(hasAnyAnswer(patchAnswers(emptyAnswers(), { handicap: 'nsp' }))).toBe(true)
   })
 

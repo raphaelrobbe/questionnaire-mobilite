@@ -45,7 +45,7 @@ export type QuestionnairePart = {
 export const OCCASIONAL_TRIPS: { label: string; theme: ThemeId | ''; autre: string }[] = [
   { label: 'Démarche administrative', theme: 'administratif', autre: '' },
   { label: 'Banque', theme: 'administratif', autre: '' },
-  { label: 'Coiffeur', theme: 'loisirs', autre: 'Coiffeur' },
+  { label: 'Coiffeur·euse', theme: 'loisirs', autre: 'Coiffeur·euse' },
   { label: 'Cinéma', theme: 'loisirs', autre: 'Cinéma' },
   { label: 'Soirée', theme: 'loisirs', autre: 'Soirée' },
   { label: 'Gare', theme: '', autre: '' },
@@ -304,7 +304,7 @@ export const QUESTIONNAIRE: readonly QuestionnairePart[] = [
           },
           {
             id: 'electoral',
-            ask: 'Inscrite sur les listes électorales ?',
+            ask: 'Inscrit·e sur les listes électorales ?',
             when: 'la personne a 18 ans ou plus',
             choices: ['Oui', 'Non'],
             inline: true,
@@ -417,7 +417,7 @@ export const QUESTIONNAIRE: readonly QuestionnairePart[] = [
     questions: [
       {
         id: 'walk-distance',
-        ask: 'Quelle distance maximale seriez-vous prêt(e) à parcourir à pied entre votre domicile (ou le lieu où vous vous rendez) et un arrêt de transport en commun ?',
+        ask: 'Quelle distance maximale seriez-vous prêt·e à parcourir à pied entre votre domicile (ou le lieu où vous vous rendez) et un arrêt de transport en commun ?',
         note: 'Une seule réponse.',
         choices: labels(WALK_DISTANCES),
         children: [
@@ -486,7 +486,7 @@ export const QUESTIONNAIRE: readonly QuestionnairePart[] = [
         children: [
           {
             id: 'handicap-who',
-            ask: 'Qui est concerné ?',
+            ask: 'Qui est concerné·e ?',
             when: 'une adaptation est retenue',
           },
           { id: 'handicap-other', ask: 'Préciser', when: '« Autre (à préciser) » est choisi' },
@@ -513,7 +513,7 @@ export const QUESTIONNAIRE: readonly QuestionnairePart[] = [
       },
       {
         id: 'recruit',
-        ask: 'Souhaitez-vous devenir enquêteur à votre tour ?',
+        ask: 'Souhaitez-vous devenir enquêteur·rice à votre tour ?',
         choices: ['Oui', 'Non'],
         inline: true,
         children: [

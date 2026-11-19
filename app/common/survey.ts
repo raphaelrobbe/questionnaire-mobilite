@@ -177,9 +177,9 @@ export const MODE_REASONS: Labeled<ModeReasonId>[] = [
   { value: 'souci', label: 'Ne pas avoir le souci de devoir conduire (restaurant, soirée, événement…)' },
   { value: 'stationnement', label: 'Ne pas chercher de place de stationnement' },
   { value: 'repos', label: 'Pouvoir se reposer, lire ou faire autre chose pendant le trajet' },
-  { value: 'dependance', label: 'Être moins dépendant de la disponibilité d’un véhicule' },
+  { value: 'dependance', label: 'Être moins dépendant·e de la disponibilité d’un véhicule' },
   { value: 'sante', label: 'Ne pas conduire (santé, âge, difficultés à conduire)' },
-  { value: 'compagnie', label: 'Ne pas être seul.e, partager le trajet avec quelqu’un' },
+  { value: 'compagnie', label: 'Ne pas être seul·e, partager le trajet avec quelqu’un' },
   { value: 'autre', label: 'Autre raison (préciser dans le champ ci-dessous)' },
   { value: 'aucune', label: 'Je ne changerais pas de mode de transport' },
 ]
@@ -973,7 +973,7 @@ export function issueForVehicles(answers: Answers): string | null {
 }
 
 export function issueForContact(answers: Answers): string | null {
-  if (!answers.enqueteur) return 'Indiquez si la personne souhaite devenir enquêteur.'
+  if (!answers.enqueteur) return 'Indiquez si la personne souhaite devenir enquêteur·rice.'
   const phone = respondentPhone(answers.phone)
   const email = answers.email.trim()
   if (answers.recontact === 'oui') {
@@ -1183,8 +1183,8 @@ export function personLine(person: Person): string {
   const driving = `${drive.charAt(0).toLocaleLowerCase('fr')}${drive.slice(1)}`
   const parts = [age, driving]
   if (person.manqueAutonomie) parts.push('manque d’autonomie')
-  if (person.electoral === 'oui' && person.electoralCommune.trim()) parts.push(`inscrit à ${person.electoralCommune.trim()}`)
-  if (person.electoral === 'non') parts.push('non inscrit')
+  if (person.electoral === 'oui' && person.electoralCommune.trim()) parts.push(`inscrit·e à ${person.electoralCommune.trim()}`)
+  if (person.electoral === 'non') parts.push('non inscrit·e')
   return parts.join(', ')
 }
 
@@ -1216,12 +1216,12 @@ export function summary(input: Answers): { label: string; value: string }[] {
     { label: 'Choix de vie', value: lifeChoicesLine(answers.lifeChoices) },
     { label: 'Handicap', value: handicap.handicap },
     { label: 'Adaptations', value: handicap.adaptations },
-    { label: 'Qui est concerné', value: handicap.qui },
+    { label: 'Qui est concerné·e', value: handicap.qui },
     { label: 'Commentaires', value: answers.handicapComment },
     { label: 'Recontact', value: answers.recontact === 'oui' ? 'Oui' : 'Non' },
     { label: 'Collectif Mobilité Haut-Doubs', value: answers.collectif ? 'Oui' : 'Non' },
     { label: 'Visites', value: answers.visits.map((visit) => visitLabel(visit.outcome)).join(' · ') },
-    { label: 'Devenir enquêteur', value: answers.enqueteur === 'oui' ? 'Oui' : answers.enqueteur === 'non' ? 'Non' : '' },
+    { label: 'Devenir enquêteur·rice', value: answers.enqueteur === 'oui' ? 'Oui' : answers.enqueteur === 'non' ? 'Non' : '' },
     { label: 'Adresse mail', value: answers.email },
     { label: 'Téléphone', value: answers.phone },
     { label: 'Ajout', value: answers.closingNote.trim() },

@@ -11,7 +11,7 @@ export const meta: MetaFunction = () => [
   { title: 'Enquête mobilité Haut-Doubs' },
   {
     name: 'description',
-    content: 'Enquête de terrain sur la mobilité des habitants du Haut-Doubs',
+    content: 'Enquête de terrain sur la mobilité des habitant·es du Haut-Doubs',
   },
 ]
 

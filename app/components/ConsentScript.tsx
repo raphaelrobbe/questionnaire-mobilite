@@ -2,7 +2,7 @@ import { Link } from '@remix-run/react'
 import { useEffect, useId, useRef, useState } from 'react'
 
 const COLLECTIF = [
-  'Le Collectif Mobilité Haut-Doubs est un collectif local de dialogue, de coopération et d’initiative. Il réunit, autour d’enjeux d’intérêt commun liés aux mobilités sur le territoire du Haut-Doubs, frontalier avec la Suisse, des associations, des collectifs, des organisations diverses auxquelles sont rattachés des citoyens, ainsi que, selon les besoins, des personnes ressources, experts ou habitants intéressés.',
+  'Le Collectif Mobilité Haut-Doubs est un collectif local de dialogue, de coopération et d’initiative. Il réunit, autour d’enjeux d’intérêt commun liés aux mobilités sur le territoire du Haut-Doubs, frontalier avec la Suisse, des associations, des collectifs, des organisations diverses auxquelles sont rattachés des citoyen·nes, ainsi que, selon les besoins, des personnes ressources, expert·es ou habitant·es intéressé·es.',
   'Le collectif n’est ni un parti politique, ni une institution, ni une entreprise, ni une association déclarée. Il constitue un cadre souple de travail collectif, de mise en discussion, de production d’idées, d’organisation d’actions et de circulation d’informations.',
 ]
 
@@ -11,10 +11,10 @@ export function ConsentScript() {
     <div className="mt-3 grid gap-3 text-lg leading-snug">
       <p>Bonjour,</p>
       <CollectifIntro />
-      <p>Vous avez été tiré au sort sur les listes électorales.</p>
+      <p>Vous avez été tiré·e au sort sur les listes électorales.</p>
       <p>
-        Nous souhaitons notamment savoir comment les habitants du Haut-Doubs réalisent tous leurs déplacements, quelles
-        difficultés ils rencontrent, mais aussi lesquels ils pourraient effectuer plus facilement si des transports en
+        Nous souhaitons notamment savoir comment les habitant·es du Haut-Doubs réalisent tous leurs déplacements, quelles
+        difficultés iels rencontrent, mais aussi les déplacements qu’iels pourraient effectuer plus facilement si des transports en
         commun réguliers, directs et avec des horaires adaptés, étaient mis en place.
       </p>
       <p>
@@ -93,7 +93,7 @@ function CollectifIntro() {
         >
           Le Collectif Mobilité Haut-Doubs
         </button>{' '}
-        réalise une enquête auprès des habitants du Haut-Doubs afin de mieux connaître leurs besoins en déplacements
+        réalise une enquête auprès des habitant·es du Haut-Doubs afin de mieux connaître leurs besoins en déplacements
         locaux (de/vers Pontarlier et communes proches).
       </p>
       {open ? (

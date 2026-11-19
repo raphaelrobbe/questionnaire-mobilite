@@ -102,7 +102,7 @@ export function HomeScreen() {
       ) : null}
 
       <Link to="/enqueteur" className={buttonClass('secondary')}>
-        Guide de l’enquêteur
+        Guide de l’enquêteur·rice
       </Link>
       {settings.testMode ? (
         <button type="button" className={buttonClass('primary')} onClick={() => navigate(`/entretien?fiche=${createDraft().code}`)}>

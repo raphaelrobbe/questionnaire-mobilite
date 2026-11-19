@@ -42,7 +42,7 @@ export function TreatmentRegister() {
         </p>
         <p>
           Ce registre recense les traitements de données personnelles récoltées lors de l’enquête sur les besoins de
-          mobilité des habitants du Haut-Doubs.
+          mobilité des habitant·es du Haut-Doubs.
         </p>
         <h3 className="font-extrabold">Traitements recensés</h3>
         <ol className="list-decimal space-y-1 pl-5">
@@ -126,13 +126,13 @@ function CommunicationFiche() {
       <h3 className="font-extrabold">Données traitées</h3>
       <p>Adresse e-mail ; preuve et date de l’accord pour recevoir les communications.</p>
       <h3 className="font-extrabold">Destinataires</h3>
-      <p>Membres du collectif chargés de la communication. Google, en tant que fournisseur de Google Sheets.</p>
+      <p>Membres du collectif chargé·es de la communication. Google, en tant que fournisseur de Google Sheets.</p>
       <h3 className="font-extrabold">Durée de conservation</h3>
       <p>Jusqu’au retrait de l’accord ou à la fin des activités du collectif.</p>
       <h3 className="font-extrabold">Transferts hors Union européenne</h3>
       <Transfers />
       <h3 className="font-extrabold">Sécurité</h3>
-      <p>Accès au fichier limité aux bénévoles chargés de la communication et protégé par un compte avec mot de passe.</p>
+      <p>Accès au fichier limité aux bénévoles chargé·es de la communication et protégé par un compte avec mot de passe.</p>
       <Updated />
     </div>
   )
@@ -146,7 +146,7 @@ function MobilitySurveyFiche() {
       <Controller />
       <h3 className="font-extrabold">Finalité</h3>
       <p>
-        Recueillir et analyser les besoins de déplacements des habitants du Haut-Doubs afin de produire des résultats statistiques
+        Recueillir et analyser les besoins de déplacements des habitant·es du Haut-Doubs afin de produire des résultats statistiques
         et de les présenter aux collectivités et autorités compétentes.
       </p>
       <h3 className="font-extrabold">Personnes concernées</h3>
@@ -159,7 +159,7 @@ function MobilitySurveyFiche() {
       </p>
       <h3 className="font-extrabold">Destinataires</h3>
       <p>
-        Bénévoles chargés de l’analyse ; collectivités et autorités destinataires des résultats agrégés. Google, en tant
+        Bénévoles chargé·es de l’analyse ; collectivités et autorités destinataires des résultats agrégés. Google, en tant
         que fournisseur de Google Sheets.
       </p>
       <h3 className="font-extrabold">Durée de conservation</h3>
@@ -195,7 +195,7 @@ function HouseholdFiche() {
       </p>
       <h3 className="font-extrabold">Destinataires</h3>
       <p>
-        Bénévoles chargés de réaliser et d’organiser les visites. Google, en tant que fournisseur de Google Sheets.
+        Bénévoles chargé·es de réaliser et d’organiser les visites. Google, en tant que fournisseur de Google Sheets.
       </p>
       <h3 className="font-extrabold">Durée de conservation</h3>
       <p>Deux ans après la fin de l’enquête, puis suppression des coordonnées et des informations de suivi.</p>
@@ -206,7 +206,7 @@ function HouseholdFiche() {
       </p>
       <h3 className="font-extrabold">Sécurité</h3>
       <p>
-        Accès au fichier limité aux bénévoles chargés de l’organisation des visites et protégé par un compte avec mot de
+        Accès au fichier limité aux bénévoles chargé·es de l’organisation des visites et protégé par un compte avec mot de
         passe.
       </p>
       <Updated />

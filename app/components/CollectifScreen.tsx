@@ -19,7 +19,7 @@ export function CollectifScreen() {
           </p>
           <p className="mt-3 text-base leading-relaxed">
             Le <span className="font-extrabold">Collectif Mobilité Haut-Doubs</span> rassemble des associations, des
-            collectifs, des citoyens et des acteurs engagés autour d’un objectif commun : améliorer les possibilités de
+            collectifs, des citoyen·nes et des acteurs engagés autour d’un objectif commun : améliorer les possibilités de
             déplacement dans le Haut-Doubs, territoire rural et frontalier confronté à d’importants enjeux de mobilité.
           </p>
           <p className="mt-3 text-base leading-relaxed">
@@ -77,7 +77,7 @@ export function CollectifScreen() {
             </li>
             <li>
               <span className="font-extrabold">Dialoguons avec les élus et les collectivités</span> pour faire connaître
-              les besoins des habitants et contribuer aux décisions publiques.
+              les besoins des habitant·es et contribuer aux décisions publiques.
             </li>
             <li>
               <span className="font-extrabold">Coopérons avec les associations, les professionnels et les territoires voisins</span>, notamment sur les enjeux de mobilité en zone de montagne et de mobilité transfrontalière avec la Suisse.
@@ -98,7 +98,7 @@ export function CollectifScreen() {
             </p>
             <p>
               Ses membres défendent des principes de bienveillance, de non-discrimination, d’inclusion et de respect du
-              travail de chacun.
+              travail de chacun·e.
             </p>
             <p>
               Nous croyons que l’amélioration des mobilités nécessite de croiser les expériences, de confronter les
@@ -115,7 +115,7 @@ export function CollectifScreen() {
               questions de mobilité.
             </p>
             <p>
-              Les citoyens, habitants et personnes disposant d’une expertise particulière peuvent également participer
+              Les citoyen·nes, habitant·es et personnes disposant d’une expertise particulière peuvent également participer
               aux échanges et contribuer aux réflexions.
             </p>
           </div>

@@ -40,7 +40,7 @@ export function AdminScreen() {
     const message =
       lists.status === 'error'
         ? lists.message || 'Listes indisponibles.'
-        : 'L’administration est réservée à un enquêteur marqué Admin, sur un appareil déjà autorisé pour lui.'
+        : 'L’administration est réservée à un·e enquêteur·rice marqué·e Admin, sur un appareil déjà autorisé pour ellui.'
     return (
       <div className="grid gap-4">
         <h1 className="text-3xl font-extrabold tracking-tight">Administration</h1>
@@ -94,7 +94,7 @@ export function AdminScreen() {
       return
     }
     if (lists.interviewers.some((person) => fold(person.name) === fold(name))) {
-      setNotice('Cet enquêteur est déjà dans la liste.')
+      setNotice('Cet·te enquêteur·rice est déjà dans la liste.')
       return
     }
     const phone = normalizePhone(personPhone)
@@ -121,10 +121,10 @@ export function AdminScreen() {
       publishLists(next)
       const created = next.interviewers.find((person) => fold(person.name) === fold(name))
       if (!created) {
-        throw new Error('Le script n’a pas ajouté l’enquêteur. Mettez à jour le script du tableur, puis redéployez-le.')
+        throw new Error('Le script n’a pas ajouté l’enquêteur·rice. Mettez à jour le script du tableur, puis redéployez-le.')
       }
       if (email && created.email !== email) {
-        setNotice('L’enquêteur est ajouté. L’adresse mail n’a pas été enregistrée. Mettez à jour le script du tableur, puis redéployez-le.')
+        setNotice('L’enquêteur·rice est ajouté·e. L’adresse mail n’a pas été enregistrée. Mettez à jour le script du tableur, puis redéployez-le.')
       }
       if (scannedId) {
         try {
@@ -142,7 +142,7 @@ export function AdminScreen() {
           setPersonEmail('')
           setScannedId(null)
           const detail = error instanceof Error ? error.message : ''
-          throw new Error(detail ? `L’enquêteur est ajouté. L’identifiant n’a pas été enregistré. ${detail}` : 'L’enquêteur est ajouté. Relisez le QR-code sur sa fiche.')
+          throw new Error(detail ? `L’enquêteur·rice est ajouté·e. L’identifiant n’a pas été enregistré. ${detail}` : 'L’enquêteur·rice est ajouté·e. Relisez le QR-code sur sa fiche.')
         }
       }
       setPersonName('')
@@ -186,7 +186,7 @@ export function AdminScreen() {
     }
     const person = lists.interviewers.find((item) => item.name === interviewer)
     if (person?.devices?.includes(target)) {
-      setNotice('Cet identifiant est déjà autorisé pour cet enquêteur.')
+      setNotice('Cet identifiant est déjà autorisé pour cet·te enquêteur·rice.')
       return
     }
     void apply(interviewer, 'add', target)
@@ -257,7 +257,7 @@ export function AdminScreen() {
       {tab === 'enqueteurs' ? (
       <>
       <section className="grid gap-2 rounded-2xl border border-line bg-card px-3 py-3">
-        <h2 className="font-extrabold">Nouvel enquêteur</h2>
+        <h2 className="font-extrabold">Nouvel·le enquêteur·rice</h2>
         <button
           type="button"
           className="min-h-11 rounded-xl text-left text-base font-bold text-leaf disabled:opacity-45"
@@ -315,7 +315,7 @@ export function AdminScreen() {
           disabled={busy !== null}
           onClick={() => void createPerson()}
         >
-          {busy === 'create' ? '…' : 'Ajouter l’enquêteur'}
+          {busy === 'create' ? '…' : 'Ajouter l’enquêteur·rice'}
         </button>
       </section>
 
